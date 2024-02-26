@@ -21,7 +21,7 @@ See the [Releases](https://github.com/tolius/solver/releases) page.
 ### Building from source
 
 Solver requires Qt 5.15 or greater, a compiler with C++17 support, and CMake.
-[Fairy-Stockfish](https://github.com/tolius/solver/fairy-stockfish-egtb) with support of DTW antichess endgame tablebases is supposed to be used as an engine.
+[Fairy-Stockfish](https://github.com/tolius/fairy-stockfish-egtb) with support of DTW antichess endgame tablebases is supposed to be used as an engine.
 
 ### Endgame tablebase files
 
