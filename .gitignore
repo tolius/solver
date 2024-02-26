@@ -1,0 +1,83 @@
+# main executables
+projects/gui/cutechess
+projects/cli/cutechess-cli
+Cute Chess.app/
+cutechess.exe
+cutechess-cli.exe
+
+# test executables
+tst_board
+tst_gtb
+tst_sprt
+tst_mersenne
+tst_polyglotbook
+tst_tournamentpair
+tst_tournamentplayer
+tst_tb
+tst_pipereader
+tst_jsonparser
+tst_jsonserializer
+tst_xboardengine
+target_wrapper.sh
+
+# tool executables
+tagtrimmer
+
+# libraries
+*.so
+*.so.*
+*.dylib
+*.dll
+*.lib
+
+# qmake generated Makefile
+Makefile
+
+# doxygen generated api documents
+docs/api/html/
+
+# temporary directories used by qmake and compiler
+.rcc/
+.moc/
+.obj/
+
+# other temporary files
+*~
+*.a
+ui_*.h
+.qmake.stash
+
+# files created by MinGW
+*.Debug
+*.Release
+
+# files created by KDevelop
+Doxyfile
+*.kdevelop
+*.kdevelop.pcs
+*.kdevses
+
+# files created by Qt Creator
+*.pro.user*
+qtc-gdbmacros/
+CMakeLists.txt.user
+
+# files created by Mac OS X
+.DS_Store
+
+# files created by MSVC
+*.exe.embed.manifest
+*.dll.embed.manifest
+*.exe_manifest.rc
+*.dll_manifest.rc
+*.exe_manifest.res
+*.dll_manifest.res
+*.ilk
+*.pdb
+*.exp
+
+# object files
+*.o
+
+# Installation packages
+dist/linux/package

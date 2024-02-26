@@ -1,0 +1,13 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+  <qresource prefix="/styles">
+    <file>Combinear.qss</file>
+    <file>Diffnes.qss</file>
+    <file>MaterialDark.qss</file>
+    <file>Medize.qss</file>
+    <file>Remover.qss</file>
+    <file>Takezo.qss</file>
+    <file>Toolery.qss</file>
+    <file>VisualScript.qss</file>
+  </qresource>
+</RCC>

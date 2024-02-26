@@ -1,0 +1,201 @@
+#ifndef SOLUTION_H
+#define SOLUTION_H
+
+#include "solutionbook.h"
+#include "positioninfo.h"
+#include "side.h"
+
+#include <QStringList>
+#include <QChar>
+#include <QSettings>
+
+#include <array>
+#include <list>
+#include <map>
+#include <memory>
+#include <tuple>
+#include <functional>
+
+namespace Chess
+{
+	class Board;
+	class Move;
+	class Side;
+}
+class QWidget;
+
+
+struct LIB_EXPORT MoveEntry : SolutionEntry
+{
+public:
+	MoveEntry(const QString& san, const SolutionEntry& entry);
+	MoveEntry(const QString& san, quint16 pgMove, quint16 weight, quint32 learn);
+
+public:
+	QString san;
+	bool is_best;
+};
+
+
+struct LIB_EXPORT EngineEntry
+{
+	EngineEntry(const QString& san, const SolutionEntry& entry);
+
+	//qint16 score() const;
+	//quint32 version() const;
+	//quint32 time() const;
+	bool is_overridden() const;
+
+	QString info() const;
+	//QString getScore(int add_plies = 0) const;
+	//QString getNodes() const;
+
+public:
+	SolutionEntry entry;
+	QString san;
+};
+
+
+struct LIB_EXPORT BranchToSkip
+{
+	BranchToSkip(const Line& branch, int score)
+		: branch(branch), score(score)
+	{}
+	Line branch;
+	int score;
+};
+
+
+struct LIB_EXPORT SolutionData
+{
+	SolutionData()
+	{}
+	SolutionData(const Line& opening, const Line& branch, const QString& tag, const std::list<BranchToSkip>& branchesToSkip, const QString& folder)
+	    : opening(opening), branch(branch), tag(tag), branchesToSkip(branchesToSkip), folder(folder)
+	{}
+	Line opening;
+	Line branch;
+	QString tag;
+	std::list<BranchToSkip> branchesToSkip;
+	QString folder;
+};
+
+
+class Solution;
+using SolutionCollection = std::map<QString, std::list<std::shared_ptr<Solution>>>;
+
+
+class LIB_EXPORT Solution : public QObject
+{
+	Q_OBJECT
+
+public:
+	enum FileType : int
+	{
+		FileType_START           = 0,
+		FileType_DATA_START      = 0,
+		FileType_UPPER           = 0,
+		FileType_positions_upper = 0,
+		FileType_multi_upper     = 1,
+		FileType_alts_upper      = 2,
+		FileType_solution_upper  = 3,
+		FileType_endgames_upper  = 4,//
+		FileType_LOWER           = 5,
+		FileType_positions_lower = 5,
+		FileType_multi_lower     = 6,
+		FileType_alts_lower      = 7,
+		FileType_solution_lower  = 8,
+		FileType_endgames_lower  = 9,//
+		FileType_comments        = 10,
+		FileType_DATA_END        = 11,
+		FileType_BOOKS_START     = 11,
+		FileType_book_upper      = 11,
+		FileType_book_short      = 12,
+		FileType_book            = 13,
+		FileType_BOOKS_END       = 14,
+		FileType_META_START      = 14,
+		FileType_state           = 14,//
+		FileType_spec            = 15,
+		FileType_SIZE            = 16
+	};
+
+	enum class FileSubtype
+	{
+		Std, New, Bak
+	};
+
+	constexpr static int SOLUTION_VERSION = 1;
+	
+public:
+	Solution(std::shared_ptr<SolutionData> data, const QString& name = "", int version = SOLUTION_VERSION, bool is_imported = false);
+
+	static std::shared_ptr<Solution> load(const QString& filepath);
+	static std::tuple<SolutionCollection, QString> loadFolder(const QString& folder_path);
+
+	bool isValid() const;
+	bool isBookOpen() const;
+	Chess::Side winSide() const;
+	Line openingMoves(bool with_branch = false) const;
+	std::list<SolutionEntry> entries(quint64 key) const;
+	std::list<MoveEntry> nextEntries(Chess::Board* board, std::list<MoveEntry>* missing_entries = nullptr) const;
+	std::shared_ptr<SolutionEntry> bookEntry(std::shared_ptr<Chess::Board> board, FileType type) const;
+	std::shared_ptr<EngineEntry> positionEntry(std::shared_ptr<Chess::Board> board, FileType type) const;
+	QString positionInfo(std::shared_ptr<Chess::Board> board) const;
+	void addToBook(std::shared_ptr<const Chess::Board> board, const SolutionEntry& entry, FileType type) const;
+	void addToBook(std::shared_ptr<const Chess::Board> board, uint64_t data, FileType type) const;
+	QString info() const;
+	QString nameToShow(bool include_tag = false) const;
+	std::tuple<QString, QString> branchToShow(bool include_tag = false) const;
+	const QString& nameString() const;
+	QString score() const;
+	QString nodes() const;
+	const QString& subTag() const;
+	bool exists() const;
+	std::shared_ptr<SolutionData> mainData() const;
+
+	void init_filenames();
+	void activate();
+	void deactivate();
+	bool remove(std::function<bool(const QString&)> are_you_sure, std::function<void(const QString&)> message);
+	void edit(std::shared_ptr<SolutionData> data);
+	bool mergeAllFiles();
+
+signals:
+	void Message(const QString&);
+
+private:
+	QString path(FileType type, FileSubtype subtype = FileSubtype::Std) const;
+	bool file_exists(FileType type, FileSubtype subtype = FileSubtype::Std) const;
+	bool hasMergeErrors() const;
+	void saveBranchSettings(QSettings& s, std::shared_ptr<Chess::Board> board);
+	bool mergeFiles(FileType type);
+
+private:
+	Line opening;
+	Line branch;
+	QString tag;
+	std::list<BranchToSkip> branchesToSkip;
+	QString folder;
+	QString name;
+	Chess::Side side;
+	int version;
+	bool is_imported;
+	int info_win_in;
+
+	std::shared_ptr<SolutionBook> book_main;
+	std::array<QString, FileType_SIZE> filenames;
+	std::array<QString, FileType_DATA_END> filenames_new;
+	std::array<std::shared_ptr<SolutionBook>, FileType_DATA_END> books;
+
+	friend class Solver;
+
+public:
+	static const QString DATA;
+	static const QString BOOKS;
+	static const QString SPEC_EXT;
+	static const QString DATA_EXT;
+	static const QString TDATA_EXT;
+	static const QString BAK_EXT;
+};
+
+#endif // SOLUTION_H
