@@ -814,7 +814,7 @@ void Evaluation::onEngineEval(const MoveEvaluation& eval)
 		int eval_time = eval.time();
 		quint64 eval_nps = eval.nps();
 		last_eval_depth = eval_depth;
-		int interval = (int)std::max(0LL, 200 - duration_cast<milliseconds>(steady_clock::now() - t_last_eval_update).count());
+		int interval = (int)std::max((decltype(milliseconds().count()))0, 200 - duration_cast<milliseconds>(steady_clock::now() - t_last_eval_update).count());
 		auto update = [=]()
 		{
 			if (last_eval_depth > eval_depth && san_moves.empty())

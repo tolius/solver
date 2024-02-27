@@ -76,7 +76,7 @@ struct TBTable
     }
     uint64_t get_idx(const Position& pos/*, bool* is_inversion = nullptr*/) const;
     uint64_t size() const;
-    std::string TBTable::size_info() const;
+    std::string size_info() const;
 };
 
 void Tablebases_init();

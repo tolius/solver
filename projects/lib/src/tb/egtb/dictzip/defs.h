@@ -24,6 +24,9 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#ifdef __linux__
+#include <sys/errno.h>
+#endif
 
 static const char * _err_programName = "Dictzip";
 #define _err_program_name _err_programName;
@@ -192,21 +195,19 @@ static void err_internal( const char *routine, const char *format, ... )
 #endif
 
 #if _MSC_VER
-
 #define snprintf _snprintf
 #define fileno _fileno
 #define open   _open
 #define read   _read
 #define close  _close
 #define unlink _unlink
+#endif
 
 #define xmalloc malloc
 #define xfree free
 
 #ifndef S_ISREG
 #define S_ISREG(mode) (((mode) & S_IFMT) == S_IFREG)
-#endif
-
 #endif
 
 

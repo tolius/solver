@@ -53,7 +53,7 @@ Chess::Move SolutionEntry::move(const Chess::Board* board) const
 	return board->moveFromGenericMove(move());
 }
 
-Chess::Move SolutionEntry::move(std::shared_ptr<const Chess::Board> board) const
+Chess::Move SolutionEntry::move(std::shared_ptr<Chess::Board> board) const
 {
 	return board->moveFromGenericMove(move());
 }

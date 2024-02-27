@@ -25,7 +25,7 @@ namespace
 SolverMove::SolverMove() : score(UNKNOWN_SCORE), depth_time(0)
 {}
 
-SolverMove::SolverMove(Chess::Move& move, qint16 score, quint32 depth_time) : move(move), score(score), depth_time(depth_time)
+SolverMove::SolverMove(Chess::Move move, qint16 score, quint32 depth_time) : move(move), score(score), depth_time(depth_time)
 {}
 
 SolverMove::SolverMove(std::shared_ptr<SolutionEntry> entry, std::shared_ptr<Chess::Board> board)
@@ -67,7 +67,7 @@ void SolverMove::set_time(quint32 time)
 	depth_time = (depth_time & 0xFFFF) | (time << 16);
 }
 
-std::shared_ptr<SolverMove> SolverMove::fromBytes(quint64 bytes, std::shared_ptr<const Chess::Board> board)
+std::shared_ptr<SolverMove> SolverMove::fromBytes(quint64 bytes, std::shared_ptr<Chess::Board> board)
 {
 	quint32 depth = static_cast<quint32>(bytes & 0x00000000FFFFFFFF);
 	uint16_t val = static_cast<uint16_t>((bytes >> 32) & 0xFFFF);
@@ -78,7 +78,7 @@ std::shared_ptr<SolverMove> SolverMove::fromBytes(quint64 bytes, std::shared_ptr
 	return make_shared<SolverMove>(move, score, depth);
 }
 
-quint64 SolverMove::toBytes(std::shared_ptr<const Chess::Board> board) const
+quint64 SolverMove::toBytes(std::shared_ptr<Chess::Board> board) const
 {
 	quint64 bytes = depth_time;
 	uint16_t val = reinterpret_cast<const uint16_t&>(score);

@@ -2,8 +2,12 @@ cmake_minimum_required (VERSION 3.13.0)
 
 project(dictzip LANGUAGES C)
 
-if (ARCH_FLAGS)
-	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -arch:${ARCH_FLAGS}")
+if(ARCH_FLAGS)
+	if (WIN32)
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -arch:${ARCH_FLAGS}")
+	else()
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+	endif()
 endif()
 
 file(GLOB SRC_APP
@@ -30,11 +34,16 @@ add_library(${PROJECT_NAME} OBJECT
 )
 set_property(TARGET ${PROJECT_NAME} PROPERTY POSITION_INDEPENDENT_CODE 1)
 
-target_compile_definitions(${PROJECT_NAME}
-	PRIVATE _CRT_SECURE_NO_WARNINGS
-)
-
-target_compile_options(${PROJECT_NAME}
-	PRIVATE "/Ox"
-	PRIVATE "/GL"
-)
+if (WIN32)
+	target_compile_definitions(${PROJECT_NAME}
+		PRIVATE _CRT_SECURE_NO_WARNINGS
+	)
+	target_compile_options(${PROJECT_NAME}
+		PRIVATE "/Ox"
+		PRIVATE "/GL"
+	)
+else()
+	target_compile_definitions(${PROJECT_NAME}
+		PRIVATE HAVE_UNISTD_H
+	)
+endif()

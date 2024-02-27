@@ -785,7 +785,7 @@ bool Solver::is_stop_move(const SolverMove& best_move, const SolverState& info) 
 	return (best_move_depth < REAL_DEPTH_LIMIT);
 }
 
-Solver::pMove Solver::get_existing(pcBoard board) const
+Solver::pMove Solver::get_existing(pBoard board) const
 {
 	auto it = positions.find(board->key());
 	if (it == positions.end())

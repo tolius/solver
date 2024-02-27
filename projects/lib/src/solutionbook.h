@@ -26,7 +26,7 @@ struct LIB_EXPORT SolutionEntry : public OpeningBook::Entry
 	quint32 time() const;
 	quint32 nodes() const;
 	Chess::Move move(const Chess::Board* board) const;
-	Chess::Move move(std::shared_ptr<const Chess::Board> board) const;
+	Chess::Move move(std::shared_ptr<Chess::Board> board) const;
 	using OpeningBook::Entry::move;
 
 	QString info(Chess::Board* board, bool is_book = true) const;

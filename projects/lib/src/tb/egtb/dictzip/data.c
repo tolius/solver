@@ -21,6 +21,10 @@
 #include "data.h"
 #include "dictzip.h"
 
+#include <string.h>
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
 #include <sys/stat.h>
 #ifdef HAVE_MMAP
 #include <sys/mman.h>

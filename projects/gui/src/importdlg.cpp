@@ -29,10 +29,10 @@ namespace fs = std::filesystem;
 static const vector<string> list_old_bases = { "positions", "multi",    "alts",   "override", "esolution"}; //, "endgames" };
 static const vector<string> list_new_bases = { "pos_up",    "multi_up", "alt_up", "alt_up",   "sol_up"}; //,    "eg_up"};
 
-constexpr static char* IMPORTED = "IMPORTED";
-constexpr static char* EXISTS = "EXISTS";
-constexpr static char* NOT_COPIED = "NOT COPIED";
-constexpr static char* LOWER_LEVEL = "LOWER LEVEL";
+static const char* IMPORTED = "IMPORTED";
+static const char* EXISTS = "EXISTS";
+static const char* NOT_COPIED = "NOT COPIED";
+static const char* LOWER_LEVEL = "LOWER LEVEL";
 
 
 bool SolutionFiles::isImported() const
@@ -308,7 +308,7 @@ tuple<vector<char>, QString> read_override_file(ifstream& file)
 	set<quint64> positions;
 	size_t n = 0;
 	/// Process lines.
-	for (auto& row : arr) {
+	for (auto row : arr) {
 		n++;
 		if (!row.isArray()) {
 			QString error = QString("Wrong format for row #%1").arg(n);

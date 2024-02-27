@@ -141,8 +141,8 @@ public:
 	std::shared_ptr<SolutionEntry> bookEntry(std::shared_ptr<Chess::Board> board, FileType type) const;
 	std::shared_ptr<EngineEntry> positionEntry(std::shared_ptr<Chess::Board> board, FileType type) const;
 	QString positionInfo(std::shared_ptr<Chess::Board> board) const;
-	void addToBook(std::shared_ptr<const Chess::Board> board, const SolutionEntry& entry, FileType type) const;
-	void addToBook(std::shared_ptr<const Chess::Board> board, uint64_t data, FileType type) const;
+	void addToBook(std::shared_ptr<Chess::Board> board, const SolutionEntry& entry, FileType type) const;
+	void addToBook(std::shared_ptr<Chess::Board> board, uint64_t data, FileType type) const;
 	QString info() const;
 	QString nameToShow(bool include_tag = false) const;
 	std::tuple<QString, QString> branchToShow(bool include_tag = false) const;

@@ -306,7 +306,7 @@ Position& set_variant_pos(Position& pos, const string& code, Color c, StateInfo*
     assert(sides[0].length() > 0 && sides[0].length() < 8);
     assert(sides[1].length() > 0 && sides[1].length() < 8);
 
-    std::transform(sides[c].begin(), sides[c].end(), sides[c].begin(), tolower);
+    std::transform(sides[c].begin(), sides[c].end(), sides[c].begin(), ::tolower);
 
     string fenStr = "8/" + sides[0] + char(8 - sides[0].length() + '0') + "/8/8/8/8/"
         + sides[1] + char(8 - sides[1].length() + '0') + "/8 w - - 0 10";

@@ -11,6 +11,7 @@
 
 #include <filesystem>
 #include <thread>
+#include <cmath>
 
 
 namespace fs = std::filesystem;

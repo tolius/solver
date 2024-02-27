@@ -100,7 +100,6 @@ public:
 	using pMove = std::shared_ptr<SolverMove>;
 	using pcMove = std::shared_ptr<const SolverMove>;
 	using pBoard = std::shared_ptr<Chess::Board>;
-	using pcBoard = std::shared_ptr<const Chess::Board>;
 
 public:
 	Solver(std::shared_ptr<Solution> solution);
@@ -132,7 +131,7 @@ protected:
 	pMove get_engine_move(SolverMove& move, SolverState& info, bool is_super_boost);
 	void update_max_move(int16_t score, QString move_sequence = "");
 	bool is_stop_move(const SolverMove& m, const SolverState& info) const;
-	pMove get_existing(pcBoard board) const;
+	pMove get_existing(pBoard board) const;
 	pMove get_solution_move() const;
 	pMove get_esolution_move() const;
 	pMove get_alt_move() const;

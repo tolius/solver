@@ -25,6 +25,10 @@ endif()
 
 option(WITH_TESTS "Enable building of unit tests" OFF)
 
+if (UNIX)
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+endif()
+
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 set(CMAKE_AUTOUIC ON)

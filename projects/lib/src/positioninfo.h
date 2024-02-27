@@ -35,7 +35,7 @@ struct SolutionEntry;
 struct LIB_EXPORT SolverMove
 {
 	SolverMove();
-	SolverMove(Chess::Move& move, qint16 score, quint32 depth_time);
+	SolverMove(Chess::Move move, qint16 score, quint32 depth_time);
 	SolverMove(std::shared_ptr<SolutionEntry> entry, std::shared_ptr<Chess::Board> board);
 
 	bool isNull() const;
@@ -50,8 +50,8 @@ struct LIB_EXPORT SolverMove
 
 	void set_time(quint32 time);
 
-	quint64 toBytes(std::shared_ptr<const Chess::Board> board) const;
-	static std::shared_ptr<SolverMove> fromBytes(quint64 bytes, std::shared_ptr<const Chess::Board> board);
+	quint64 toBytes(std::shared_ptr<Chess::Board> board) const;
+	static std::shared_ptr<SolverMove> fromBytes(quint64 bytes, std::shared_ptr<Chess::Board> board);
 
 	Chess::Move move;
 	qint16 score;

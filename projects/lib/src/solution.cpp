@@ -871,7 +871,7 @@ bool Solution::hasMergeErrors() const
 	return false;
 }
 
-void Solution::addToBook(std::shared_ptr<const Chess::Board> board, const SolutionEntry& entry, FileType type) const
+void Solution::addToBook(std::shared_ptr<Chess::Board> board, const SolutionEntry& entry, FileType type) const
 {
 	if (!entry.pgMove)
 		return;
@@ -886,7 +886,7 @@ void Solution::addToBook(std::shared_ptr<const Chess::Board> board, const Soluti
 	file.write(p, row.size());
 }
 
-void Solution::addToBook(std::shared_ptr<const Chess::Board> board, uint64_t data, FileType type) const
+void Solution::addToBook(std::shared_ptr<Chess::Board> board, uint64_t data, FileType type) const
 {
 	if (!(data >> 48))
 		return;

@@ -22,7 +22,22 @@
 #include "data.h"
 
 #include <sys/stat.h>
+#include <time.h>
+#include <string.h>
 #include <assert.h>
+
+#ifndef max
+#define max(a,b) \
+       ({ typeof (a) _a = (a); \
+           typeof (b) _b = (b); \
+         _a > _b ? _a : _b; })
+#endif
+#ifndef min
+#define min(a,b) \
+       ({ typeof (a) _a = (a); \
+           typeof (b) _b = (b); \
+         _a < _b ? _a : _b; })
+#endif
 
 static void xfwrite(
    const void *ptr, size_t size, size_t nmemb,
@@ -139,7 +154,11 @@ int dict_data_zip(const char *inFilename, const char *outFilename, const char *p
 	FILE          *outStr;
 	FILE          *inStr;
 	int           len;
+#ifdef _WIN32
 	struct __stat64   st;
+#else
+	struct stat   st;
+#endif
 	char          *header;
 	int           headerLength;
 	int           dataLength;
@@ -195,7 +214,11 @@ int dict_data_zip(const char *inFilename, const char *outFilename, const char *p
 	/* Write initial header information */
 	if (chunkLength <= 0)
 		chunkLength = (preFilter ? PREFILTER_IN_BUFFER_SIZE : IN_BUFFER_SIZE);
+#ifdef _WIN32
 	_fstat64(fileno(inStr), &st);
+#else
+	stat(fileno(inStr), &st);
+#endif
 	chunks = st.st_size / chunkLength;
 	if (st.st_size % chunkLength) ++chunks;
 	PRINTF(DBG_VERBOSE, ("%lu chunks * %u per chunk = %lu (filesize = %lu)\n",
@@ -205,7 +228,7 @@ int dict_data_zip(const char *inFilename, const char *outFilename, const char *p
 
 	extraLength = 10 + dataLength;
 	if (extraLength > 0xFFFF) {
-		fprintf(stderr, "\nFile too long: %u chunks needed, 32762 allowed\n", chunks);
+		fprintf(stderr, "\nFile too long: %lu chunks needed, 32762 allowed\n", chunks);
 		fclose(inStr);
 		fclose(outStr);
 		unlink(outFilename);
@@ -354,7 +377,11 @@ int dict_databuf_zip(const char *data, unsigned long len_data, const char *outFi
 	z_stream      zStream;
 	FILE          *outStr;
 	int           len;
+#ifdef _WIN32
 	struct __stat64   st;
+#else
+	struct stat   st;
+#endif
 	char          *header;
 	int           headerLength;
 	int           dataLength;
@@ -410,7 +437,11 @@ int dict_databuf_zip(const char *data, unsigned long len_data, const char *outFi
 	/* Write initial header information */
 	if (chunkLength <= 0)
 		chunkLength = (preFilter ? PREFILTER_IN_BUFFER_SIZE : IN_BUFFER_SIZE);
+#ifdef _WIN32
 	_fstat64(fileno(outStr), &st);  // to get date/time of the out file
+#else
+	fstat(fileno(outStr), &st);  // to get date/time of the out file
+#endif
 	chunks = len_data / chunkLength;
 	if (len_data % chunkLength) ++chunks;
 	PRINTF(DBG_VERBOSE, ("%lu chunks * %u per chunk = %lu (filesize = %lu)\n",
@@ -420,7 +451,7 @@ int dict_databuf_zip(const char *data, unsigned long len_data, const char *outFi
 
 	extraLength = 10 + dataLength;
 	if (extraLength > 0xFFFF) {
-		fprintf(stderr, "\nFile too long: %u chunks needed, 32762 allowed\n", chunks);
+		fprintf(stderr, "\nFile too long: %lu chunks needed, 32762 allowed\n", chunks);
 		fclose(outStr);
 		unlink(outFilename);
 		return -1;

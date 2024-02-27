@@ -1,7 +1,8 @@
 #ifndef _DZ_H_
 #define _DZ_H_
 
-#include <corecrt.h>
+#include <time.h>
+
 
 int dz_pack_file(const char* inFilename, const char* outFilename, int chunkLength, unsigned short flags);
 int dz_pack(const char* data, unsigned long len_data, const char* outFilename, 
