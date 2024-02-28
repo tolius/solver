@@ -268,7 +268,11 @@ void Evaluation::setEngine(const QString* filename)
 	}
 	EngineConfiguration config;
 	//config.setName("UciEngine"); // if it's "UciEngine", the name will be changed according to the engine output "id name ..."
+#ifdef _WIN32
 	config.setCommand(engine_filename);
+#else
+	config.setCommand("./" + engine_filename);
+#endif
 	config.addArgument("solver");
 	QString path_exe = QDir::toNativeSeparators(QCoreApplication::applicationDirPath());
 	QString path_engines_dir = QDir::toNativeSeparators(path_exe + "/engines/");
@@ -347,7 +351,8 @@ void Evaluation::onEngineReady()
 			bool ok;
 			int num = str_num.toInt(&ok);
 			if (ok) {
-				engine_version = (num == 240226)       ? 3
+				engine_version = 
+				      (240226 <= num && num <= 240229) ? 3
 				    : (num == 230811)                  ? 2
 				    : (num == 230803)                  ? 1
 				    : (230409 <= num && num <= 230415) ? 1
