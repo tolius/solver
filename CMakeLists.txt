@@ -12,7 +12,7 @@ if(NOT CMAKE_BUILD_TYPE)
       FORCE)
 endif()
 
-set(SOLVER_VERSION "unknown")
+set(SOLVER_VERSION "unknown" FORCE)
 if(EXISTS ${CMAKE_SOURCE_DIR}/.version-solver)
 	file(READ ${CMAKE_SOURCE_DIR}/.version-solver SOLVER_VERSION)
 	string(REGEX REPLACE "(\r?\n)+" "" SOLVER_VERSION "${SOLVER_VERSION}")

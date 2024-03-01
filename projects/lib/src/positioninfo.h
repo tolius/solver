@@ -10,6 +10,7 @@
 #include <list>
 #include <tuple>
 #include <string>
+#include <array>
 
 constexpr static qint16 UNKNOWN_SCORE = -32768;
 constexpr static qint16 MATE_VALUE = 32767;
@@ -74,7 +75,13 @@ std::shared_ptr<Position> boardToPosition(std::shared_ptr<Chess::Board> board);
 std::tuple<std::list<SolverMove>, uint8_t> get_endgame_moves(std::shared_ptr<Chess::Board> board, std::shared_ptr<Position> position = nullptr, bool apply_50move_rule = true);
 bool init_EGTB();
 bool is_endgame_available(std::shared_ptr<const Position> pos);
-bool isBranch(std::shared_ptr<Chess::Board> main_pos, std::shared_ptr<Chess::Board> branch);
+bool is_branch(std::shared_ptr<Chess::Board> main_pos, std::shared_ptr<Chess::Board> branch);
+
+uint64_t load_bigendian(const void* bytes);
+template<typename T>
+	void save_bigendian(T val, void* bytes);
+std::array<char, 16> entry_to_bytes(uint64_t key, quint16 pgMove, qint16 weight, quint32 learn);
+std::array<char, 16> entry_to_bytes(uint64_t key, const SolutionEntry& entry);
 
 
 #endif // POSITIONINFO_H

@@ -1123,6 +1123,7 @@ void MainWindow::openSolution(QModelIndex index, SolutionItem* item)
 			disconnect(m_solver.get(), SIGNAL(Message(const QString&)), m_log, SLOT(appendPlainText(QString)));
 		m_solver = std::make_shared<Solver>(m_solution);
 		connect(m_solver.get(), SIGNAL(Message(const QString&)), m_log, SLOT(appendPlainText(QString)));
+		connect(m_solver.get(), SIGNAL(updateCurrentSolution()), this, SLOT(updateCurrentSolution()));
 	}
 	m_results->setSolution(m_solution);
 	m_evaluation->setSolver(m_solver);
@@ -1146,6 +1147,17 @@ void MainWindow::importSolution(const std::filesystem::path& filepath)
 		m_solutionsModel->addSolution(solution);
 	else
 		QMessageBox::warning(this, QApplication::applicationName(), tr("Failed to merge files in the \"%1\" solution").arg(solution->nameToShow()));
+}
+
+void MainWindow::updateCurrentSolution()
+{
+	if (!m_solution)
+		return;
+	m_solution->deactivate(false);
+	m_solution->activate(false);
+	m_solutionsModel->dataChanged(QModelIndex(), QModelIndex());
+	m_results->setSolution(m_solution);
+	m_results->positionChanged();
 }
 
 void MainWindow::setTint(QColor tint, bool to_color_move_buttons)

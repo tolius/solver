@@ -88,7 +88,7 @@ Solution::Solution(std::shared_ptr<SolutionData> data, const QString& basename, 
 			opening.clear();
 			return;
 		}
-		init_filenames();
+		initFilenames();
 		/// Create folders.
 		if (!data->tag.isEmpty())
 		{
@@ -107,7 +107,7 @@ Solution::Solution(std::shared_ptr<SolutionData> data, const QString& basename, 
 	else
 	{
 		name = basename;
-		init_filenames();
+		initFilenames();
 		QSettings s(path(FileType_spec), QSettings::IniFormat);
 		info_win_in = s.value("info/win_in", UNKNOWN_WIN_IN).toInt();
 	}
@@ -115,7 +115,7 @@ Solution::Solution(std::shared_ptr<SolutionData> data, const QString& basename, 
 
 }
 
-void Solution::init_filenames()
+void Solution::initFilenames()
 {
 	filenames[FileType_positions_upper] = QString("%1_pos_up.%2").arg(name).arg(DATA_EXT);
 	filenames[FileType_multi_upper] = QString("%1_multi_up.%2").arg(name).arg(DATA_EXT);
@@ -141,66 +141,69 @@ void Solution::init_filenames()
 	}
 }
 
-void Solution::activate()
+void Solution::loadBook(bool update_info)
 {
-	emit Message(QString("Loading solution: %1...").arg(nameToShow(true)));
+	QString path_book = fileExists(FileType_book) ? path(FileType_book) : fileExists(FileType_book_upper) ? path(FileType_book_upper) : "";
+	if (path_book.isEmpty())
+		return;
+
+	QFileInfo fi(path_book);
+	if (fi.size() <= ram_budget) {
+		book_main = make_shared<SolutionBook>(OpeningBook::Ram);
+		ram_budget -= fi.size();
+	}
+	else {
+		book_main = make_shared<SolutionBook>(OpeningBook::Disk);
+	}
+	bool is_ok = book_main->read(path_book);
+	if (!is_ok)
+	{
+		book_main.reset();
+		ram_budget += fi.size();
+		return;
+	}
+
+	if (!update_info && info_win_in != UNKNOWN_WIN_IN)
+		return;
+
+	using namespace Chess;
+	shared_ptr<Board> board(BoardFactory::create("antichess"));
+	board->setFenString(board->defaultFenString());
+	for (const auto& move : opening)
+		board->makeMove(move);
+	auto opening_entries = entries(board->key());
+	if (opening_entries.empty())
+		return;
+
+	//qint16 add_plies = static_cast<qint16>(opening.size());
+	int score = opening_entries.front().score();
+	if (score == UNKNOWN_SCORE)
+		return;
+	
+	info_win_in = score == 0       ? 0
+		: score == FAKE_DRAW_SCORE ? CURR_WIN_IN
+		: score > FAKE_MATE_VALUE  ? MATE_VALUE - score
+		: score > MATE_THRESHOLD   ? FAKE_MATE_VALUE - score + CURR_WIN_IN
+		: score < -FAKE_MATE_VALUE ? -MATE_VALUE - score
+		: score < -MATE_THRESHOLD  ? -FAKE_MATE_VALUE - score - CURR_WIN_IN
+						            : UNKNOWN_SCORE;
+	if (info_win_in != UNKNOWN_SCORE) {
+		QSettings s(path(FileType_spec), QSettings::IniFormat);
+		s.setValue("info/win_in", info_win_in);
+	}
+}
+
+void Solution::activate(bool send_msg)
+{
+	if (send_msg)
+		emit Message(QString("Loading solution: %1...").arg(nameToShow(true)));
 
 	// Merge files
 	mergeAllFiles();
 
 	// Read the book
-	int64_t ram_budget = static_cast<quint64>(QSettings().value("solver/book_cache", 1.0).toDouble() * 1024 * 1024 * 1024);
-	QString path_book = file_exists(FileType_book) ? path(FileType_book) : file_exists(FileType_book_upper) ? path(FileType_book_upper) : "";
-	if (!path_book.isEmpty())
-	{
-		QFileInfo fi(path_book);
-		if (fi.size() <= ram_budget) {
-			book_main = make_shared<SolutionBook>(OpeningBook::Ram);
-			ram_budget -= fi.size();
-		}
-		else {
-			book_main = make_shared<SolutionBook>(OpeningBook::Disk);
-		}
-		bool is_ok = book_main->read(path_book);
-		if (is_ok) {
-			if (info_win_in == UNKNOWN_WIN_IN)
-			{
-				using namespace Chess;
-				shared_ptr<Board> board(BoardFactory::create("antichess"));
-				board->setFenString(board->defaultFenString());
-				for (const auto& move : opening)
-					board->makeMove(move);
-				auto opening_entries = entries(board->key());
-				if (!opening_entries.empty())
-				{
-					int score = opening_entries.front().score();
-					if (score != UNKNOWN_SCORE)
-					{
-						qint16 add_plies = (qint16)opening.size();
-						if (score > MATE_THRESHOLD)
-							score = min(MATE_VALUE, qint16(score + (add_plies + 1) / 2));
-						else if (score < -MATE_THRESHOLD)
-							score = max(-MATE_VALUE, score - (add_plies + 1) / 2);
-						info_win_in = score == 0       ? 0
-						    : score == FAKE_DRAW_SCORE ? CURR_WIN_IN
-						    : score > FAKE_MATE_VALUE  ? MATE_VALUE - score
-						    : score > MATE_THRESHOLD   ? FAKE_MATE_VALUE - score + CURR_WIN_IN
-						    : score < -FAKE_MATE_VALUE ? -MATE_VALUE - score
-						    : score < -MATE_THRESHOLD  ? -FAKE_MATE_VALUE - score - CURR_WIN_IN
-						                               : UNKNOWN_SCORE;
-						if (info_win_in != UNKNOWN_SCORE) {
-							QSettings s(path(FileType_spec), QSettings::IniFormat);
-							s.setValue("info/win_in", info_win_in);
-						}
-					}
-				}
-			}
-		}
-		else {
-			book_main.reset();
-			ram_budget += fi.size();
-		}
-	}
+	ram_budget = static_cast<quint64>(QSettings().value("solver/book_cache", 1.0).toDouble() * 1024 * 1024 * 1024);
+	loadBook(false);
 
 	// Read positions book, alts_upper, solution_upper
 	for (FileType type : { FileType_positions_upper, FileType_positions_lower, FileType_alts_upper, FileType_solution_upper })
@@ -225,9 +228,10 @@ void Solution::activate()
 	}
 }
 
-void Solution::deactivate()
+void Solution::deactivate(bool send_msg)
 {
-	emit Message(QString("Closing solution: %1...").arg(nameToShow(true)));
+	if (send_msg)
+		emit Message(QString("Closing solution: %1...").arg(nameToShow(true)));
 
 	book_main.reset();
 	for (auto& book : books)
@@ -359,7 +363,7 @@ std::tuple<SolutionCollection, QString> Solution::loadFolder(const QString& fold
 	return { solutions, warning_message };
 }
 
-QString ext_to_bak(const QString& filepath)
+QString Solution::ext_to_bak(const QString& filepath)
 {
 	int n = filepath.lastIndexOf(QChar('.'));
 	return QString("%1.%2").arg(filepath.leftRef(n)).arg(Solution::BAK_EXT);
@@ -377,7 +381,7 @@ QString Solution::path(FileType type, FileSubtype subtype) const
 	return QString("%1/%2%3/%4").arg(folder).arg(subfolder).arg(tag.isEmpty() ? "" : ('/' + tag)).arg(filename);
 }
 
-bool Solution::file_exists(FileType type, FileSubtype subtype) const
+bool Solution::fileExists(FileType type, FileSubtype subtype) const
 {
 	QFileInfo fi(path(type, subtype));
 	return fi.exists();
@@ -533,9 +537,9 @@ QString Solution::info() const
 		info = (version == 0)              ? "unknown"
 		    : (version < SOLUTION_VERSION) ? QString("old_v%1").arg(version)
 		                                   : QString("new_v%1").arg(version);
-	if (file_exists(FileType_positions_upper) || file_exists(FileType_positions_lower))
+	if (fileExists(FileType_positions_upper) || fileExists(FileType_positions_lower))
 		info += " D";
-	if (file_exists(FileType_book_upper) || file_exists(FileType_book))
+	if (fileExists(FileType_book_upper) || fileExists(FileType_book))
 		info += " B";
 	return info.trimmed();
 }
@@ -621,7 +625,7 @@ bool Solution::remove(std::function<bool(const QString&)> are_you_sure, std::fun
 			"you can do it manually after closing this program.").arg(nameToShow(true)));
 	};
 
-	if (book_main || file_exists(FileType_book) || file_exists(FileType_book_short) || file_exists(FileType_book_upper)) {
+	if (book_main || fileExists(FileType_book) || fileExists(FileType_book_short) || fileExists(FileType_book_upper)) {
 		msg_cannot_be_deleted();
 		return false;
 	}
@@ -727,28 +731,6 @@ void Solution::saveBranchSettings(QSettings& s, std::shared_ptr<Chess::Board> bo
 		s.setValue("branch", line_to_string(branch_to_skip.branch, board));
 	}
 	s.endArray();
-}
-
-uint64_t load_bigendian(const void* bytes)
-{
-	uint64_t result = 0;
-	int shift = 0;
-	for (int i = sizeof(result) - 1; i >= 0; i--)
-	{
-		result |= static_cast<uint64_t>(*(reinterpret_cast<const unsigned char*>(bytes) + i)) << shift;
-		shift += 8;
-	}
-	return result;
-}
-
-template<typename T>
-void save_bigendian(T val, void* bytes)
-{
-	for (int i = sizeof(val) - 1; i >= 0; i--)
-	{
-		*(reinterpret_cast<uint8_t*>(bytes) + i) = static_cast<uint8_t>(val & 0xFF);
-		val >>= 8;
-	}
 }
 
 bool Solution::mergeFiles(FileType type)
@@ -865,7 +847,7 @@ bool Solution::hasMergeErrors() const
 {
 	for (int i = FileType_DATA_START; i < FileType_DATA_END; i++)
 	{
-		if (file_exists(FileType(i), FileSubtype::Bak))
+		if (fileExists(FileType(i), FileSubtype::Bak))
 			return true;
 	}
 	return false;
@@ -875,15 +857,10 @@ void Solution::addToBook(std::shared_ptr<Chess::Board> board, const SolutionEntr
 {
 	if (!entry.pgMove)
 		return;
-	array<char, 16> row;
-	auto p = row.data();
-	save_bigendian(board->key(), p);
-	save_bigendian(entry.pgMove, p + 8);
-	save_bigendian(entry.weight, p + 10);
-	save_bigendian(entry.learn, p + 12);
+	auto row = entry_to_bytes(board->key(), entry);
 	auto book_path = path(type, FileSubtype::New).toStdString();
 	ofstream file(book_path, ios::binary | ios::out | ios::app);
-	file.write(p, row.size());
+	file.write(row.data(), row.size());
 }
 
 void Solution::addToBook(std::shared_ptr<Chess::Board> board, uint64_t data, FileType type) const

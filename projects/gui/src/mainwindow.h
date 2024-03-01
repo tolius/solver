@@ -103,6 +103,7 @@ class MainWindow : public QMainWindow
 		void addSolution(std::shared_ptr<SolutionData>);
 		void openSolution(QModelIndex index, SolutionItem* item = nullptr);
 		void importSolution(const std::filesystem::path&);
+		void updateCurrentSolution();
 		void setTint(QColor tint, bool to_color_move_buttons);
 
 	private:

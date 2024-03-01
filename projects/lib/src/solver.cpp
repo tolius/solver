@@ -6,9 +6,13 @@
 #include "moveevaluation.h"
 
 #include <QTimer>
+#include <QFile>
+#include <QFileInfo>
 
 #include <stdexcept>
 #include <thread>
+#include <algorithm>
+#include <fstream>
 
 using namespace std;
 
@@ -39,6 +43,14 @@ bool SolverEvalResult::empty() const
 {
 	return !data;
 }
+
+
+Transposition::Transposition(quint32 num_nodes, MapT& sub_saved_positions, MapT& sub_trans_positions, qint16 score)
+    : num_nodes(num_nodes)
+	, sub_saved_positions(sub_saved_positions)
+	, sub_trans_positions(sub_trans_positions)
+	, score(score)
+{}
 
 
 Solver::Solver(std::shared_ptr<Solution> solution)
@@ -137,7 +149,7 @@ const SolverSettings& Solver::settings() const
 
 bool Solver::isCurrentBranch(pBoard pos) const
 {
-	return isBranch(board, pos);
+	return is_branch(board, pos);
 }
 
 void Solver::init()
@@ -155,7 +167,7 @@ void Solver::init()
 			num_moves++;
 		}
 		int16_t score = (branch_to_skip.score == 0) ? FAKE_DRAW_SCORE : static_cast<int16_t>(FAKE_MATE_VALUE - branch_to_skip.score + board->plyCount() / 2);
-		skip_branches[board->key()] = branch_to_skip.score;
+		skip_branches[board->key()] = score;
 		while (num_moves--)
 			board->undoMove();
 	}
@@ -230,6 +242,8 @@ void Solver::start(pBoard new_pos, std::function<void(QString)> message)
 	emit Message(QString("Number of solver moves: %1").arg(num_moves_from_solver));
 	emit Message(QString("Number of evaluated endgames: %1").arg(num_evaluated_endgames));
 
+	create_book();
+	sol->mergeAllFiles();
 	status = Status::idle;
 	init();
 }
@@ -941,4 +955,211 @@ std::shared_ptr<SolverSession> Solver::whatToSolve() const
 std::shared_ptr<Chess::Board> Solver::positionToSolve() const
 {
 	return board;
+}
+
+void Solver::create_book()
+{
+	int num_opening_moves = (sol->opening.size() + sol->branch.size() + 1) / 2;
+	positions.clear();
+	prepared_transpositions.clear();
+	all_entries.clear();
+	MapT saved_positions;
+	MapT transpositions;
+	num_processed = 0;
+	auto [num_nodes, score] = prepare_moves(tree, saved_positions, transpositions);
+	bool is_their_turn = (board->sideToMove() != our_color);
+	qint16 tree_score = UNKNOWN_SCORE;
+	correct_score(tree_score, score, is_their_turn, tree);
+	emit Message(QString("Number of nodes: %1").arg(num_nodes));
+	qint16 mate_score = MATE_VALUE - tree.score;
+	bool is_mate_fake = (MATE_VALUE - FAKE_MATE_VALUE < mate_score && mate_score <= MATE_VALUE - FAKE_DRAW_SCORE);
+	if (is_mate_fake)
+		mate_score -= MATE_VALUE - FAKE_MATE_VALUE;
+	emit Message(QString("Mate score%1: %2 = %3 + %4")
+	                 .arg(is_mate_fake ? " (FAKE)" : "")
+	                 .arg(num_opening_moves + mate_score)
+	                 .arg(num_opening_moves)
+	                 .arg(mate_score));
+	sort(all_entries.begin(), all_entries.end(),
+		[](array<char, 16>& a, array<char, 16>& b)
+		{
+			for (size_t i = 0; i < 8; i++) {
+			    if (reinterpret_cast<uint8_t&>(a[i]) < reinterpret_cast<uint8_t&>(b[i]))
+				    return true;
+			    if (reinterpret_cast<uint8_t&>(a[i]) > reinterpret_cast<uint8_t&>(b[i]))
+				    return false;
+			}
+			for (size_t i = 10; i < 12; i++) {
+			    if (reinterpret_cast<uint8_t&>(a[i]) < reinterpret_cast<uint8_t&>(b[i]))
+					return false;
+			    if (reinterpret_cast<uint8_t&>(a[i]) > reinterpret_cast<uint8_t&>(b[i]))
+					return true;
+			}
+			return true;
+		}
+	);
+	auto path_book = sol->path(Solution::FileType_book_upper);
+	auto path_bak = Solution::ext_to_bak(path_book);
+	ofstream book(path_bak.toStdString(), ios::binary | ios::out | ios::trunc);
+	for (auto& entry : all_entries)
+		book.write(entry.data(), entry.size());
+	book.close();
+	QFileInfo fi(path_book);
+	if (fi.exists()) {
+		if (sol->book_main) {
+			sol->book_main.reset();
+			sol->ram_budget += fi.size();
+		}
+		bool is_removed = QFile::remove(path_book);
+		if (!is_removed)
+			emit Message(QString("Failed to delete the existing book:\n\n%1").arg(path_book));
+	}
+	bool is_renamed = QFile::rename(path_bak, path_book);
+	if (!is_renamed)
+		emit Message(QString("Failed to save the book:\n\nTemporary file path: %1\nBook file path: %2").arg(path_bak).arg(path_book));
+	assert(transpositions.size() == 0);
+	assert(saved_positions.size() == prepared_transpositions.size());
+	assert(saved_positions.size() == trans.size());
+	prepared_transpositions.clear();
+	sol->loadBook(true);
+	emit updateCurrentSolution();
+}
+
+std::tuple<quint32, qint16> Solver::prepare_moves(SolverMove& move, MapT& saved_positions, MapT& transpositions)
+{
+	// trans           - transpositions from the processing procedure
+	// positions       - all positions from the processing procedure
+	// prepared_transpositions - to accumulate all the transpositions in this function
+	// saved_positions - positions saved in this branch because they will be used as transpositions in the next branches
+	// transpositions  - transpositions used in this branch
+
+	bool is_their_turn = (board->sideToMove() != our_color);
+	assert(is_their_turn || move.moves.size() <= 1);
+	quint32 num_new_nodes = 0;
+	qint16 score = UNKNOWN_SCORE;
+	uint64_t key = board->key();
+	if (move.moves.empty())
+	{
+		if (!is_their_turn)
+		{
+			auto it = prepared_transpositions.find(key);
+			if (it != prepared_transpositions.end()) {
+				auto& t = it->second;
+				if (transpositions.find(key) == transpositions.end())
+					transpositions[key] = t;
+				score = t->score;
+			}
+			auto it_skip = skip_branches.find(board->key());
+			if (it_skip != skip_branches.end()) {
+				auto row = entry_to_bytes(board->key(), 0, it_skip->second, 0);
+				all_entries.push_back(row);
+			}
+		}
+	}
+	else
+	{
+		for (auto& m : move.moves)
+		{
+			board->makeMove(m.move);
+			MapT new_transpositions;
+			MapT new_saved_positions;
+			auto [sub_num_nodes, sub_score] = prepare_moves(m, new_saved_positions, new_transpositions);
+			num_new_nodes += sub_num_nodes;
+			correct_score(score, sub_score, is_their_turn, m);
+			if (!is_their_turn)
+				expand_positions(new_saved_positions, new_transpositions);
+			board->undoMove();
+			new_saved_positions.merge(saved_positions);
+			new_saved_positions.swap(saved_positions);
+			new_transpositions.merge(transpositions);
+			new_transpositions.swap(transpositions);
+			if (is_their_turn)
+				continue;
+			// ONLY if not is_their_turn:
+			assert(move.moves.size() == 1);
+			num_new_nodes++;
+			quint32 num_nodes = num_new_nodes;
+			for (auto& d : transpositions)
+				num_nodes += d.second->num_nodes;
+			if (trans.find(key) != trans.end())
+			{
+				assert(saved_positions.find(key) == saved_positions.end() && prepared_transpositions.find(key) == prepared_transpositions.end());
+				auto new_t = make_shared<Transposition>(num_new_nodes, new_saved_positions, new_transpositions, m.score);
+				prepared_transpositions[key] = new_t;
+				saved_positions[key] = new_t;
+			}
+			auto generic_move = board->genericMove(m.move);
+			quint16 pgMove = OpeningBook::moveToBits(generic_move);
+			auto row = entry_to_bytes(board->key(), pgMove, m.score, num_nodes);
+			all_entries.push_back(row);
+			num_processed++;
+			if (num_processed % 5000 == 0)
+				emit Message(QString("Prepared %1").arg(num_processed));
+		}
+	}
+	return { num_new_nodes, score };
+}
+
+void Solver::correct_score(qint16& score, qint16 sub_score, bool is_their_turn, SolverMove& m)
+{
+	qint16 new_score;
+	if (sub_score == UNKNOWN_SCORE)
+	{
+		new_score = m.score;
+	}
+	else
+	{
+		new_score = is_their_turn ? (sub_score - 1) : sub_score;
+		//assert(m.score <= new_score);
+		if (m.score > new_score) {
+			emit Message(QString("...Wrong trans score %1: %2 > %3! in %4")
+				                .arg(m.score - new_score)
+				                .arg(m.score)
+				                .arg(new_score)
+				                .arg(get_move_stack(board)));
+		}
+		//else if (m.score < new_score) {
+		//	//emit Message(QString("Correct score from %1 to %2 for %3").arg(m.score).arg(new_score).arg(get_move_stack(board)));
+		//}
+		m.score = new_score;
+	}
+
+	if (score == UNKNOWN_SCORE || new_score < score)
+		score = new_score;
+}
+
+void Solver::expand_positions(MapT& saved_positions, MapT& transpositions)
+{
+	/// Merge all saved positions (depth=1)
+	MapT to_add;
+	for (auto& d : saved_positions)
+	{
+		d.second->sub_saved_positions.merge(to_add);
+		d.second->sub_saved_positions.swap(to_add);
+	}
+	to_add.merge(saved_positions);
+	to_add.swap(saved_positions);
+	for (auto& d : transpositions)
+	{
+		d.second->sub_saved_positions.merge(saved_positions);
+		d.second->sub_saved_positions.swap(saved_positions);
+	}
+
+	/// Merge all transpositions (depth=1)
+	to_add.clear();
+	for (auto& d : transpositions)
+		for (auto& [sub_key, sub_t] : d.second->sub_trans_positions)
+			if (saved_positions.find(sub_key) == saved_positions.end())
+				to_add[sub_key] = sub_t;
+	to_add.merge(transpositions);
+	to_add.swap(transpositions);
+
+	/// Clear transpositions (after all sub-items have been expanded)
+	for (auto it = transpositions.begin(); it != transpositions.end();)
+	{
+		if (saved_positions.find(it->first) == saved_positions.end())
+			++it;
+		else
+			it = transpositions.erase(it);
+	}
 }

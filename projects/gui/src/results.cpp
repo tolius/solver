@@ -29,6 +29,7 @@ Results::Results(QWidget* parent)
 	m_flowLayout = new FlowLayout(ui->widget_Solution, 6, 6);
 	ui->widget_Solution->setLayout(m_flowLayout);
 	//ui->scrollArea->setWidget(ui->widget_Solution);
+	ui->widget_ResultInfo->setVisible(false);
 }
 
 void Results::setSolution(std::shared_ptr<Solution> solution)
@@ -90,8 +91,7 @@ QString Results::positionChanged()
 		auto entries = solution->entries(board->key());
 		for (auto& entry : entries)
 		{
-			auto move = entry.move(board);
-			QString san = board->moveString(move, Chess::Board::StandardAlgebraic);
+			QString san = entry.pgMove ? board->moveString(entry.move(board), Chess::Board::StandardAlgebraic) : "";
 			MoveEntry move_entry(san, entry);
 			move_entry.is_best = true;
 			solution_entries.push_back(move_entry);
@@ -110,14 +110,19 @@ QString Results::positionChanged()
 	QList<QVector<QWidget*>> move_boxes;
 	for (auto& entry : solution_entries)
 	{
-		auto btn = new QPushButton(entry.san, ui->widget_Solution);
+		auto btn = entry.san.isEmpty() ? nullptr : new QPushButton(entry.san, ui->widget_Solution);
 		//btn->setFlat(true);
 		//btn->setMinimumWidth(1);
 		//btn->setSizePolicy(QSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum));
 		//btn->setMaximumWidth(50);
+		if (btn) {
+			quint32 nodes_threshold = (board->sideToMove() == solution->winSide()) ? 1 : 0;
+			if (entry.nodes() <= nodes_threshold)
+				btn->setEnabled(false);
+		}
 		buttons.push_back(btn);
 		QString score = entry.getScore(true, board->sideToMove() == solution->winSide() ? 0 : 1);
-		QString nodes = (entry.score() == UNKNOWN_SCORE && entry.nodes() == 0) ? "" : entry.getNodes();
+		QString nodes = (entry.score() == UNKNOWN_SCORE || entry.nodes() == 0) ? "" : entry.getNodes();
 		//if (entry.nodes() == 0)
 		//	btn->setEnabled(false);
 		auto label_score = new QLabel(score, ui->widget_Solution);
@@ -126,13 +131,15 @@ QString Results::positionChanged()
 			QFont font;
 			font.setBold(true);
 			font.setWeight(75);
-			btn->setFont(font);
+			if (btn)
+				btn->setFont(font);
 			font.setPointSize(9);
 			label_score->setFont(font);
 		}
 		auto label_nodes = new QLabel(nodes, ui->widget_Solution);
 		QVector<QWidget*> element;
-		element.append(btn);
+		if (btn)
+			element.append(btn);
 		element.append(label_score);
 		element.append(label_nodes);
 		move_boxes.append(element);
@@ -163,6 +170,8 @@ QString Results::positionChanged()
 	auto it = solution_entries.cbegin();
 	for (int i = 0; i < buttons.size(); i++)
 	{
+		if (!buttons[i])
+			continue;
 		auto side = board->sideToMove();
 		auto move = it->move();
 		ChessPlayer* player(game->player(side));

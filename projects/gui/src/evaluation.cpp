@@ -504,7 +504,7 @@ void Evaluation::positionChanged()
 		return;
 	engine->write(tr("position fen %1").arg(board_->fenString()));
 	/// UI
-	if (!solver)
+	if (!solver || !solver->solution())
 		return;
 	QString info = solver->solution()->positionInfo(board_);
 	if (info.isEmpty())
@@ -617,6 +617,7 @@ void Evaluation::startEngine()
 		session.to_repeat = false;
 		if (session.multi_mode != session.prev_multi_mode) {
 			bool to_save_multi = (solver 
+								  && solver->solution()
 								  && session.prev_multi_mode > 0 
 								  && session.multi_mode == 0
 								  && board_->sideToMove() == solver->solution()->winSide()
@@ -637,7 +638,7 @@ void Evaluation::startEngine()
 	{
 		if (!board_->result().isNone())
 			return; // otherwise engine returns "null"
-		bool is_solver_side = (board_->sideToMove() == solver->solution()->winSide());
+		bool is_solver_side = solver && solver->solution() && (board_->sideToMove() == solver->solution()->winSide());
 		bool auto_multi_pv = ui->btn_MultiPV_Auto->isChecked();
 		clearEvals();
 		bool is_solving = solver && is_solver_side && solver->positionToSolve() && solver->positionToSolve()->key() == board_->key();

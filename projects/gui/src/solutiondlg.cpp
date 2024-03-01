@@ -97,20 +97,19 @@ SolutionDialog::SolutionDialog(QWidget* parent, std::shared_ptr<SolutionData> da
 	using namespace Chess;
 	shared_ptr<Board> board(BoardFactory::create("antichess"));
 	board->setFenString(board->defaultFenString());
-	int num = 0;
-	auto add_moves = [&](const Line& line, QStringList& moves)
+	auto add_moves = [](shared_ptr<Board> board, const Line& line, QStringList& moves)
 	{
 		for (const auto& move : line)
 		{
 			QString san = board->moveString(move, Chess::Board::StandardAlgebraic);
+			int num = board->MoveHistory().size();
 			QString str_move = (board->sideToMove() == Side::White) ? QString("%1.%2").arg(num / 2 + 1).arg(san) : san;
 			moves.push_back(str_move);
-			num++;
 			board->makeMove(move);
 		}
 	};
-	add_moves(data->opening, moves_opening);
-	add_moves(data->branch, moves_branch);
+	add_moves(board, data->opening, moves_opening);
+	add_moves(board, data->branch, moves_branch);
 
 	/// Update UI
 	ui->line_Opening->setText(moves_opening.join(' '));
@@ -121,7 +120,9 @@ SolutionDialog::SolutionDialog(QWidget* parent, std::shared_ptr<SolutionData> da
 	}
 	else {
 		QStringList extra_branch;
-		add_moves(extra_moves, extra_branch);
+		for (size_t i = 0; i < data->branch.size(); i++)
+			board->undoMove();
+		add_moves(board, extra_moves, extra_branch);
 		board_position += ' ' + extra_branch.join(' ');
 	}
 	ui->line_BranchToSkip->setText(board_position);

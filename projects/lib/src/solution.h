@@ -131,6 +131,7 @@ public:
 
 	static std::shared_ptr<Solution> load(const QString& filepath);
 	static std::tuple<SolutionCollection, QString> loadFolder(const QString& folder_path);
+	static QString ext_to_bak(const QString& filepath);
 
 	bool isValid() const;
 	bool isBookOpen() const;
@@ -153,9 +154,10 @@ public:
 	bool exists() const;
 	std::shared_ptr<SolutionData> mainData() const;
 
-	void init_filenames();
-	void activate();
-	void deactivate();
+	void initFilenames();
+	void loadBook(bool update_info);
+	void activate(bool send_msg = true);
+	void deactivate(bool send_msg = true);
 	bool remove(std::function<bool(const QString&)> are_you_sure, std::function<void(const QString&)> message);
 	void edit(std::shared_ptr<SolutionData> data);
 	bool mergeAllFiles();
@@ -165,7 +167,7 @@ signals:
 
 private:
 	QString path(FileType type, FileSubtype subtype = FileSubtype::Std) const;
-	bool file_exists(FileType type, FileSubtype subtype = FileSubtype::Std) const;
+	bool fileExists(FileType type, FileSubtype subtype = FileSubtype::Std) const;
 	bool hasMergeErrors() const;
 	void saveBranchSettings(QSettings& s, std::shared_ptr<Chess::Board> board);
 	bool mergeFiles(FileType type);
@@ -186,6 +188,7 @@ private:
 	std::array<QString, FileType_SIZE> filenames;
 	std::array<QString, FileType_DATA_END> filenames_new;
 	std::array<std::shared_ptr<SolutionBook>, FileType_DATA_END> books;
+	int64_t ram_budget;
 
 	friend class Solver;
 

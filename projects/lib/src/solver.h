@@ -13,6 +13,7 @@
 #include <list>
 #include <map>
 #include <set>
+#include <vector>
 #include <tuple>
 #include <string>
 #include <functional>
@@ -84,6 +85,22 @@ struct LIB_EXPORT SolverEvalResult
 	bool is_only_move;
 };
 
+
+struct Transposition;
+using MapT = std::map<uint64_t, std::shared_ptr<Transposition>>;
+
+struct LIB_EXPORT Transposition
+{
+	Transposition(quint32 num_nodes, MapT& sub_saved_positions, MapT& sub_trans_positions, qint16 score);
+	
+	quint32 num_nodes;
+	MapT sub_saved_positions;
+	MapT sub_trans_positions;
+	qint16 score;
+};
+
+
+
 class LIB_EXPORT Solver : public QObject
 {
 	Q_OBJECT
@@ -120,6 +137,7 @@ public:
 signals:
 	void Message(const QString& message);
 	void evaluatePosition();
+	void updateCurrentSolution();
 
 protected:
 	void init();
@@ -140,6 +158,10 @@ protected:
 	void add_existing(const SolverMove& move, bool is_stop_move);
 	void save_data(pcMove move, bool to_save = true);
 	void save_alt(pcMove move);
+	void create_book();
+	std::tuple<quint32, qint16> prepare_moves(SolverMove& move, MapT& saved_positions, MapT& transpositions);
+	void correct_score(qint16& score, qint16 sub_score, bool is_their_turn, SolverMove& m);
+	void expand_positions(MapT& saved_positions, MapT& transpositions);
 
 protected:
 	std::shared_ptr<Solution> sol;
@@ -154,6 +176,8 @@ protected:
 	std::map<uint64_t, quint64> new_positions;
 	std::shared_ptr<SolverSession> solver_session;
 	SolverEvalResult eval_result;
+	MapT prepared_transpositions;
+	std::vector<std::array<char, 16>> all_entries;
 
 private:
 	bool to_copy_solution;

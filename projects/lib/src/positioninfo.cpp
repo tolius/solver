@@ -398,7 +398,7 @@ bool is_endgame_available(std::shared_ptr<const Position> pos)
 	return special_endgames.find(name) != special_endgames.end();
 }
 
-bool isBranch(std::shared_ptr<Chess::Board> main_pos, std::shared_ptr<Chess::Board> branch)
+bool is_branch(std::shared_ptr<Chess::Board> main_pos, std::shared_ptr<Chess::Board> branch)
 {
 	auto& board_history = main_pos->MoveHistory();
 	auto& new_pos_history = branch->MoveHistory();
@@ -410,4 +410,42 @@ bool isBranch(std::shared_ptr<Chess::Board> main_pos, std::shared_ptr<Chess::Boa
 			return false;
 	}
 	return true;
+}
+
+uint64_t load_bigendian(const void* bytes)
+{
+	uint64_t result = 0;
+	int shift = 0;
+	for (int i = sizeof(result) - 1; i >= 0; i--)
+	{
+		result |= static_cast<uint64_t>(*(reinterpret_cast<const unsigned char*>(bytes) + i)) << shift;
+		shift += 8;
+	}
+	return result;
+}
+
+template<typename T>
+void save_bigendian(T val, void* bytes)
+{
+	for (int i = sizeof(val) - 1; i >= 0; i--)
+	{
+		*(reinterpret_cast<uint8_t*>(bytes) + i) = static_cast<uint8_t>(val & 0xFF);
+		val >>= 8;
+	}
+}
+
+std::array<char, 16> entry_to_bytes(uint64_t key, quint16 pgMove, qint16 weight, quint32 learn)
+{
+	array<char, 16> row;
+	auto p = row.data();
+	save_bigendian(key, p);
+	save_bigendian(pgMove, p + 8);
+	save_bigendian(weight, p + 10);
+	save_bigendian(learn, p + 12);
+	return row;
+}
+
+std::array<char, 16> entry_to_bytes(uint64_t key, const SolutionEntry& entry)
+{
+	return entry_to_bytes(key, entry.pgMove, entry.weight, entry.learn);
 }
