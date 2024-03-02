@@ -35,38 +35,16 @@ MoveEntry::MoveEntry(const QString& san, const SolutionEntry& entry)
 MoveEntry::MoveEntry(const QString& san, quint16 pgMove, quint16 weight, quint32 learn)
 	: SolutionEntry(pgMove, weight, learn)
 	, san(san)
+	, is_best(false)
 {}
 
-bool comp_moves(const SolutionEntry& a, const SolutionEntry& b)
+bool comp_book_moves(const SolutionEntry& a, const SolutionEntry& b)
 { 
 	if (a.score() < b.score())
 		return true;
 	if (a.score() > b.score())
 		return false;
 	return a.nodes() > b.nodes();
-}
-
-EngineEntry::EngineEntry(const QString& san, const SolutionEntry& entry)
-	: entry(entry)
-	, san(san)
-{}
-
-bool EngineEntry::is_overridden() const
-{
-	//return (entry.learn & 0x000000FF) == 0xFF;
-	return (entry.learn & OVERRIDE_MASK) == OVERRIDE_MASK;
-}
-
-QString EngineEntry::info() const
-{
-	QString str_score = entry.getScore(false);
-	quint32 depth = entry.learn & 0x000000FF;
-	if (is_overridden() || depth == MANUAL_VALUE)
-		return QString("%1: <b>%2</b> overridden").arg(san).arg(str_score);
-	QString str_depth = QString::number(depth);
-	uint time = (entry.learn & 0xFFFF0000) >> 16;
-	uint version = (entry.learn & 0x0000FF00) >> 8;
-	return QString("<b>%1 %2</b>&nbsp; d=%3&nbsp; t=%4&nbsp; v=%5").arg(san).arg(str_score).arg(str_depth).arg(time).arg(version);
 }
 
 
@@ -171,7 +149,7 @@ void Solution::loadBook(bool update_info)
 	board->setFenString(board->defaultFenString());
 	for (const auto& move : opening)
 		board->makeMove(move);
-	auto opening_entries = entries(board->key());
+	auto opening_entries = entries(board.get());
 	if (opening_entries.empty())
 		return;
 
@@ -407,14 +385,60 @@ Line Solution::openingMoves(bool with_branch) const
 	return full_line;
 }
 
-std::list<SolutionEntry> Solution::entries(quint64 key) const
+std::list<MoveEntry> Solution::entries(Chess::Board* board) const
 {
 	if (!book_main)
-		return list<SolutionEntry>();
-	auto book_entries = book_main->bookEntries(key);
+		return list<MoveEntry>();
+	auto book_entries = book_main->bookEntries(board->key());
 	//book_entries.remove_if([](const SolutionEntry& entry) { return entry.nodes() == 0; });
-	book_entries.sort(std::not_fn(comp_moves));
-	return book_entries;
+	book_entries.sort(std::not_fn(comp_book_moves));
+	std::list<MoveEntry> solution_entries;
+	for (auto& entry : book_entries)
+	{
+		QString san = entry.pgMove ? entry.san(board) : "";
+		MoveEntry move_entry(san, entry);
+		move_entry.is_best = true;
+		solution_entries.push_back(move_entry);
+	}
+	return solution_entries;
+}
+
+void set_best_moves(std::list<MoveEntry>& entries)
+{
+	if (entries.empty())
+		return;
+
+	auto& best = entries.front();
+	best.is_best = true;
+	auto best_dtw = MATE_VALUE - best.score();
+	auto best_nodes = best.nodes();
+	for (auto& entry : entries)
+	{
+		if (entry.score() == UNKNOWN_SCORE) {
+			entry.is_best = false;
+			continue;
+		}
+		auto dtw_i = MATE_VALUE - entry.score();
+		auto nodes_i = entry.nodes();
+		int bonus_nodes = 0;
+		if (best_nodes >= 100 && nodes_i >= 100)
+		{
+			float factor = ((float)std::min(nodes_i, best_nodes)) / std::max(nodes_i, best_nodes); // 100%...0%
+			bool is_worse = (dtw_i > best_dtw) == (nodes_i > best_nodes);
+			if (is_worse) {
+				if (factor > 0.97f) // tolerance 3%
+					bonus_nodes = 0;
+				else
+					bonus_nodes = best_dtw * (1 - factor) / 3; // +33%...-33%
+			}
+			else {
+				bonus_nodes = -best_dtw * (1 - factor) / 3; // -33%...+33%
+			}
+		}
+		int delta = abs(best_dtw - dtw_i) + bonus_nodes;
+		if (delta <= 0)
+			entry.is_best = true;
+	}
 }
 
 std::list<MoveEntry> Solution::nextEntries(Chess::Board* board, std::list<MoveEntry>* missing_entries) const
@@ -431,61 +455,126 @@ std::list<MoveEntry> Solution::nextEntries(Chess::Board* board, std::list<MoveEn
 		auto book_entries = book_main->bookEntries(board->key());
 		if (!book_entries.empty())
 		{
-			auto it = std::min_element(book_entries.begin(), book_entries.end(), comp_moves);
+			auto it = std::min_element(book_entries.begin(), book_entries.end(), comp_book_moves);
 			if (it->weight > MATE_THRESHOLD + 1)
 				it->weight--;
 			it->pgMove = pgMove;
-			entries.push_back({ san, *it });
+			entries.emplace_back(san, *it);
 		}
 		else if (missing_entries)
 		{
-			missing_entries->push_back({ san, pgMove, (quint16)UNKNOWN_SCORE, 0 });
+			missing_entries->emplace_back(san, pgMove, (quint16)UNKNOWN_SCORE, 0);
 		}
 		board->undoMove();
 	}
-	entries.sort(comp_moves);
-	if (!entries.empty())
-	{
-		auto& best = entries.front();
-		best.is_best = true;
-		auto best_dtw = MATE_VALUE - best.score();
-		auto best_nodes = best.nodes();
-		for (auto& entry : entries)
-		{
-			auto dtw_i = MATE_VALUE - entry.score();
-			auto nodes_i = entry.nodes();
-			int bonus_nodes = 0;
-			if (best_nodes >= 100 && nodes_i >= 100)
-			{
-				float factor = ((float)std::min(nodes_i, best_nodes)) / std::max(nodes_i, best_nodes);  // 100%...0%
-				bool is_worse = (dtw_i > best_dtw) == (nodes_i > best_nodes);
-				if (is_worse)
-				{
-					if (factor > 0.97f)  // tolerance 3%
-						bonus_nodes = 0;
-					else
-						bonus_nodes = best_dtw * (1 - factor) / 3;  // +33%...-33%
-				}
-				else
-				{
-					bonus_nodes = -best_dtw * (1 - factor) / 3;  // -33%...+33%
-				}
-			}
-			int delta = abs(best_dtw - dtw_i) + bonus_nodes;
-			if (delta <= 0)
-				entry.is_best = true;
+	entries.sort(comp_book_moves);
+	set_best_moves(entries);
+	return entries;
+}
+
+std::list<MoveEntry> Solution::positionEntries(Chess::Board* board) const
+{
+	auto entry = bookEntry(board, FileType_positions_upper);
+	if (!entry)
+		entry = bookEntry(board, FileType_positions_lower);
+	auto alt_entry = bookEntry(board, FileType_alts_upper);
+	if (!alt_entry)
+		alt_entry = bookEntry(board, FileType_alts_lower);
+	auto sol_entry = bookEntry(board, FileType_solution_upper);
+	if (!sol_entry)
+		sol_entry = bookEntry(board, FileType_solution_lower);
+	if (!entry && !alt_entry && !sol_entry)
+		return list<MoveEntry>();
+
+	std::list<MoveEntry> position_entries;
+	if (entry) {
+		position_entries.emplace_back(entry->san(board), *entry);
+		auto& e = position_entries.back();
+		e.is_best = true;
+		if (alt_entry && alt_entry->pgMove == entry->pgMove) {
+			e.info = alt_entry->is_overridden() ? "Overridden" : "Alt";
+			alt_entry = nullptr;
+		}
+		if (sol_entry && sol_entry->pgMove == entry->pgMove) {
+			e.info = e.info.isEmpty() ? "Sol" : QString("Sol %1").arg(e.info);
+			sol_entry = nullptr;
 		}
 	}
-	return entries;
+	if (alt_entry) {
+		position_entries.emplace_back(alt_entry->san(board), *alt_entry);
+		auto& e = position_entries.back();
+		e.is_best = !entry;
+		//e.weight = MATE_VALUE - MANUAL_VALUE;
+		e.info = alt_entry->is_overridden() ? "Overridden" : "Alt";
+		if (sol_entry && sol_entry->pgMove == alt_entry->pgMove) {
+			e.info = e.info.isEmpty() ? "Sol" : QString("Sol %1").arg(e.info);
+			sol_entry = nullptr;
+		}
+	}
+	if (sol_entry) {
+		position_entries.emplace_back(sol_entry->san(board), *sol_entry);
+		auto& e = position_entries.back();
+		e.is_best = !entry && !alt_entry;
+		e.info = "Sol";
+	}
+
+	return position_entries;
+}
+
+std::list<MoveEntry> Solution::nextPositionEntries(Chess::Board* board, std::list<MoveEntry>* missing_entries) const
+{
+	list<MoveEntry> next_entries;
+	auto legal_moves = board->legalMoves();
+	for (auto& m : legal_moves)
+	{
+		auto pgMove = OpeningBook::moveToBits(board->genericMove(m));
+		QString san = board->moveString(m, Chess::Board::StandardAlgebraic);
+		board->makeMove(m);
+		auto entries = positionEntries(board);
+		if (!entries.empty()) {
+			auto& e = entries.front();
+			if (e.weight > MATE_THRESHOLD + 1)
+				e.weight--;
+			e.pgMove = pgMove;
+			next_entries.emplace_back(san, e);
+		}
+		else if (missing_entries) {
+			missing_entries->emplace_back(san, pgMove, (quint16)UNKNOWN_SCORE, 0);
+		}
+		board->undoMove();
+	}
+	next_entries.sort(comp_book_moves);
+	set_best_moves(next_entries);
+	return next_entries;
+	return list<MoveEntry>();
 }
 
 std::shared_ptr<SolutionEntry> Solution::bookEntry(std::shared_ptr<Chess::Board> board, FileType type) const
 {
-	if (!board || !books[type])
+	return bookEntry(board.get(), type);
+}
+
+std::shared_ptr<SolutionEntry> Solution::bookEntry(Chess::Board* board, FileType type) const
+{
+	if (!board)
 		return nullptr;
 	if (side != board->sideToMove())
 		return nullptr;
-	auto book_entries = books[type]->bookEntries(board->key());
+	list<SolutionEntry> book_entries;
+	if (books[type])
+		book_entries = books[type]->bookEntries(board->key());
+	if (type < data_new.size()) {
+		auto it_new = data_new[type].find(board->key());
+		if (it_new != data_new[type].end()) {
+			for (auto it = book_entries.begin(); it != book_entries.end(); ++it) {
+				if (it->pgMove == it_new->second.pgMove) {
+					book_entries.erase(it);
+					break;
+				}
+			}
+			book_entries.push_front(it_new->second);
+		}
+	}
 	if (book_entries.empty())
 		return nullptr;
 	auto entry = make_shared<SolutionEntry>(book_entries.front());
@@ -493,32 +582,38 @@ std::shared_ptr<SolutionEntry> Solution::bookEntry(std::shared_ptr<Chess::Board>
 	return entry;
 }
 
-std::shared_ptr<EngineEntry> Solution::positionEntry(std::shared_ptr<Chess::Board> board, FileType type) const
-{
-	auto entry = bookEntry(board, type);
-	if (!entry)
-		return nullptr;
-	auto move = board->moveFromGenericMove(entry->move());
-	QString san = board->moveString(move, Chess::Board::StandardAlgebraic);
-	return make_shared<EngineEntry>(san, *entry);
-}
-
 QString Solution::positionInfo(std::shared_ptr<Chess::Board> board) const
 {
-	auto entry = positionEntry(board, FileType_positions_upper);
+	auto entry = bookEntry(board, FileType_positions_upper);
 	if (!entry)
-		entry = positionEntry(board, FileType_positions_lower);
+		entry = bookEntry(board, FileType_positions_lower);
 	auto alt_entry = bookEntry(board, FileType_alts_upper);
 	if (!alt_entry)
 		alt_entry = bookEntry(board, FileType_alts_lower);
-	if (entry && alt_entry && alt_entry->is_overridden())
-		alt_entry = nullptr; // this info is already in entry->info()
 	if (!entry && !alt_entry)
 		return "";
-	QString info = entry ? entry->info() : QString("%1:").arg(board->moveString(board->moveFromGenericMove(alt_entry->move()), Chess::Board::StandardAlgebraic));
-	if (alt_entry)
-		info = QString("%1 <b>%2</b>").arg(info).arg(alt_entry->is_overridden() ? "Overridden" : "Alt");
-	return entry->info();
+
+	QString info;
+	QString san = entry ? entry->san(board) : "";
+	if (entry) {
+		QString str_score = entry->getScore(false);
+		if (entry->is_overridden() || entry->depth() == MANUAL_VALUE) {
+			info = QString("%1: <b>%2</b>%3").arg(san).arg(str_score).arg(alt_entry ? "" : " overridden");
+		}
+		else {
+			info = QString("<b>%1 %2</b>&nbsp; d=%3").arg(san).arg(str_score).arg(entry->depth());
+			if (!alt_entry)
+				info = QString("%1&nbsp; t=%2&nbsp; v=%3").arg(info).arg(entry->time()).arg(entry->version());
+		}
+	}
+	if (alt_entry) {
+		QString alt_san = alt_entry->san(board);
+		info = QString("%1<b>%2 %3</b>")
+		           .arg(info)
+		           .arg((info.isEmpty() || san == alt_san) ? "" : QString(" &rarr; %1").arg(alt_san))
+		           .arg(alt_entry->is_overridden() ? "Overridden" : "Alt");
+	}
+	return info;
 }
 
 Chess::Side Solution::winSide() const
@@ -853,25 +948,37 @@ bool Solution::hasMergeErrors() const
 	return false;
 }
 
-void Solution::addToBook(std::shared_ptr<Chess::Board> board, const SolutionEntry& entry, FileType type) const
+void Solution::addToBook(std::shared_ptr<Chess::Board> board, const SolutionEntry& entry, FileType type)
+{
+	addToBook(board->key(), entry, type);
+}
+
+void Solution::addToBook(quint64 key, const SolutionEntry& entry, FileType type)
 {
 	if (!entry.pgMove)
 		return;
-	auto row = entry_to_bytes(board->key(), entry);
-	auto book_path = path(type, FileSubtype::New).toStdString();
-	ofstream file(book_path, ios::binary | ios::out | ios::app);
-	file.write(row.data(), row.size());
+	auto row = entry_to_bytes(key, entry);
+	addToBook(row, type);
+	if (type < data_new.size())
+		data_new[type][key] = entry;
 }
 
-void Solution::addToBook(std::shared_ptr<Chess::Board> board, uint64_t data, FileType type) const
+void Solution::addToBook(std::shared_ptr<Chess::Board> board, uint64_t data, FileType type)
 {
 	if (!(data >> 48))
 		return;
-	array<char, 16> row;
+	EntryRow row;
 	auto p = row.data();
 	save_bigendian(board->key(), p);
 	save_bigendian(data, p + 8);
+	addToBook(row, type);
+	if (type < data_new.size())
+		data_new[type][board->key()] = data;
+}
+
+void Solution::addToBook(const EntryRow& row, FileType type) const
+{
 	auto book_path = path(type, FileSubtype::New).toStdString();
 	ofstream file(book_path, ios::binary | ios::out | ios::app);
-	file.write(p, row.size());
+	file.write(row.data(), row.size());
 }

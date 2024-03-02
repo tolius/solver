@@ -62,6 +62,7 @@ struct LIB_EXPORT SolverMove
 
 
 using Line = std::list<Chess::Move>;
+using EntryRow = std::array<char, 16>;
 
 QString get_move_stack(std::shared_ptr<Chess::Board> game_board, bool add_fen = false, int move_limit = 999);
 QString get_san_sequence(int ply, const QStringList& moves);
@@ -76,12 +77,13 @@ std::tuple<std::list<SolverMove>, uint8_t> get_endgame_moves(std::shared_ptr<Che
 bool init_EGTB();
 bool is_endgame_available(std::shared_ptr<const Position> pos);
 bool is_branch(std::shared_ptr<Chess::Board> main_pos, std::shared_ptr<Chess::Board> branch);
+bool is_branch(Chess::Board* pos, const Line& opening, const Line& branch);
 
 uint64_t load_bigendian(const void* bytes);
 template<typename T>
 	void save_bigendian(T val, void* bytes);
-std::array<char, 16> entry_to_bytes(uint64_t key, quint16 pgMove, qint16 weight, quint32 learn);
-std::array<char, 16> entry_to_bytes(uint64_t key, const SolutionEntry& entry);
+EntryRow entry_to_bytes(quint64 key, quint16 pgMove, qint16 weight, quint32 learn);
+EntryRow entry_to_bytes(quint64 key, const SolutionEntry& entry);
 
 
 #endif // POSITIONINFO_H

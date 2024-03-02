@@ -86,24 +86,31 @@ QString Results::positionChanged()
 		return best_score;
 	// Find entries in the book
 	std::list<MoveEntry> solution_entries;
+	bool is_book = true;
 	if (board->sideToMove() == solution->winSide())
 	{
-		auto entries = solution->entries(board->key());
-		for (auto& entry : entries)
-		{
-			QString san = entry.pgMove ? board->moveString(entry.move(board), Chess::Board::StandardAlgebraic) : "";
-			MoveEntry move_entry(san, entry);
-			move_entry.is_best = true;
-			solution_entries.push_back(move_entry);
+		solution_entries = solution->entries(board);
+		if (solution_entries.empty()) {
+			is_book = false;
+			solution_entries = solution->positionEntries(board);
 		}
 	}
 	else
 	{
 		std::list<MoveEntry> missing_entries;
 		solution_entries = solution->nextEntries(board, &missing_entries);
-		if (!solution_entries.empty())
+		if (solution_entries.empty()) {
+			is_book = false;
+			solution_entries = solution->nextPositionEntries(board, &missing_entries);
+			if (!solution_entries.empty())
+				solution_entries.splice(solution_entries.begin(), missing_entries);
+		}
+		else {
 			solution_entries.splice(solution_entries.end(), missing_entries);
+		}
 	}
+	if (!solution_entries.empty())
+		best_score = solution_entries.front().getScore(is_book, board->sideToMove() == solution->winSide() ? 0 : 1);
 
 	// Create buttons
 	std::vector<QPushButton*> buttons;
@@ -121,8 +128,8 @@ QString Results::positionChanged()
 				btn->setEnabled(false);
 		}
 		buttons.push_back(btn);
-		QString score = entry.getScore(true, board->sideToMove() == solution->winSide() ? 0 : 1);
-		QString nodes = (entry.score() == UNKNOWN_SCORE || entry.nodes() == 0) ? "" : entry.getNodes();
+		QString score = entry.getScore(is_book, board->sideToMove() == solution->winSide() ? 0 : 1);
+		QString info = !is_book ? entry.info : (entry.score() == UNKNOWN_SCORE || entry.nodes() == 0) ? "" : entry.getNodes();
 		//if (entry.nodes() == 0)
 		//	btn->setEnabled(false);
 		auto label_score = new QLabel(score, ui->widget_Solution);
@@ -136,7 +143,7 @@ QString Results::positionChanged()
 			font.setPointSize(9);
 			label_score->setFont(font);
 		}
-		auto label_nodes = new QLabel(nodes, ui->widget_Solution);
+		auto label_nodes = new QLabel(info, ui->widget_Solution);
 		QVector<QWidget*> element;
 		if (btn)
 			element.append(btn);
@@ -188,21 +195,6 @@ QString Results::positionChanged()
 		++it;
 	}
 
-	/*QString info;
-	if (game && solution)
-	{
-		auto board = game->board();
-		if (board)
-		{
-			auto entry = solution->entry(board->key());
-			if (entry)
-				info = entry->info(board);
-		}
-	}
-	ui->label_SolutionInfo->setText(info);*/
-
 	// Return best score
-	if (!solution_entries.empty())
-		best_score = solution_entries.front().getScore(true, board->sideToMove() == solution->winSide() ? 0 : 1);
 	return best_score;
 }

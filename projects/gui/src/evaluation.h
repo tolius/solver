@@ -124,7 +124,7 @@ private:
 	void updateStartStop();
 	void clearEvals();
 	void clearEvalLabels();
-	std::tuple<std::shared_ptr<SolutionEntry>, Chess::Move> currData(bool is_overridden) const;
+	std::tuple<std::shared_ptr<SolutionEntry>, Chess::Move> currData() const;
 	void reportWinStatus(WinStatus status);
 	void sync_positions();
 	void startEngine();

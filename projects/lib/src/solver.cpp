@@ -147,9 +147,19 @@ const SolverSettings& Solver::settings() const
 	return s;
 }
 
-bool Solver::isCurrentBranch(pBoard pos) const
+bool Solver::isCurrentLine(pBoard pos) const
 {
 	return is_branch(board, pos);
+}
+
+bool Solver::isCurrentBranch(pBoard pos) const
+{
+	return isCurrentBranch(pos.get());
+}
+
+bool Solver::isCurrentBranch(Chess::Board* pos) const
+{
+	return is_branch(pos, sol->opening, sol->branch);
 }
 
 void Solver::init()
@@ -275,6 +285,37 @@ void Solver::save(pBoard pos, Chess::Move move, std::shared_ptr<SolutionEntry> d
 		eval_result = { data, move, is_only_move };
 }
 
+void Solver::save_override(Chess::Board* pos, std::shared_ptr<SolutionEntry> data)
+{
+	if (!pos || !isCurrentBranch(pos))
+		return;
+
+	const auto& moves = pos->MoveHistory();
+	auto move = moves.back().move;
+	if (move.isNull() || pos->sideToMove() == our_color)
+		return;
+
+	pos->undoMove();
+	auto pgMove = OpeningBook::moveToBits(pos->genericMove(move));
+	pos->makeMove(move);
+	if (data) {
+		data->pgMove = pgMove;
+		if (data->score() < MATE_VALUE - MANUAL_VALUE)
+			data->weight = MATE_VALUE - MANUAL_VALUE;
+	}
+	else {
+		data = std::make_shared<SolutionEntry>(pgMove, MATE_VALUE - MANUAL_VALUE, static_cast<quint32>(MANUAL_VALUE));
+	}
+	data->learn |= OVERRIDE_MASK;
+
+	auto prev_key = moves.back().key;
+	bool is_waiting = (status == Status::waitingEval) && (prev_key == board->key());
+	if (is_waiting)
+		eval_result = { data, move, false };
+
+	sol->addToBook(prev_key, *data, Solution::FileType_alts_upper);
+}
+
 void Solver::process(pBoard pos, Chess::Move move, std::shared_ptr<SolutionEntry> data, bool is_only_move)
 {
 	if (status != Status::waitingEval
@@ -282,10 +323,9 @@ void Solver::process(pBoard pos, Chess::Move move, std::shared_ptr<SolutionEntry
 		|| !data
 		|| pos->sideToMove() != our_color
 		|| move.isNull()
-		|| !isCurrentBranch(pos))
+		|| !isCurrentLine(pos))
 		return;
 
-	//sol->addToBook(board, *data, Solution::FileType_positions_upper);
 	eval_result = { data, move, is_only_move };
 }
 
@@ -981,7 +1021,7 @@ void Solver::create_book()
 	                 .arg(num_opening_moves)
 	                 .arg(mate_score));
 	sort(all_entries.begin(), all_entries.end(),
-		[](array<char, 16>& a, array<char, 16>& b)
+		[](EntryRow& a, EntryRow& b)
 		{
 			for (size_t i = 0; i < 8; i++) {
 			    if (reinterpret_cast<uint8_t&>(a[i]) < reinterpret_cast<uint8_t&>(b[i]))

@@ -33,26 +33,8 @@ public:
 
 public:
 	QString san;
+	QString info;
 	bool is_best;
-};
-
-
-struct LIB_EXPORT EngineEntry
-{
-	EngineEntry(const QString& san, const SolutionEntry& entry);
-
-	//qint16 score() const;
-	//quint32 version() const;
-	//quint32 time() const;
-	bool is_overridden() const;
-
-	QString info() const;
-	//QString getScore(int add_plies = 0) const;
-	//QString getNodes() const;
-
-public:
-	SolutionEntry entry;
-	QString san;
 };
 
 
@@ -137,13 +119,13 @@ public:
 	bool isBookOpen() const;
 	Chess::Side winSide() const;
 	Line openingMoves(bool with_branch = false) const;
-	std::list<SolutionEntry> entries(quint64 key) const;
+	std::list<MoveEntry> entries(Chess::Board* board) const;
 	std::list<MoveEntry> nextEntries(Chess::Board* board, std::list<MoveEntry>* missing_entries = nullptr) const;
+	std::list<MoveEntry> positionEntries(Chess::Board* board) const;
+	std::list<MoveEntry> nextPositionEntries(Chess::Board* board, std::list<MoveEntry>* missing_entries = nullptr) const;
 	std::shared_ptr<SolutionEntry> bookEntry(std::shared_ptr<Chess::Board> board, FileType type) const;
-	std::shared_ptr<EngineEntry> positionEntry(std::shared_ptr<Chess::Board> board, FileType type) const;
+	std::shared_ptr<SolutionEntry> bookEntry(Chess::Board* board, FileType type) const;
 	QString positionInfo(std::shared_ptr<Chess::Board> board) const;
-	void addToBook(std::shared_ptr<Chess::Board> board, const SolutionEntry& entry, FileType type) const;
-	void addToBook(std::shared_ptr<Chess::Board> board, uint64_t data, FileType type) const;
 	QString info() const;
 	QString nameToShow(bool include_tag = false) const;
 	std::tuple<QString, QString> branchToShow(bool include_tag = false) const;
@@ -161,6 +143,9 @@ public:
 	bool remove(std::function<bool(const QString&)> are_you_sure, std::function<void(const QString&)> message);
 	void edit(std::shared_ptr<SolutionData> data);
 	bool mergeAllFiles();
+	void addToBook(std::shared_ptr<Chess::Board> board, const SolutionEntry& entry, FileType type);
+	void addToBook(quint64 key, const SolutionEntry& entry, FileType type);
+	void addToBook(std::shared_ptr<Chess::Board> board, uint64_t data, FileType type);
 
 signals:
 	void Message(const QString&);
@@ -171,6 +156,7 @@ private:
 	bool hasMergeErrors() const;
 	void saveBranchSettings(QSettings& s, std::shared_ptr<Chess::Board> board);
 	bool mergeFiles(FileType type);
+	void addToBook(const EntryRow& row, FileType type) const;
 
 private:
 	Line opening;
@@ -188,6 +174,7 @@ private:
 	std::array<QString, FileType_SIZE> filenames;
 	std::array<QString, FileType_DATA_END> filenames_new;
 	std::array<std::shared_ptr<SolutionBook>, FileType_DATA_END> books;
+	std::array<std::map<uint64_t, SolutionEntry>, FileType_DATA_END> data_new;
 	int64_t ram_budget;
 
 	friend class Solver;

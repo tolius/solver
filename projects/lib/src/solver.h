@@ -124,7 +124,9 @@ public:
 
 	std::shared_ptr<Solution> solution() const;
 	const SolverSettings& settings() const;
+	bool isCurrentLine(pBoard pos) const;
 	bool isCurrentBranch(pBoard pos) const;
+	bool isCurrentBranch(Chess::Board* pos) const;
 	Chess::Side sideToWin() const;
 	std::shared_ptr<SolverSession> whatToSolve() const;
 	pBoard positionToSolve() const;
@@ -132,6 +134,7 @@ public:
 	void start(pBoard new_pos, std::function<void(QString)> message);
 	void stop();
 	void save(pBoard pos, Chess::Move move, std::shared_ptr<SolutionEntry> data, bool is_only_move, Solution::FileType type);
+	void save_override(Chess::Board* pos, std::shared_ptr<SolutionEntry> data);
 	void process(pBoard pos, Chess::Move move, std::shared_ptr<SolutionEntry> data, bool is_only_move);
 
 signals:
@@ -177,7 +180,7 @@ protected:
 	std::shared_ptr<SolverSession> solver_session;
 	SolverEvalResult eval_result;
 	MapT prepared_transpositions;
-	std::vector<std::array<char, 16>> all_entries;
+	std::vector<EntryRow> all_entries;
 
 private:
 	bool to_copy_solution;

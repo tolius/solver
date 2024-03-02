@@ -6,6 +6,9 @@
 #include <sstream>
 
 
+SolutionEntry::SolutionEntry()
+	: OpeningBook::Entry { 0, reinterpret_cast<const quint16&>(UNKNOWN_SCORE), 0 }
+{}
 SolutionEntry::SolutionEntry(const OpeningBook::Entry& entry)
 	: OpeningBook::Entry { entry.pgMove, entry.weight, entry.learn }
 {}
@@ -17,6 +20,13 @@ SolutionEntry::SolutionEntry(const SolutionEntry& entry)
 SolutionEntry::SolutionEntry(quint16 pgMove, quint16 weight, quint32 learn)
 	: OpeningBook::Entry { pgMove, weight, learn }
 {}
+
+SolutionEntry::SolutionEntry(uint64_t bytes)
+{
+	pgMove = bytes >> 48;
+	weight = static_cast<quint16>((bytes >> 32) & 0xFFFF);
+	learn = static_cast<quint32>(bytes & 0x00000000FFFFFFFF);
+}
 
 qint16 SolutionEntry::score(qint16 add_plies) const
 {
@@ -38,6 +48,16 @@ bool SolutionEntry::is_overridden() const
 	return (learn & OVERRIDE_MASK) == OVERRIDE_MASK;
 }
 
+quint32 SolutionEntry::depth() const
+{
+	return learn & quint32(0xFF);
+}
+
+quint32 SolutionEntry::version() const
+{
+	return (learn & 0x0000FF00) >> 8;
+}
+
 quint32 SolutionEntry::time() const
 {
 	return learn >> 16;
@@ -56,6 +76,18 @@ Chess::Move SolutionEntry::move(const Chess::Board* board) const
 Chess::Move SolutionEntry::move(std::shared_ptr<Chess::Board> board) const
 {
 	return board->moveFromGenericMove(move());
+}
+
+QString SolutionEntry::san(std::shared_ptr<Chess::Board> board) const
+{
+	return san(board.get());
+}
+
+QString SolutionEntry::san(Chess::Board* board) const
+{
+	if (!board)
+		return "";
+	return board->moveString(move(board), Chess::Board::StandardAlgebraic);
 }
 
 QString SolutionEntry::info(Chess::Board* board, bool is_book) const
@@ -89,15 +121,15 @@ QString SolutionEntry::score2Text(qint16 score)
 QString SolutionEntry::getScore(bool is_book, qint16 add_plies) const
 {
 	qint16 s = score(add_plies);
-	QString str_score = !is_book ? score2Text(s)
-	    : s == UNKNOWN_SCORE     ? "?"
-	    : s == 0                 ? "Draw"
-	    : s == FAKE_DRAW_SCORE   ? "Draw?"
-	    : s > FAKE_MATE_VALUE    ? QString("#%1").arg(MATE_VALUE - s)
-	    : s > MATE_THRESHOLD     ? QString("#%1?").arg(FAKE_MATE_VALUE - s)
-	    : s < -FAKE_MATE_VALUE   ? QString("#-%1").arg(MATE_VALUE + s)
-	    : s < -MATE_THRESHOLD    ? QString("#-%1").arg(FAKE_MATE_VALUE + s)
-	                             : score2Text(s); // QString("%1").arg(float(s) / 100, 0, 'f', 2);
+	QString str_score = s == UNKNOWN_SCORE ? "?"
+	    : !is_book                         ? score2Text(s)
+	    : s == 0                           ? "Draw"
+	    : s == FAKE_DRAW_SCORE             ? "Draw?"
+	    : s > FAKE_MATE_VALUE              ? QString("#%1").arg(MATE_VALUE - s)
+	    : s > MATE_THRESHOLD               ? QString("#%1?").arg(FAKE_MATE_VALUE - s)
+	    : s < -FAKE_MATE_VALUE             ? QString("#-%1").arg(MATE_VALUE + s)
+	    : s < -MATE_THRESHOLD              ? QString("#-%1").arg(FAKE_MATE_VALUE + s)
+	                                       : score2Text(s); // QString("%1").arg(float(s) / 100, 0, 'f', 2);
 	return str_score;
 }
 

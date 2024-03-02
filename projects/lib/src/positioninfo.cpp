@@ -412,6 +412,23 @@ bool is_branch(std::shared_ptr<Chess::Board> main_pos, std::shared_ptr<Chess::Bo
 	return true;
 }
 
+bool is_branch(Chess::Board* pos, const Line& opening, const Line& branch)
+{
+	if (!pos || pos->MoveHistory().size() < opening.size() + branch.size())
+		return false;
+
+	const auto& moves = pos->MoveHistory();
+	auto it_moves = moves.begin();
+	for (auto it_opening = opening.begin(); it_opening != opening.end(); ++it_opening, ++it_moves)
+		if (it_moves->move != *it_opening)
+			return false;
+	for (auto it_branch = branch.begin(); it_branch != branch.end(); ++it_branch, ++it_moves)
+		if (it_moves->move != *it_branch)
+			return false;
+
+	return true;
+}
+
 uint64_t load_bigendian(const void* bytes)
 {
 	uint64_t result = 0;
@@ -433,10 +450,12 @@ void save_bigendian(T val, void* bytes)
 		val >>= 8;
 	}
 }
+template void save_bigendian(uint64_t val, void* bytes);
+template void save_bigendian(quint64 val, void* bytes);
 
-std::array<char, 16> entry_to_bytes(uint64_t key, quint16 pgMove, qint16 weight, quint32 learn)
+EntryRow entry_to_bytes(quint64 key, quint16 pgMove, qint16 weight, quint32 learn)
 {
-	array<char, 16> row;
+	EntryRow row;
 	auto p = row.data();
 	save_bigendian(key, p);
 	save_bigendian(pgMove, p + 8);
@@ -445,7 +464,7 @@ std::array<char, 16> entry_to_bytes(uint64_t key, quint16 pgMove, qint16 weight,
 	return row;
 }
 
-std::array<char, 16> entry_to_bytes(uint64_t key, const SolutionEntry& entry)
+EntryRow entry_to_bytes(quint64 key, const SolutionEntry& entry)
 {
 	return entry_to_bytes(key, entry.pgMove, entry.weight, entry.learn);
 }

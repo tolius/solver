@@ -134,7 +134,6 @@ void Evaluation::updateBoard(Chess::Board* board)
 	if (board_->key() == board->key())
 		return;
 	ui->btn_Save->setEnabled(false);
-	ui->btn_Override->setEnabled(false);
 	ui->btn_Override->setChecked(false);
 	board_.reset(board->copy());
 }
@@ -240,9 +239,12 @@ void Evaluation::setGame(ChessGame* game)
 	if (this->game)
 		disconnect(this->game);
 	this->game = game;
-	if (game)
+	if (game) {
 		connect(this->game, SIGNAL(moveMade(Chess::GenericMove, QString, QString)), this, SLOT(positionChanged()));
-	updateBoard(game->board());
+		updateBoard(game->board());
+	}
+	if (!game || !game->board())
+		ui->btn_Override->setEnabled(false);
 }
 
 void Evaluation::setEngine(const QString* filename)
@@ -421,7 +423,7 @@ void Evaluation::onEngineQuit()
 	setMode(is_auto);
 }
 
-std::tuple<std::shared_ptr<SolutionEntry>, Chess::Move> Evaluation::currData(bool is_overridden) const
+std::tuple<std::shared_ptr<SolutionEntry>, Chess::Move> Evaluation::currData() const
 {
 	if (!solver || !board_
 			|| best_move.isEmpty() || best_score == MoveEvaluation::NULL_SCORE
@@ -438,7 +440,7 @@ std::tuple<std::shared_ptr<SolutionEntry>, Chess::Move> Evaluation::currData(boo
 
 	quint32 depth_time = static_cast<quint32>(std::min((int)REAL_DEPTH_LIMIT, curr_depth));
 	depth_time |= static_cast<quint32>(std::min(0xFFFF, best_time)) << 16;
-	depth_time |= is_overridden ? OVERRIDE_MASK : static_cast<quint32>(engine_version) << 8;
+	depth_time |= static_cast<quint32>(engine_version) << 8;
 	qint16 score = static_cast<qint16>(best_score);
 	auto data = std::make_shared<SolutionEntry>(pgMove, score, depth_time);
 	return { data, move };
@@ -450,7 +452,7 @@ void Evaluation::onSaveClicked()
 	if (now - t_last_T1_change < 1000ms)
 		return;
 	t_last_T1_change = now;
-	auto [data, move] = currData(false);
+	auto [data, move] = currData();
 	solver->save(board_, move, data, is_only_move, Solution::FileType_positions_upper);
 }
 
@@ -473,11 +475,17 @@ void Evaluation::onOverrideToggled(bool flag)
 
 void Evaluation::positionChanged()
 {
+	ui->btn_Override->setEnabled(false);
 	if (!game || !engine)
 		return;
-	if (ui->btn_Override->isChecked()) {
-		auto [data, move] = currData(true);
-		solver->save(board_, move, data, is_only_move, Solution::FileType_alts_upper);
+	if (ui->btn_Override->isChecked() && game->board() && !game->board()->MoveHistory().empty())
+	{
+		auto prev_key = game->board()->MoveHistory().back().key;
+		std::shared_ptr<SolutionEntry> data;
+		if (prev_key == board_->key())
+			data = std::get<0>(currData());
+		solver->save_override(game->board(), data);
+		ui->btn_Override->setChecked(false);
 	}
 	Chess::Board* new_board = (is_auto && solver) ? solver->positionToSolve().get() : game->board();
 	if (!new_board)
@@ -500,6 +508,10 @@ void Evaluation::positionChanged()
 	ui->label_SolutionInfo->setText("");
 	ui->widget_SolutionInfo->setVisible(false);
 	updateBoard(new_board);
+	ui->btn_Override->setEnabled(solver 
+	                             && solver->solution() 
+	                             && game->board()->sideToMove() == solver->solution()->winSide()
+	                             && solver->isCurrentBranch(game->board()));
 	if (!board_)
 		return;
 	engine->write(tr("position fen %1").arg(board_->fenString()));
@@ -629,7 +641,7 @@ void Evaluation::startEngine()
 								: (session.multi_mode == 1) ? boost_value 
 								: solver->settings().multiPV_2_num;
 			if (to_save_multi) {
-				auto [data, move] = currData(false);
+				auto [data, move] = currData();
 				solver->save(board_, move, data, is_only_move, Solution::FileType_multi_upper);
 			}
 		}
@@ -692,9 +704,8 @@ void Evaluation::startEngine()
 		timer_engine.start();
 		bool enabled = solver && is_solver_side && board_->key() == curr_key;
 		if (enabled)
-			enabled = (solver->whatToSolve()) ? (solver->whatToSolve()->alt_step < 0) : solver->isCurrentBranch(board_);
+			enabled = solver->whatToSolve() ? solver->whatToSolve()->alt_step == NO_ALT_STEPS : solver->isCurrentBranch(board_);
 		ui->btn_Save->setEnabled(enabled);
-		ui->btn_Override->setEnabled(enabled);
 	}
 	num_pieces = board_->numPieces();
 	engine->setOption("MultiPV", session.multi_pv);
@@ -1088,7 +1099,7 @@ void Evaluation::onEngineFinished()
 		session.reset();
 		if (is_auto && solver) {
 			if (to_keep_solving /*|| ui->progressBar->value() == 100*/) {
-				auto [data, move] = currData(false);
+				auto [data, move] = currData();
 				solver->process(board_, move, data, is_only_move);
 			}
 			else {
