@@ -110,7 +110,7 @@ QString Results::positionChanged()
 		}
 	}
 	if (!solution_entries.empty())
-		best_score = solution_entries.front().getScore(is_book, board->sideToMove() == solution->winSide() ? 0 : 1);
+		best_score = solution_entries.front().getScore(is_book);
 
 	// Create buttons
 	std::vector<QPushButton*> buttons;
@@ -128,7 +128,7 @@ QString Results::positionChanged()
 				btn->setEnabled(false);
 		}
 		buttons.push_back(btn);
-		QString score = entry.getScore(is_book, board->sideToMove() == solution->winSide() ? 0 : 1);
+		QString score = entry.getScore(is_book);
 		QString info = !is_book ? entry.info : (entry.score() == UNKNOWN_SCORE || entry.nodes() == 0) ? "" : entry.getNodes();
 		//if (entry.nodes() == 0)
 		//	btn->setEnabled(false);
