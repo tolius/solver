@@ -106,10 +106,16 @@ set(EGTB_SRC
 )
 SOURCE_GROUP ("EGTB" FILES ${EGTB_SRC})
 
+set(WATKINS_SRC
+	projects/lib/src/watkins/watkinssolution.h
+	projects/lib/src/watkins/watkinssolution.cpp
+)
+SOURCE_GROUP ("Watkins" FILES ${WATKINS_SRC})
+
 add_library(lib STATIC
 	${ENG_SRC}
 	${EGTB_SRC}
-
+	${WATKINS_SRC}
 	projects/lib/src/board/boardfactory.cpp
 	projects/lib/src/board/twokingseachboard.cpp
 	projects/lib/src/board/placementboard.cpp

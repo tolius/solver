@@ -7,6 +7,7 @@ The following libraries/modules/components are used in the programme:
 - [Cute Chess 1.3.1](https://github.com/cutechess/cutechess/releases/tag/v1.3.1) (modified)
 - [Fairy-Stockfish](https://github.com/fairy-stockfish/Fairy-Stockfish/tree/104d2f40e4d064815d6b06d0c812aec3b7b01f20) (modified)
 - [Multi-Variant Stockfish](https://github.com/ddugovic/Stockfish/tree/146269195b1b6a5e9d1121d9fd5767668a48a2a6) (modified)
+- [Library to query Watkins proof tables](https://github.com/niklasf/antichess-tree-server/tree/097dbbce7253151813b06d2e1ad0861ac4e5864f) (modified)
 - QSS templates of [DevSec Studio](https://qss-stock.devsecstudio.com/templates.php) (modified)
 - QSS templates of [GTRONICK](https://github.com/GTRONICK/QSS/blob/master/MaterialDark.qss) (modified)
 - Dictzip from [dictd 1.12.1](https://sourceforge.net/projects/dict/) with [Tvangeste's tweaks](https://github.com/Tvangeste/dictzip-win32/tree/bb996c999e9f437b1abb98d941a0a7a98ba82f67) (modified)

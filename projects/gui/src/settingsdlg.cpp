@@ -169,6 +169,12 @@ SettingsDialog::SettingsDialog(QWidget* parent)
 		}
 	);
 
+	connect(ui->m_showWatkinsForOpponent, &QCheckBox::toggled, this, 
+		[=](bool checked) {
+			QSettings().setValue("ui/show_Watkins_for_opponent", checked);
+		}
+	);
+
 	connect(ui->m_openLastSolution, &QCheckBox::toggled,
 		this, [=](bool checked) {
 			QSettings().setValue("solutions/open_last_solution", checked);
@@ -233,6 +239,8 @@ void SettingsDialog::readSettings()
 	ui->m_showMoveArrowsCheck->setChecked(
 		s.value("show_move_arrows", true).toBool());
 	ui->m_moveAnimationSpin->setValue(s.value("move_animation_duration", 300).toInt());
+	ui->m_showWatkinsForOpponent->setChecked(
+		s.value("show_Watkins_for_opponent", true).toBool());
 	s.endGroup();
 
 	s.beginGroup("solutions");

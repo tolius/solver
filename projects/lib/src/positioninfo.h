@@ -19,7 +19,7 @@ constexpr static qint16 FAKE_DRAW_SCORE = 31500;
 constexpr static qint16 MATE_THRESHOLD = 31500;
 constexpr static qint16 WIN_THRESHOLD = MATE_VALUE - 190; // #190
 constexpr static qint16 MANUAL_VALUE = 0xFF;
-constexpr static qint16 SOLVER_VALUE = 0xDD;
+constexpr static qint16 ESOLUTION_VALUE = 0xDD;
 constexpr static quint32 OVERRIDE_MASK = 0xFF00;
 constexpr static quint32 REAL_DEPTH_LIMIT = 200;
 

@@ -4,6 +4,9 @@
 #include "solutionbook.h"
 #include "positioninfo.h"
 #include "side.h"
+#include "board/move.h"
+#include "board/board.h"
+#include "watkins/watkinssolution.h"
 
 #include <QStringList>
 #include <QChar>
@@ -15,14 +18,6 @@
 #include <memory>
 #include <tuple>
 #include <functional>
-
-namespace Chess
-{
-	class Board;
-	class Move;
-	class Side;
-}
-class QWidget;
 
 
 struct LIB_EXPORT MoveEntry : SolutionEntry
@@ -51,14 +46,18 @@ struct LIB_EXPORT BranchToSkip
 struct LIB_EXPORT SolutionData
 {
 	SolutionData()
+		: WatkinsStartingPly(-1)
 	{}
-	SolutionData(const Line& opening, const Line& branch, const QString& tag, const std::list<BranchToSkip>& branchesToSkip, const QString& folder)
-	    : opening(opening), branch(branch), tag(tag), branchesToSkip(branchesToSkip), folder(folder)
+	SolutionData(const Line& opening, const Line& branch, const QString& tag, const std::list<BranchToSkip>& branchesToSkip, 
+		const QString& Watkins, int WatkinsStartingPly, const QString& folder)
+	    : opening(opening), branch(branch), tag(tag), branchesToSkip(branchesToSkip), Watkins(Watkins), WatkinsStartingPly(WatkinsStartingPly), folder(folder)
 	{}
 	Line opening;
 	Line branch;
 	QString tag;
 	std::list<BranchToSkip> branchesToSkip;
+	QString Watkins;
+	int WatkinsStartingPly;
 	QString folder;
 };
 
@@ -121,11 +120,11 @@ public:
 	Line openingMoves(bool with_branch = false) const;
 	std::list<MoveEntry> entries(Chess::Board* board) const;
 	std::list<MoveEntry> nextEntries(Chess::Board* board, std::list<MoveEntry>* missing_entries = nullptr) const;
-	std::list<MoveEntry> positionEntries(Chess::Board* board) const;
-	std::list<MoveEntry> nextPositionEntries(Chess::Board* board, std::list<MoveEntry>* missing_entries = nullptr) const;
+	std::list<MoveEntry> positionEntries(Chess::Board* board, bool use_esolution = true);
+	std::list<MoveEntry> nextPositionEntries(Chess::Board* board, std::list<MoveEntry>* missing_entries = nullptr);
 	std::shared_ptr<SolutionEntry> bookEntry(std::shared_ptr<Chess::Board> board, FileType type) const;
 	std::shared_ptr<SolutionEntry> bookEntry(Chess::Board* board, FileType type) const;
-	QString positionInfo(std::shared_ptr<Chess::Board> board) const;
+	QString positionInfo(std::shared_ptr<Chess::Board> board);
 	QString info() const;
 	QString nameToShow(bool include_tag = false) const;
 	std::tuple<QString, QString> branchToShow(bool include_tag = false) const;
@@ -146,6 +145,8 @@ public:
 	void addToBook(std::shared_ptr<Chess::Board> board, const SolutionEntry& entry, FileType type);
 	void addToBook(quint64 key, const SolutionEntry& entry, FileType type);
 	void addToBook(std::shared_ptr<Chess::Board> board, uint64_t data, FileType type);
+	std::vector<SolutionEntry> eSolutionEntries(std::shared_ptr<Chess::Board> board);
+	std::vector<SolutionEntry> eSolutionEntries(Chess::Board* board);
 
 signals:
 	void Message(const QString&);
@@ -163,6 +164,9 @@ private:
 	Line branch;
 	QString tag;
 	std::list<BranchToSkip> branchesToSkip;
+	QString Watkins;
+	int WatkinsStartingPly;
+	WatkinsTree WatkinsSolution;
 	QString folder;
 	QString name;
 	Chess::Side side;

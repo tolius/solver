@@ -726,7 +726,7 @@ Solver::pMove Solver::get_engine_move(SolverMove& move, SolverState& info, bool 
 		is_score_ok = !is_last_move;
 	}
 	if (best_move && is_score_ok) {
-		assert(best_move->score != SOLVER_VALUE || best_move->depth() != SOLVER_VALUE); // a solver move might have been saved in a previous version of the app => skip it
+		assert(best_move->score != ESOLUTION_VALUE || best_move->depth() != ESOLUTION_VALUE); // a esolution move might have been saved in a previous version of the app => skip it
 		return best_move;
 	}
 	auto old_best_move = best_move;
@@ -768,7 +768,7 @@ Solver::pMove Solver::get_engine_move(SolverMove& move, SolverState& info, bool 
 	/// Update cache.
 	bool is_score_better = !old_best_move || (best_move->score > ABOVE_EG && best_move->score > old_best_move->score);
 	if (old_best_move 
-		&& old_best_move_depth != SOLVER_VALUE 
+		&& old_best_move_depth != ESOLUTION_VALUE 
 		&& old_best_move_depth > depth 
 		&& !is_score_better
 	    && old_best_move->time() <= max_search_time 
@@ -782,7 +782,7 @@ Solver::pMove Solver::get_engine_move(SolverMove& move, SolverState& info, bool 
 	}
 	if (!old_best_move 
 		|| depth >= old_best_move_depth 
-		|| old_best_move_depth == SOLVER_VALUE 
+		|| old_best_move_depth == ESOLUTION_VALUE 
 		|| is_score_better 
 		|| old_best_move->is_old_version())
 	{

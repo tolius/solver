@@ -1,6 +1,7 @@
 #include "solution.h"
 #include "board/board.h"
 #include "board/boardfactory.h"
+#include "watkins/watkinssolution.h"
 
 #include <QFileInfo>
 #include <QDir>
@@ -9,6 +10,7 @@
 #include <functional>
 #include <filesystem>
 #include <vector>
+#include <map>
 #include <fstream>
 
 
@@ -53,6 +55,8 @@ Solution::Solution(std::shared_ptr<SolutionData> data, const QString& basename, 
 	opening = data->opening;
 	branch = data->branch;
 	branchesToSkip = data->branchesToSkip;
+	Watkins = data->Watkins;
+	WatkinsStartingPly = data->WatkinsStartingPly;
 	folder = data->folder;
 	tag = data->tag;
 	this->version = version;
@@ -78,6 +82,10 @@ Solution::Solution(std::shared_ptr<SolutionData> data, const QString& basename, 
 		s.beginGroup("meta");
 		s.setValue("opening", name);
 		saveBranchSettings(s, board);
+		if (!Watkins.isEmpty()) {
+			s.setValue("Watkins", Watkins);
+			s.setValue("Watkins_starting_ply", WatkinsStartingPly);
+		}
 		s.setValue("version", version);
 		s.endGroup();
 		info_win_in = UNKNOWN_WIN_IN;
@@ -276,11 +284,13 @@ std::shared_ptr<Solution> Solution::load(const QString& filepath)
 		branches_to_skip.emplace_back(branch_to_skip, score);
 	}
 	s.endArray();
+	QString Watkins = s.value("Watkins").toString();
+	int WatkinsStartingPly = s.value("Watkins_starting_ply", -1).toInt();
 	int version = s.value("version").toInt();
 	bool is_imported = !s.value("import").toString().isEmpty();
 	s.endGroup();
 
-	auto data = make_shared<SolutionData>(opening, branch, tag, branches_to_skip, folder);
+	auto data = make_shared<SolutionData>(opening, branch, tag, branches_to_skip, Watkins, WatkinsStartingPly, folder);
 	auto solution = make_shared<Solution>(data, name, version, is_imported);
 	if (!solution->isValid())
 		return nullptr;
@@ -291,7 +301,7 @@ std::shared_ptr<Solution> Solution::load(const QString& filepath)
 
 std::shared_ptr<SolutionData> Solution::mainData() const
 {
-	return make_shared<SolutionData>(opening, branch, tag, branchesToSkip, folder);
+	return make_shared<SolutionData>(opening, branch, tag, branchesToSkip, Watkins, WatkinsStartingPly, folder);
 }
 
 std::tuple<SolutionCollection, QString> Solution::loadFolder(const QString& folder_path)
@@ -410,7 +420,7 @@ void set_best_moves(std::list<MoveEntry>& entries)
 
 	auto& best = entries.front();
 	best.is_best = true;
-	auto best_dtw = MATE_VALUE - best.score();
+	int best_dtw = static_cast<int>(MATE_VALUE) - best.score();
 	auto best_nodes = best.nodes();
 	for (auto& entry : entries)
 	{
@@ -472,7 +482,17 @@ std::list<MoveEntry> Solution::nextEntries(Chess::Board* board, std::list<MoveEn
 	return entries;
 }
 
-std::list<MoveEntry> Solution::positionEntries(Chess::Board* board) const
+QString Watkins_nodes(const SolutionEntry& entry)
+{
+	quint32 num = entry.nodes();
+	QString num_nodes = num <= 1 ? ""
+	    : num < 5'000            ? QString("%L1").arg(num)
+	    : num < 5'000'000        ? QString("<b>%L1k</b>").arg((num + 500) / 1000)
+	                             : QString("<b>%L1M</b>").arg((num + 500'000) / 1000'000);
+	return num_nodes;
+}
+
+std::list<MoveEntry> Solution::positionEntries(Chess::Board* board, bool use_esolution)
 {
 	auto entry = bookEntry(board, FileType_positions_upper);
 	if (!entry)
@@ -480,11 +500,12 @@ std::list<MoveEntry> Solution::positionEntries(Chess::Board* board) const
 	auto alt_entry = bookEntry(board, FileType_alts_upper);
 	if (!alt_entry)
 		alt_entry = bookEntry(board, FileType_alts_lower);
-	auto sol_entry = bookEntry(board, FileType_solution_upper);
-	if (!sol_entry)
-		sol_entry = bookEntry(board, FileType_solution_lower);
-	if (!entry && !alt_entry && !sol_entry)
+	auto esol_entries = use_esolution ? eSolutionEntries(board) : vector<SolutionEntry>();
+	if (!entry && !alt_entry && esol_entries.empty())
 		return list<MoveEntry>();
+
+	SolutionEntry* sol_entry = esol_entries.empty() ? nullptr : &esol_entries.front();
+	auto w = [sol_entry]() { return sol_entry->nodes() > 1 ? QString("W=%1").arg(Watkins_nodes(*sol_entry)) : "W"; };
 
 	std::list<MoveEntry> position_entries;
 	if (entry) {
@@ -496,7 +517,7 @@ std::list<MoveEntry> Solution::positionEntries(Chess::Board* board) const
 			alt_entry = nullptr;
 		}
 		if (sol_entry && sol_entry->pgMove == entry->pgMove) {
-			e.info = e.info.isEmpty() ? "Sol" : QString("Sol %1").arg(e.info);
+			e.info = e.info.isEmpty() ? w() : QString("%1 %2").arg(w()).arg(e.info);
 			sol_entry = nullptr;
 		}
 	}
@@ -507,30 +528,35 @@ std::list<MoveEntry> Solution::positionEntries(Chess::Board* board) const
 		//e.weight = MATE_VALUE - MANUAL_VALUE;
 		e.info = alt_entry->is_overridden() ? "Overridden" : "Alt";
 		if (sol_entry && sol_entry->pgMove == alt_entry->pgMove) {
-			e.info = e.info.isEmpty() ? "Sol" : QString("Sol %1").arg(e.info);
+			e.info = e.info.isEmpty() ? w() : QString("%1 %2").arg(w()).arg(e.info);
 			sol_entry = nullptr;
 		}
 	}
 	if (sol_entry) {
+		sol_entry->weight = reinterpret_cast<const quint16&>(UNKNOWN_SCORE);
 		position_entries.emplace_back(sol_entry->san(board), *sol_entry);
 		auto& e = position_entries.back();
 		e.is_best = !entry && !alt_entry;
-		e.info = "Sol";
+		e.info = w();
 	}
 
 	return position_entries;
 }
 
-std::list<MoveEntry> Solution::nextPositionEntries(Chess::Board* board, std::list<MoveEntry>* missing_entries) const
+std::list<MoveEntry> Solution::nextPositionEntries(Chess::Board* board, std::list<MoveEntry>* missing_entries)
 {
 	list<MoveEntry> next_entries;
 	auto legal_moves = board->legalMoves();
+	vector<SolutionEntry> esol_entries = eSolutionEntries(board);
+	map<quint32, SolutionEntry> esol;
+	std::transform(esol_entries.begin(), esol_entries.end(), std::inserter(esol, esol.end()),
+	               [](const SolutionEntry& s) { return std::make_pair(s.pgMove, s); });
 	for (auto& m : legal_moves)
 	{
 		auto pgMove = OpeningBook::moveToBits(board->genericMove(m));
 		QString san = board->moveString(m, Chess::Board::StandardAlgebraic);
 		board->makeMove(m);
-		auto entries = positionEntries(board);
+		auto entries = positionEntries(board, false);
 		if (!entries.empty()) {
 			auto& e = entries.front();
 			if (e.weight > MATE_THRESHOLD + 1)
@@ -538,7 +564,16 @@ std::list<MoveEntry> Solution::nextPositionEntries(Chess::Board* board, std::lis
 			e.pgMove = pgMove;
 			next_entries.emplace_back(san, e);
 		}
-		else if (missing_entries) {
+		auto it = esol.find(OpeningBook::moveToBits(board->genericMove(m)));
+		if (it != esol.end()) {
+			if (entries.empty()) {
+				it->second.weight = reinterpret_cast<const quint16&>(UNKNOWN_SCORE);
+				next_entries.emplace_back(san, it->second);
+			}
+			if (it->second.learn > 1)
+				next_entries.back().info = QString("W=%1").arg(Watkins_nodes(it->second));
+		}
+		else if (entries.empty() && missing_entries) {
 			missing_entries->emplace_back(san, pgMove, (quint16)UNKNOWN_SCORE, 0);
 		}
 		board->undoMove();
@@ -546,7 +581,6 @@ std::list<MoveEntry> Solution::nextPositionEntries(Chess::Board* board, std::lis
 	next_entries.sort(comp_book_moves);
 	set_best_moves(next_entries);
 	return next_entries;
-	return list<MoveEntry>();
 }
 
 std::shared_ptr<SolutionEntry> Solution::bookEntry(std::shared_ptr<Chess::Board> board, FileType type) const
@@ -582,7 +616,7 @@ std::shared_ptr<SolutionEntry> Solution::bookEntry(Chess::Board* board, FileType
 	return entry;
 }
 
-QString Solution::positionInfo(std::shared_ptr<Chess::Board> board) const
+QString Solution::positionInfo(std::shared_ptr<Chess::Board> board)
 {
 	auto entry = bookEntry(board, FileType_positions_upper);
 	if (!entry)
@@ -590,7 +624,8 @@ QString Solution::positionInfo(std::shared_ptr<Chess::Board> board) const
 	auto alt_entry = bookEntry(board, FileType_alts_upper);
 	if (!alt_entry)
 		alt_entry = bookEntry(board, FileType_alts_lower);
-	if (!entry && !alt_entry)
+	auto esol_entries = eSolutionEntries(board);
+	if (!entry && !alt_entry && esol_entries.empty())
 		return "";
 
 	QString info;
@@ -610,8 +645,17 @@ QString Solution::positionInfo(std::shared_ptr<Chess::Board> board) const
 		QString alt_san = alt_entry->san(board);
 		info = QString("%1<b>%2 %3</b>")
 		           .arg(info)
-		           .arg((info.isEmpty() || san == alt_san) ? "" : QString(" &rarr; %1").arg(alt_san))
+		           .arg((info.isEmpty() || san == alt_san) ? "" : QString(" &rarr;&nbsp;%1").arg(alt_san))
 		           .arg(alt_entry->is_overridden() ? "Overridden" : "Alt");
+	}
+	if (!esol_entries.empty()) {
+		auto& esol_entry = esol_entries.front();
+		quint32 num = esol_entry.nodes();
+		QString num_nodes = num <= 1 ? "" : QString("&nbsp;(%1)").arg(Watkins_nodes(esol_entry));
+		info = QString("%1 W:&nbsp;<b>%2</b>%3")
+		           .arg(info)
+		           .arg(esol_entry.san(board))
+		           .arg(num_nodes);
 	}
 	return info;
 }
@@ -632,6 +676,8 @@ QString Solution::info() const
 		info = (version == 0)              ? "unknown"
 		    : (version < SOLUTION_VERSION) ? QString("old_v%1").arg(version)
 		                                   : QString("new_v%1").arg(version);
+	if (!Watkins.isEmpty() && WatkinsStartingPly >= 0)
+		info += " W";
 	if (fileExists(FileType_positions_upper) || fileExists(FileType_positions_lower))
 		info += " D";
 	if (fileExists(FileType_book_upper) || fileExists(FileType_book))
@@ -808,10 +854,17 @@ void Solution::edit(std::shared_ptr<SolutionData> data)
 
 	this->branch = data->branch;
 	this->branchesToSkip = data->branchesToSkip;
+	bool update_Watkins = (Watkins != data->Watkins || WatkinsStartingPly != data->WatkinsStartingPly);
+	this->Watkins = data->Watkins;
+	this->WatkinsStartingPly = data->WatkinsStartingPly;
 
 	QSettings s(path(FileType_spec), QSettings::IniFormat);
 	s.beginGroup("meta");
 	saveBranchSettings(s, board);
+	if (update_Watkins) {
+		s.setValue("Watkins", Watkins);
+		s.setValue("Watkins_starting_ply", WatkinsStartingPly);
+	}
 }
 
 void Solution::saveBranchSettings(QSettings& s, std::shared_ptr<Chess::Board> board)
@@ -881,7 +934,7 @@ bool Solution::mergeFiles(FileType type)
 					if (   (val & 0xFFFF) == 1                      // endgame
 						|| (val & 0xFFFF000000000000) == 0          // null-move
 					//	|| (val & 0xFFFFFFFFFFFF) == 0x00DD000000DD // esolution
-					    || (val & 0xFFFF) == SOLVER_VALUE           // esolution
+					    || (val & 0xFFFF) == ESOLUTION_VALUE        // esolution
 						|| (val & 0xFFFF) == MANUAL_VALUE)          // override
 						it = entries.erase(it);
 					else
@@ -981,4 +1034,87 @@ void Solution::addToBook(const EntryRow& row, FileType type) const
 	auto book_path = path(type, FileSubtype::New).toStdString();
 	ofstream file(book_path, ios::binary | ios::out | ios::app);
 	file.write(row.data(), row.size());
+}
+
+std::vector<SolutionEntry> Solution::eSolutionEntries(std::shared_ptr<Chess::Board> board)
+{
+	return eSolutionEntries(board.get());
+}
+
+std::vector<SolutionEntry> Solution::eSolutionEntries(Chess::Board* board)
+{
+	static map<quint64, vector<SolutionEntry>> cache; // TODO: set max size for the cache
+
+	vector<SolutionEntry> entries;
+	if (!board)
+		return entries;
+	if (board->sideToMove() == side)
+	{
+		auto entry = bookEntry(board, FileType_solution_upper);
+		if (!entry)
+			entry = bookEntry(board, FileType_solution_lower);
+		if (entry) {
+			if (entry->pgMove)
+				entries.push_back(*entry);
+			return entries;
+		}
+	}
+	else
+	{
+		if (!QSettings().value("ui/show_Watkins_for_opponent", true).toBool())
+			return entries;
+
+		auto it_cache = cache.find(board->key());
+		if (it_cache != cache.end())
+			return it_cache->second;
+	}
+
+	if (Watkins.isEmpty())
+		return entries;
+	if (board->MoveHistory().size() <= WatkinsStartingPly)
+		return entries;
+
+	using namespace Chess;
+	shared_ptr<Board> temp_board(BoardFactory::create("antichess"));
+	temp_board->setFenString(temp_board->defaultFenString());
+	for (int i = 0; i < WatkinsStartingPly; i++)
+		temp_board->makeMove(board->MoveHistory()[i].move);
+	std::vector<move_t> moves;
+	for (int i = WatkinsStartingPly; i < board->MoveHistory().size(); i++)
+	{
+		auto& m = board->MoveHistory()[i].move;
+		auto pgMove = OpeningBook::moveToBits(temp_board->genericMove(m));
+		moves.push_back(pgMove);
+		temp_board->makeMove(m);
+	}
+	try
+	{
+		if (!WatkinsSolution.is_open())
+		{
+			fs::path filepath = folder.toStdString();
+			filepath /= "Watkins";
+			filepath /= Watkins.toStdString();
+			bool is_ok = WatkinsSolution.open_tree(filepath);
+			if (!is_ok) {
+				emit Message(QString("Failed to open the solution file \"%1\".").arg(Watkins));
+				Watkins = "";
+				return entries;
+			}
+		}
+		entries = WatkinsSolution.get_solution(moves, true /*temp_board->sideToMove() == side*/);
+		if (board->sideToMove() == side) {
+			if (entries.empty())
+				addToBook(temp_board->key(), SolutionEntry(0, ESOLUTION_VALUE, 0), FileType_solution_upper);
+			else
+				addToBook(temp_board->key(), entries.front(), FileType_solution_upper);
+		}
+		else {
+			cache[board->key()] = entries;
+		}
+	}
+	catch (exception e)
+	{
+		emit Message(QString("Failed to read from the solution file \"%1\".\n\n%2").arg(Watkins).arg(e.what()));
+	}
+	return entries;
 }

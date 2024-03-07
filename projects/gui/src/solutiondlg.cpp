@@ -142,6 +142,14 @@ SolutionDialog::SolutionDialog(QWidget* parent, std::shared_ptr<SolutionData> da
 		}
 	}
 	//ui->btn_AddBranchToSkip->setEnabled(false);
+	ui->line_Watkins->setText(data->Watkins);
+	known_solutions = {
+		{"e3wins.rev4", 0}
+	};
+	if (data->WatkinsStartingPly >= 0)
+		ui->num_WatkinsStartingMove->setValue(data->WatkinsStartingPly / 2 + 1);
+	else
+		on_WatkinsSolutionChanged();
 
 	connect(ui->btn_setCurrent, &QPushButton::clicked, this, [this]() { ui->line_Branch->setText(board_position); });
 
@@ -156,6 +164,8 @@ SolutionDialog::SolutionDialog(QWidget* parent, std::shared_ptr<SolutionData> da
 	connect(ui->btn_AddBranchToSkip, &QPushButton::clicked, this, &SolutionDialog::on_AddBranchToSkipClicked);
 	connect(ui->table_BranchesToSkip, &QTableWidget::itemSelectionChanged, this, &SolutionDialog::on_BranchesToSkipSelectionChanged);
 	connect(ui->btn_DeleteSelectedBranches, &QPushButton::clicked, this, &SolutionDialog::on_DeleteSelectedBranchesClicked);
+	connect(ui->btn_BrowseWatkins, &QPushButton::clicked, this, &SolutionDialog::on_BrowseWatkinsClicked);
+	connect(ui->line_Watkins, &QLineEdit::textChanged, this, &SolutionDialog::on_WatkinsSolutionChanged);
 	connect(ui->btn_OK, &QPushButton::clicked, this, &SolutionDialog::on_OKClicked);
 }
 
@@ -329,6 +339,49 @@ void SolutionDialog::on_DeleteSelectedBranchesClicked()
 		ui->table_BranchesToSkip->removeRow(row);
 }
 
+void SolutionDialog::on_BrowseWatkinsClicked()
+{
+	QString dir_Watkins = QSettings().value("solutions/path", "").toString() + "/Watkins";
+	QString file_Watkins = QFileDialog::getOpenFileName(this, tr("Open Watkins solution"), dir_Watkins);
+	if (file_Watkins.isEmpty())
+	{
+		ui->line_Watkins->setText("");
+		ui->num_WatkinsStartingMove->setValue(1);
+		ui->num_WatkinsStartingMove->setReadOnly(true);
+		return;
+	}
+	QFileInfo fi_selected(file_Watkins);
+	QString filename = fi_selected.fileName();
+	QFileInfo fi(dir_Watkins + "/" + filename);
+	ui->line_Watkins->setText(filename);
+	if (!fi.exists())
+	{
+		QMessageBox::warning(this, QApplication::applicationName(), 
+			tr("Please move the solution file to the Watkins subfolder (\"%1\") or create a symlink to it.").arg(dir_Watkins));
+		return;
+	}
+}
+
+void SolutionDialog::on_WatkinsSolutionChanged()
+{
+	QString filename = ui->line_Watkins->text();
+	if (filename.isEmpty())
+	{
+		ui->num_WatkinsStartingMove->setReadOnly(true);
+		return;
+	}
+	auto it = known_solutions.find(filename);
+	if (it == known_solutions.end())
+	{
+		ui->num_WatkinsStartingMove->setReadOnly(false);
+	}
+	else
+	{
+		ui->num_WatkinsStartingMove->setReadOnly(true);
+		ui->num_WatkinsStartingMove->setValue(it->second);
+	}
+}
+
 void SolutionDialog::on_OKClicked()
 {
 	auto warninig = [&](const QString& info)
@@ -421,6 +474,26 @@ void SolutionDialog::on_OKClicked()
 			}
 			data->branchesToSkip.emplace_back(opening_branch, score);
 		}
+	}
+
+	/// Check Watkins solution file.
+	QString file_Watkins = ui->line_Watkins->text();
+	if (file_Watkins.isEmpty())
+	{
+		data->Watkins = "";
+		data->WatkinsStartingPly = -1;
+	}
+	else
+	{
+		QString dir_Watkins = QSettings().value("solutions/path", "").toString() + "/Watkins";
+		QFileInfo fi(dir_Watkins + "/" + file_Watkins);
+		if (!fi.exists())
+		{
+			warninig(tr("Unable to open the Watkins solution file \"%1\" in \"%2\".").arg(file_Watkins).arg(dir_Watkins));
+			return;
+		}
+		data->Watkins = file_Watkins;
+		data->WatkinsStartingPly = ui->num_WatkinsStartingMove->value() * 2 - (data->opening.size() % 2 == 0 ? 2 : 1);
 	}
 
 	/// Accept.

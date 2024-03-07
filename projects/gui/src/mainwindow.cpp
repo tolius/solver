@@ -922,7 +922,10 @@ void MainWindow::showAboutDialog()
 			"Fairy-Stockfish</span></a> (modified)</div>";
 	html += "<div>&bull; Using <a href=\"https://github.com/ddugovic/Stockfish/tree/146269195b1b6a5e9d1121d9fd5767668a48a2a6\">"
 			"<span style=\"text-decoration: underline; color:#569de5;\">"
-			"Multi-Variant Stockfish</span></a> (modified)</div>";
+	        "Multi-Variant Stockfish</span></a> (modified)</div>";
+	html += "<div>&bull; Using <a href=\"https://github.com/niklasf/antichess-tree-server/tree/097dbbce7253151813b06d2e1ad0861ac4e5864f\">"
+	        "<span style=\"text-decoration: underline; color:#569de5;\">"
+	        "Library to query Watkins proof tables</span></a> (modified)</div>";
 	html += "<div>&bull; Using QSS templates of "
 			"<a href=\"https://qss-stock.devsecstudio.com/templates.php\">"
 			"<span style=\"text-decoration: underline; color:#569de5;\">DevSec Studio</span></a> (modified) and "
