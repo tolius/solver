@@ -7,8 +7,6 @@
 #include <QString>
 #include <QDialog>
 
-#include <list>
-#include <map>
 #include <memory>
 #include <tuple>
 #include <chrono>
@@ -50,7 +48,6 @@ private:
 	Ui::SolutionDialog* ui;
 	std::shared_ptr<SolutionData> data;
 	Line branch_to_skip;
-	std::map<QString, int> known_solutions;
 	std::chrono::steady_clock::time_point t_last_opening_edited;
 	std::chrono::steady_clock::time_point t_last_branch_edited;
 	QString board_position;

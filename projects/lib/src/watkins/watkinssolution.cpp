@@ -258,7 +258,7 @@ uint32_t WatkinsTree::get_subtree_size(const node_t* node)
 
 	uint16_t k = node->move >> 12;
 	assert(node_trans_index(node) != 0x3fffffff);
-	assert(node->move == 0xfedc || (k != 7 && k < 9));
+	assert(node->move == 0xfedc || (k != 7 && k < 9)); // or it can be an incomplete solution like 1.Na3 e6 w/o 2.b3
 
 	while (node_is_trans(node))
 		node = trans(node);
@@ -457,8 +457,6 @@ bool WatkinsTree::is_open() const
 std::vector<SolutionEntry> WatkinsTree::get_solution(const std::vector<move_t>& moves, bool calc_num_nodes)
 {
 	std::vector<SolutionEntry> entries;
-	if (moves.empty())
-		return entries;
 
 	query_result_t result;
 	//bool calc_num_nodes = (moves.size() % 2 == 1);

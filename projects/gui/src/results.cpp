@@ -101,6 +101,7 @@ QString Results::positionChanged()
 		solution_entries = solution->nextEntries(board, &missing_entries);
 		if (solution_entries.empty()) {
 			is_book = false;
+			missing_entries.clear();
 			solution_entries = solution->nextPositionEntries(board, &missing_entries);
 			if (!solution_entries.empty())
 				solution_entries.splice(solution_entries.begin(), missing_entries);

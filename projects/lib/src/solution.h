@@ -14,6 +14,7 @@
 
 #include <array>
 #include <list>
+#include <vector>
 #include <map>
 #include <memory>
 #include <tuple>
@@ -190,6 +191,8 @@ public:
 	static const QString DATA_EXT;
 	static const QString TDATA_EXT;
 	static const QString BAK_EXT;
+
+	static const std::map<QString, std::vector<QString>> Watkins_solutions;
 };
 
 #endif // SOLUTION_H

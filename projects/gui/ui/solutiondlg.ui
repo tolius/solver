@@ -262,7 +262,7 @@
      <item row="9" column="1">
       <widget class="QLabel" name="label_6">
        <property name="text">
-        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Optionally, you can specify an existing Watkins solution to be used as a reference. You can download the solutions &lt;a href=&quot;https://magma.maths.usyd.edu.au/~watkins/LOSING_CHESS/&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#569de5;&quot;&gt;here&lt;/span&gt;&lt;/a&gt;. Unzip the downloaded files into the &lt;span style=&quot; font-weight:600; font-style:italic;&quot;&gt;Watkins&lt;/span&gt; subfolder.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Optionally, you can specify an existing Watkins solution to be used as a reference. You can download the solutions &lt;a href=&quot;https://magma.maths.usyd.edu.au/~watkins/LOSING_CHESS/&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#569de5;&quot;&gt;here&lt;/span&gt;&lt;/a&gt;. Unzip the downloaded files into the &lt;span style=&quot; font-weight:600; font-style:italic;&quot;&gt;Watkins&lt;/span&gt; subfolder. Make sure that the file name does not change. For example, the file &lt;span style=&quot; font-style:italic;&quot;&gt;e3wins.rev4.bz2&lt;/span&gt; should get the &lt;span style=&quot; font-style:italic;&quot;&gt;e3wins.rev4&lt;/span&gt; name after unpacking.&lt;/p&gt;&lt;p&gt;* Adding a Watkins's solution can slow down navigation through the positions. This may be especially noticeable immediately after opening the initial position.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
        </property>
        <property name="textFormat">
         <enum>Qt::RichText</enum>

@@ -143,13 +143,14 @@ SolutionDialog::SolutionDialog(QWidget* parent, std::shared_ptr<SolutionData> da
 	}
 	//ui->btn_AddBranchToSkip->setEnabled(false);
 	ui->line_Watkins->setText(data->Watkins);
-	known_solutions = {
-		{"e3wins.rev4", 0}
-	};
-	if (data->WatkinsStartingPly >= 0)
+	if (data->WatkinsStartingPly >= 0) {
 		ui->num_WatkinsStartingMove->setValue(data->WatkinsStartingPly / 2 + 1);
-	else
+		auto it = Solution::Watkins_solutions.find(data->Watkins);
+		ui->num_WatkinsStartingMove->setReadOnly(it != Solution::Watkins_solutions.end());
+	}
+	else {
 		on_WatkinsSolutionChanged();
+	}
 
 	connect(ui->btn_setCurrent, &QPushButton::clicked, this, [this]() { ui->line_Branch->setText(board_position); });
 
@@ -370,15 +371,15 @@ void SolutionDialog::on_WatkinsSolutionChanged()
 		ui->num_WatkinsStartingMove->setReadOnly(true);
 		return;
 	}
-	auto it = known_solutions.find(filename);
-	if (it == known_solutions.end())
+	auto it = Solution::Watkins_solutions.find(filename);
+	if (it == Solution::Watkins_solutions.end())
 	{
 		ui->num_WatkinsStartingMove->setReadOnly(false);
 	}
 	else
 	{
 		ui->num_WatkinsStartingMove->setReadOnly(true);
-		ui->num_WatkinsStartingMove->setValue(it->second);
+		ui->num_WatkinsStartingMove->setValue(it->second.size() / 2 + 1);
 	}
 }
 
@@ -493,7 +494,23 @@ void SolutionDialog::on_OKClicked()
 			return;
 		}
 		data->Watkins = file_Watkins;
-		data->WatkinsStartingPly = ui->num_WatkinsStartingMove->value() * 2 - (data->opening.size() % 2 == 0 ? 2 : 1);
+		bool white_to_win = (data->opening.size() % 2 == 0);
+		data->WatkinsStartingPly = ui->num_WatkinsStartingMove->value() * 2 - (white_to_win ? 1 : 2);
+		if (white_to_win && data->WatkinsStartingPly == 1)
+		{
+			bool is_1e3 = data->opening.front().sourceSquare() == 85 && data->opening.front().targetSquare() == 75;
+			if (is_1e3)
+				data->WatkinsStartingPly--;
+		}
+		auto it = Solution::Watkins_solutions.find(data->Watkins);
+		if (it != Solution::Watkins_solutions.end()) {
+			if (abs(data->WatkinsStartingPly - static_cast<int>(it->second.size())) > 1)
+				warninig(tr("Setting the first ply for the Watkins solution file \"%1\" to %2 instead of %3.")
+				             .arg(data->Watkins)
+				             .arg(it->second.size())
+				             .arg(data->WatkinsStartingPly));
+			data->WatkinsStartingPly = static_cast<int>(it->second.size());
+		}
 	}
 
 	/// Accept.
