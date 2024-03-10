@@ -291,8 +291,7 @@ Move WesternBoard::moveFromLanString(const QString& str)
 	int source = move.sourceSquare();
 	int target = move.targetSquare();
 
-	if (source == m_kingSquare[side]
-	&&  qAbs(source - target) != 1)
+	if (source == m_kingSquare[side] && qAbs(source - target) != 1 && !move.promotion())
 	{
 		const int* rookSq = m_castlingRights.rookSquare[side];
 		if (target == m_castleTarget[side][QueenSide])

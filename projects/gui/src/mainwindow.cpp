@@ -1009,7 +1009,7 @@ void MainWindow::copyPgn()
 		return;
 	//s << *pgn;
 	pgn->writeMoves(s);
-	QString str_pgn = s.readAll().replace('\n', "");
+	QString str_pgn = s.readAll().replace('\n', ' ');
 
 	QClipboard* cb = CuteChessApplication::clipboard();
 	cb->setText(str_pgn);

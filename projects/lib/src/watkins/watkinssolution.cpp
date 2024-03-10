@@ -463,18 +463,7 @@ uint16_t wMove_to_pgMove(move_t wMove)
 	if (promotion >= 0x1000 && promotion <= 0x6000)
 	{
 		pgMove &= ~uint16_t(0x7000);
-		if (promotion == 0x1000)
-			pgMove |= uint16_t(0x0000); // pawn?
-		else if (promotion == 0x2000)
-			pgMove |= uint16_t(0x1000); // knight
-		else if (promotion == 0x3000)
-			pgMove |= uint16_t(0x5000); // king
-		else if (promotion == 0x4000)
-			pgMove |= uint16_t(0x2000); // bishop
-		else if (promotion == 0x5000)
-			pgMove |= uint16_t(0x3000); // rook
-		else if (promotion == 0x6000)
-			pgMove |= uint16_t(0x4000); // queen
+		pgMove |= promotion - uint16_t(0x1000);
 	}
 	return pgMove;
 }
@@ -487,16 +476,7 @@ move_t pgMove_to_wMove(uint16_t pgMove)
 	if (promotion >= 0x1000 && promotion <= 0x5000)
 	{
 		wMove &= ~uint16_t(0x7000);
-		if (promotion == 0x1000)
-			wMove |= uint16_t(0x2000); // knight
-		else if (promotion == 0x2000)
-			wMove |= uint16_t(0x4000); // bishop
-		else if (promotion == 0x3000)
-			wMove |= uint16_t(0x5000); // rook
-		else if (promotion == 0x4000)
-			wMove |= uint16_t(0x6000); // queen
-		else if (promotion == 0x5000)
-			wMove |= uint16_t(0x3000); // king
+		wMove |= promotion + uint16_t(0x1000);
 	}
 	return wMove;
 }

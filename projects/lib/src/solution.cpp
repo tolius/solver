@@ -1165,7 +1165,10 @@ std::vector<SolutionEntry> Solution::eSolutionEntries(Chess::Board* board)
 			}
 			else
 			{
-				emit Message(QString("Error: wrong move %1 (%2) from Watkins's solution, ZS=0x%3").arg(it->san(board)).arg(it->pgMove).arg(board->key(), 16, 16));
+				emit Message(QString("Error: wrong move %1 (%2) from Watkins's solution, ZS=0x%3")
+				                 .arg(it->san(board))
+				                 .arg(it->pgMove)
+				                 .arg(board->key(), 16, 16, QChar('0')));
 				it = entries.erase(it);
 			}
 		}
