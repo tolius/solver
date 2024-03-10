@@ -454,7 +454,54 @@ bool WatkinsTree::is_open() const
 	return tree_size != 0;
 }
 
-std::vector<SolutionEntry> WatkinsTree::get_solution(const std::vector<move_t>& moves, bool calc_num_nodes)
+
+uint16_t wMove_to_pgMove(move_t wMove)
+{
+	uint16_t pgMove = wMove;
+	uint16_t promotion = pgMove & uint16_t(0x7000);
+	assert(promotion == 0 || (promotion >= 0x2000 && promotion <= 0x6000));
+	if (promotion >= 0x1000 && promotion <= 0x6000)
+	{
+		pgMove &= ~uint16_t(0x7000);
+		if (promotion == 0x1000)
+			pgMove |= uint16_t(0x0000); // pawn?
+		else if (promotion == 0x2000)
+			pgMove |= uint16_t(0x1000); // knight
+		else if (promotion == 0x3000)
+			pgMove |= uint16_t(0x5000); // king
+		else if (promotion == 0x4000)
+			pgMove |= uint16_t(0x2000); // bishop
+		else if (promotion == 0x5000)
+			pgMove |= uint16_t(0x3000); // rook
+		else if (promotion == 0x6000)
+			pgMove |= uint16_t(0x4000); // queen
+	}
+	return pgMove;
+}
+
+move_t pgMove_to_wMove(uint16_t pgMove)
+{
+	move_t wMove = pgMove;
+	uint16_t promotion = wMove & uint16_t(0x7000);
+	assert(promotion <= 0x5000);
+	if (promotion >= 0x1000 && promotion <= 0x5000)
+	{
+		wMove &= ~uint16_t(0x7000);
+		if (promotion == 0x1000)
+			wMove |= uint16_t(0x2000); // knight
+		else if (promotion == 0x2000)
+			wMove |= uint16_t(0x4000); // bishop
+		else if (promotion == 0x3000)
+			wMove |= uint16_t(0x5000); // rook
+		else if (promotion == 0x4000)
+			wMove |= uint16_t(0x6000); // queen
+		else if (promotion == 0x5000)
+			wMove |= uint16_t(0x3000); // king
+	}
+	return wMove;
+}
+
+std::vector<SolutionEntry> WatkinsTree::get_solution(const std::vector<uint16_t>& moves, bool calc_num_nodes)
 {
 	std::vector<SolutionEntry> entries;
 
@@ -463,7 +510,8 @@ std::vector<SolutionEntry> WatkinsTree::get_solution(const std::vector<move_t>& 
 	const node_t* node = root;
 	for (size_t i = 0; i < moves.size(); i++)
 	{
-		node = get_move(moves[i], node);
+		move_t move = pgMove_to_wMove(moves[i]);
+		node = get_move(move, node);
 		if (!node)
 			return entries;
 	}
@@ -490,7 +538,8 @@ std::vector<SolutionEntry> WatkinsTree::get_solution(const std::vector<move_t>& 
 	for (auto& r : result)
 	{
 		uint32_t num_nodes = calc_num_nodes ? r.size : 1;
-		entries.emplace_back(r.move, ESOLUTION_VALUE, num_nodes);
+		uint16_t pgMove = wMove_to_pgMove(r.move);
+		entries.emplace_back(pgMove, ESOLUTION_VALUE, num_nodes);
 	}
 	return entries;
 }

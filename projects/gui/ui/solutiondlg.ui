@@ -306,12 +306,12 @@
        <item>
         <widget class="QLabel" name="label_7">
          <property name="text">
-          <string>Starting move:</string>
+          <string>Starting ply:</string>
          </property>
         </widget>
        </item>
        <item>
-        <widget class="QSpinBox" name="num_WatkinsStartingMove">
+        <widget class="QSpinBox" name="num_WatkinsStartingPly">
          <property name="enabled">
           <bool>true</bool>
          </property>
@@ -322,7 +322,7 @@
           <number>1</number>
          </property>
          <property name="maximum">
-          <number>9</number>
+          <number>19</number>
          </property>
         </widget>
        </item>

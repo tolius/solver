@@ -1151,6 +1151,24 @@ std::vector<SolutionEntry> Solution::eSolutionEntries(Chess::Board* board)
 			}
 		}
 		entries = WatkinsSolution.get_solution(moves, true /*temp_board->sideToMove() == side*/);
+#if defined(DEBUG) || defined(_DEBUG)
+		for (auto& entry : entries) {
+			if ((entry.pgMove & 0x7000) >= 0x6000)
+				emit Message(QString("Error: wrong promotion 0x%1 from Watkins's solution: %2").arg((entry.pgMove & 0x7000) >> 12).arg(entry.san(temp_board)));
+		}
+#endif
+		for (auto it = entries.begin(); it != entries.end();)
+		{
+			auto m = board->moveFromGenericMove(it->move());
+			if (board->isLegalMove(m)) {
+				++it;
+			}
+			else
+			{
+				emit Message(QString("Error: wrong move %1 (%2) from Watkins's solution, ZS=0x%3").arg(it->san(board)).arg(it->pgMove).arg(board->key(), 16, 16));
+				it = entries.erase(it);
+			}
+		}
 		if (board->sideToMove() == side) {
 			if (!entries.empty())
 				addToBook(temp_board->key(), entries.front(), FileType_solution_upper);

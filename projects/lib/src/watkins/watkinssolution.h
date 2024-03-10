@@ -50,7 +50,7 @@ public:
 	bool open_tree(const std::filesystem::path& filepath);
 	void close_tree();
     bool is_open() const;
-	std::vector<SolutionEntry> get_solution(const std::vector<move_t>& moves, bool calc_num_nodes);
+	std::vector<SolutionEntry> get_solution(const std::vector<uint16_t>& moves, bool calc_num_nodes);
 
 private:
 	const node_t* next(const node_t* node) const;
