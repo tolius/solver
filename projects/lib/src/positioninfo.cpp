@@ -32,6 +32,10 @@ SolverMove::SolverMove(std::shared_ptr<SolutionEntry> entry, std::shared_ptr<Che
     : SolverMove(entry->move(board), entry->weight, entry->learn)
 {}
 
+SolverMove::SolverMove(const SolutionEntry& entry, std::shared_ptr<Chess::Board> board)
+    : SolverMove(entry.move(board), entry.weight, entry.learn)
+{}
+
 bool SolverMove::isNull() const
 {
 	return move.isNull();

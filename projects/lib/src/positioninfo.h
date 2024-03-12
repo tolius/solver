@@ -38,6 +38,7 @@ struct LIB_EXPORT SolverMove
 	SolverMove();
 	SolverMove(Chess::Move move, qint16 score, quint32 depth_time);
 	SolverMove(std::shared_ptr<SolutionEntry> entry, std::shared_ptr<Chess::Board> board);
+	SolverMove(const SolutionEntry& entry, std::shared_ptr<Chess::Board> board);
 
 	bool isNull() const;
 	quint32 depth() const;

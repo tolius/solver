@@ -291,8 +291,9 @@ Move WesternBoard::moveFromLanString(const QString& str)
 	int source = move.sourceSquare();
 	int target = move.targetSquare();
 
-	if (source == m_kingSquare[side] && qAbs(source - target) != 1 && !move.promotion())
+	if (source == m_kingSquare[side] && qAbs(source - target) != 1)
 	{
+		assert(!move.promotion());
 		const int* rookSq = m_castlingRights.rookSquare[side];
 		if (target == m_castleTarget[side][QueenSide])
 			target = rookSq[QueenSide];
@@ -1049,7 +1050,7 @@ void WesternBoard::vUndoMove(const Move& move)
 		m_history.pop_back();
 		return;
 	}
-	else if (target == m_kingSquare[side])
+	else if (move.promotion() == Piece::NoPiece && target == m_kingSquare[side])
 	{
 		m_kingSquare[side] = source;
 	}

@@ -557,7 +557,7 @@ void Solver::find_solution(SolverMove& move, SolverState& info, pMove& best_move
 		{
 			evaluate_position(move, info, best_move, solver_move);
 		}
-		is_solver_path = (solver_move && solver_move->move == best_move->move) || (is_solver_Watkins && (board->plyCount() <= 2 || board->plyCount() <= 5));  // the latter is if that's a White opening such as 1.h3, which doesn't have the first node(s)
+		is_solver_path = (solver_move && solver_move->move == best_move->move) || (is_solver_Watkins && (board->plyCount() < sol->WatkinsStartingPly));
 		if (!info.is_alt()) {
 			if (best_move->score > ABOVE_EG)
 				info.num_winning_moves++;
@@ -850,7 +850,10 @@ Solver::pMove Solver::get_existing(pBoard board) const
 
 Solver::pMove Solver::get_solution_move() const
 {
-	return nullptr;
+	auto entries = sol->eSolutionEntries(board);
+	if (entries.empty())
+		return nullptr;
+	return make_shared<SolverMove>(entries.front(), board);
 }
 
 Solver::pMove Solver::get_esolution_move() const
