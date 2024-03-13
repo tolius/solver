@@ -27,40 +27,40 @@ const QString Solution::DATA_EXT  = "bin";
 const QString Solution::TDATA_EXT = "tbin";
 const QString Solution::BAK_EXT   = "bak";
 
-const std::map<QString, std::vector<QString>> Solution::Watkins_solutions = {
-	{ "e3wins.rev4",          {                                                 } },
-	{ "a3e6_rev_new.proof",   { "a3", "e6"                                      } },
-	{ "b4.LOST.proof",        { "b4", "c5"                                      } },
-	{ "b4.new.LOST.proof",    { "b4", "c5"                                      } },
-	{ "b4c5_rev.proof",       { "b4", "c5", "bxc5", "a5"                        } },
-	{ "c3.LOST.proof",        { "c3", "e5"                                      } },
-	{ "c3e5.rev",             { "c3", "e5"                                      } },
-	{ "e3b5.done",            { "e3", "b5", "Bxb5"                              } },
-	{ "e3b5.rev2",            { "e3", "b5", "Bxb5"                              } },
-	{ "e3b6.proof",           { "e3", "b6", "a4"                                } },
-	{ "e3b6.2a4e6.rev2",      { "e3", "b6", "a4"                                } },
-	{ "e3b6.no2e6.rev2",      { "e3", "b6", "a4"                                } },
-	{ "e3c5.done",            { "e3", "c5", "Bb5"                               } },
-	{ "e3c5.rev3",            { "e3", "c5", "Bb5"                               } },
-	{ "e3c6.done",            { "e3", "c6", "Bb5", "cxb5", "b4"                 } },
-	{ "e3c6.rev2",            { "e3", "c6", "Bb5", "cxb5", "b4"                 } },
-	{ "e3e6.done",            { "e3", "e6", "b4"                                } },
-	{ "e3e6.rev2",            { "e3", "e6", "b4", "Bxb4", "Qg4", "Bxd2", "Qxg7" } },
-	{ "e3g5.done",            { "e3", "g5", "Ba6"                               } },
-	{ "e3g5.rev3",            { "e3", "g5", "Ba6"                               } },
-	{ "e3Nc6.done",           { "e3", "Nc6", "Ba6", "bxa6", "a4"                } },
-	{ "e3Nc6.rev2",           { "e3", "Nc6", "Ba6", "bxa6", "a4"                } },
-	{ "e3Nh6.done",           { "e3", "Nh6", "Ba6"                              } },
-	{ "e3Nh6.rev2",           { "e3", "Nh6", "Ba6"                              } },
-	{ "easy12.done",          { "e3"                                            } },
-	{ "easy12.rev",           {                                                 } },
-	{ "f3d5_new.proof",       { "f3", "d5"                                      } },
-	{ "h3.LOST.proof",        { "h3", "Nh6"                                     } },
-	{ "myNa6e3.nob3v2.proof", { "Na3", "e6"                                     } },
-	{ "Na3e6.proof",          { "Na3", "e6"                                     } },
-	{ "Na3e6_no_b3.proof",    { "Na3", "e6"                                     } },
-	{ "old_f3d5_rev.proof",   { "f3", "d5"                                      } },
-};
+//const std::map<QString, QStringList> Watkins_solutions = {
+//	{ "e3wins.rev4",          {                                                 } },
+//	{ "a3e6_rev_new.proof",   { "a3", "e6"                                      } },
+//	{ "b4.LOST.proof",        { "b4", "c5"                                      } },
+//	{ "b4.new.LOST.proof",    { "b4", "c5"                                      } },
+//	{ "b4c5_rev.proof",       { "b4", "c5", "bxc5", "a5"                        } },
+//	{ "c3.LOST.proof",        { "c3", "e5"                                      } },
+//	{ "c3e5.rev",             { "c3", "e5"                                      } },
+//	{ "e3b5.done",            { "e3", "b5", "Bxb5"                              } },
+//	{ "e3b5.rev2",            { "e3", "b5", "Bxb5"                              } },
+//	{ "e3b6.proof",           { "e3", "b6", "a4"                                } },
+//	{ "e3b6.2a4e6.rev2",      { "e3", "b6", "a4"                                } },
+//	{ "e3b6.no2e6.rev2",      { "e3", "b6", "a4"                                } },
+//	{ "e3c5.done",            { "e3", "c5", "Bb5"                               } },
+//	{ "e3c5.rev3",            { "e3", "c5", "Bb5"                               } },
+//	{ "e3c6.done",            { "e3", "c6", "Bb5", "cxb5", "b4"                 } },
+//	{ "e3c6.rev2",            { "e3", "c6", "Bb5", "cxb5", "b4"                 } },
+//	{ "e3e6.done",            { "e3", "e6", "b4"                                } },
+//	{ "e3e6.rev2",            { "e3", "e6", "b4", "Bxb4", "Qg4", "Bxd2", "Qxg7" } },
+//	{ "e3g5.done",            { "e3", "g5", "Ba6"                               } },
+//	{ "e3g5.rev3",            { "e3", "g5", "Ba6"                               } },
+//	{ "e3Nc6.done",           { "e3", "Nc6", "Ba6", "bxa6", "a4"                } },
+//	{ "e3Nc6.rev2",           { "e3", "Nc6", "Ba6", "bxa6", "a4"                } },
+//	{ "e3Nh6.done",           { "e3", "Nh6", "Ba6"                              } },
+//	{ "e3Nh6.rev2",           { "e3", "Nh6", "Ba6"                              } },
+//	{ "easy12.done",          { "e3"                                            } },
+//	{ "easy12.rev",           {                                                 } },
+//	{ "f3d5_new.proof",       { "f3", "d5"                                      } },
+//	{ "h3.LOST.proof",        { "h3", "Nh6"                                     } },
+//	{ "myNa6e3.nob3v2.proof", { "Na3", "e6"                                     } },
+//	{ "Na3e6.proof",          { "Na3", "e6"                                     } },
+//	{ "Na3e6_no_b3.proof",    { "Na3", "e6"                                     } },
+//	{ "old_f3d5_rev.proof",   { "f3", "d5"                                      } },
+//};
 
 
 MoveEntry::MoveEntry(const QString& san, const SolutionEntry& entry)
@@ -697,6 +697,49 @@ QString Solution::positionInfo(std::shared_ptr<Chess::Board> board)
 	return info;
 }
 
+QString Solution::eSolutionInfo(Chess::Board* board)
+{
+	if (Watkins.isEmpty() || WatkinsStartingPly == 0 || !eSolutionEntries(board).empty())
+		return "";
+
+	if (WatkinsOpeningSan.isEmpty() && !WatkinsSolution.is_open())
+	{
+		fs::path filepath = folder.toStdString();
+		filepath /= "Watkins";
+		filepath /= Watkins.toStdString();
+		auto moves = WatkinsTree::opening_moves(filepath);
+		if (!moves) {
+			emit Message(QString("Failed to read the solution file \"%1\".").arg(Watkins));
+			Watkins = "";
+			return "";
+		}
+		using namespace Chess;
+		shared_ptr<Board> temp_board(BoardFactory::create("antichess"));
+		temp_board->setFenString(temp_board->defaultFenString());
+		QStringList san_moves;
+		for (const auto& pgMove : *moves)
+		{
+			auto move = temp_board->moveFromGenericMove(OpeningBook::moveFromBits(pgMove));
+			if (!temp_board->isLegalMove(move)) {
+				emit Message(QString("Error: wrong move in the Watkins solution \"%1\".").arg(Watkins));
+				Watkins = "";
+				return "";
+			}
+			QString san = temp_board->moveString(move, Board::StandardAlgebraic);
+			if (temp_board->plyCount() % 2 == 0)
+				san_moves.push_back(QString("%1.%2").arg(1 + temp_board->plyCount() / 2).arg(san));
+			else
+				san_moves.push_back(san);
+			temp_board->makeMove(move);
+		}
+		WatkinsOpeningSan = san_moves.join(' ');
+	}
+
+	if (WatkinsOpeningSan.isEmpty())
+		return "";
+	return QString("Watkins solution: %1").arg(WatkinsOpeningSan);
+}
+
 Chess::Side Solution::winSide() const
 {
 	return side;
@@ -902,6 +945,8 @@ void Solution::edit(std::shared_ptr<SolutionData> data)
 		s.setValue("Watkins", Watkins);
 		s.setValue("Watkins_starting_ply", WatkinsStartingPly);
 		WatkinsSolution.close_tree();
+		WatkinsOpening.clear();
+		WatkinsOpeningSan = "";
 	}
 }
 
@@ -1111,32 +1156,9 @@ std::vector<SolutionEntry> Solution::eSolutionEntries(Chess::Board* board)
 		return entries;
 	if (board->MoveHistory().size() < WatkinsStartingPly)
 		return entries;
-
-	using namespace Chess;
-	shared_ptr<Board> temp_board(BoardFactory::create("antichess"));
-	temp_board->setFenString(temp_board->defaultFenString());
-	auto it = Watkins_solutions.find(Watkins);
-	if (it != Watkins_solutions.end() && board->MoveHistory().size() < it->second.size())
-		return entries;
-	for (int i = 0; i < WatkinsStartingPly; i++)
-	{
-		if (it != Watkins_solutions.end() && i < it->second.size()) {
-			QString san = temp_board->moveString(board->MoveHistory()[i].move, Chess::Board::StandardAlgebraic);
-			if (san != it->second[i])
-				return entries;
-		}
-		temp_board->makeMove(board->MoveHistory()[i].move);
-	}
-	std::vector<move_t> moves;
-	for (int i = WatkinsStartingPly; i < board->MoveHistory().size(); i++)
-	{
-		auto& m = board->MoveHistory()[i].move;
-		auto pgMove = OpeningBook::moveToBits(temp_board->genericMove(m));
-		moves.push_back(pgMove);
-		temp_board->makeMove(m);
-	}
 	try
 	{
+		using namespace Chess;
 		if (!WatkinsSolution.is_open())
 		{
 			emit Message(QString("Opening Watkins solution file \"%1\"...").arg(Watkins));
@@ -1144,11 +1166,68 @@ std::vector<SolutionEntry> Solution::eSolutionEntries(Chess::Board* board)
 			filepath /= "Watkins";
 			filepath /= Watkins.toStdString();
 			bool is_ok = WatkinsSolution.open_tree(filepath);
+			shared_ptr<vector<uint16_t>> opening_moves;
+			if (is_ok)
+			{
+				opening_moves = WatkinsSolution.opening_moves();
+				if (opening_moves)
+				{
+					if (opening_moves->size() != WatkinsStartingPly) {
+						WatkinsStartingPly = static_cast<int>(opening_moves->size());
+						emit Message(QString("The starting ply for the Watkins solution changed to %1").arg(WatkinsStartingPly));
+					}
+					shared_ptr<Board> temp_board(BoardFactory::create("antichess"));
+					temp_board->setFenString(temp_board->defaultFenString());
+					WatkinsOpening.clear();
+					WatkinsOpeningSan = "";
+					QStringList san_moves;
+					size_t i = 0;
+					for (const auto& pgMove : *opening_moves)
+					{
+						auto move = temp_board->moveFromGenericMove(OpeningBook::moveFromBits(pgMove));
+						if (!temp_board->isLegalMove(move)) {
+							emit Message(QString("Error: wrong move in the Watkins solution \"%1\".").arg(Watkins));
+							Watkins = "";
+							return entries;
+						}
+						WatkinsOpening.push_back(move);
+						QString san = temp_board->moveString(move, Board::StandardAlgebraic);
+						if (i++ % 2 == 0)
+							san_moves.push_back(QString("%1.%2").arg(1 + i / 2).arg(san));
+						else
+							san_moves.push_back(san);
+						temp_board->makeMove(move);
+					}
+					WatkinsOpeningSan = san_moves.join(' ');
+				}
+				else {
+					is_ok = false;
+				}
+			}
 			if (!is_ok) {
 				emit Message(QString("Failed to open the solution file \"%1\".").arg(Watkins));
 				Watkins = "";
 				return entries;
 			}
+		}
+
+		shared_ptr<Board> temp_board(BoardFactory::create("antichess"));
+		temp_board->setFenString(temp_board->defaultFenString());
+		assert(board->MoveHistory().size() >= WatkinsStartingPly);
+		for (int i = 0; i < WatkinsStartingPly; i++) {
+			auto& m = board->MoveHistory()[i].move;
+			if (m != WatkinsOpening[i])
+				return entries;
+			temp_board->makeMove(m);
+		}
+
+		std::vector<move_t> moves;
+		for (int i = WatkinsStartingPly; i < board->MoveHistory().size(); i++)
+		{
+			auto& m = board->MoveHistory()[i].move;
+			auto pgMove = OpeningBook::moveToBits(temp_board->genericMove(m));
+			moves.push_back(pgMove);
+			temp_board->makeMove(m);
 		}
 		entries = WatkinsSolution.get_solution(moves, true /*temp_board->sideToMove() == side*/);
 #if defined(DEBUG) || defined(_DEBUG)

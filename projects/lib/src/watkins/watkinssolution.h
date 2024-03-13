@@ -52,6 +52,9 @@ public:
     bool is_open() const;
 	std::vector<SolutionEntry> get_solution(const std::vector<uint16_t>& moves, bool calc_num_nodes);
 
+	std::shared_ptr<std::vector<uint16_t>> opening_moves();
+	static std::shared_ptr<std::vector<uint16_t>> opening_moves(const std::filesystem::path& filepath);
+
 private:
 	const node_t* next(const node_t* node) const;
 	node_t* from_index(uint32_t index) const;
@@ -78,7 +81,7 @@ private:
 	size_t num_pages;
 #endif
 
-	uint32_t prolog_len;
+	uint32_t prolog_len = 0;
 	move_t* prolog;
 
 	node_t* root;
@@ -90,6 +93,9 @@ private:
 	size_t num_hash_entries;
 
 	std::vector<uint64_t> arr;
+
+private:
+	constexpr static size_t MAX_NUM_OPENING_MOVES = 32;
 };
 
 #endif  // #ifndef WATKINSSOLUTION_H_

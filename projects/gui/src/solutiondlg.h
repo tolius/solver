@@ -51,6 +51,7 @@ private:
 	std::chrono::steady_clock::time_point t_last_opening_edited;
 	std::chrono::steady_clock::time_point t_last_branch_edited;
 	QString board_position;
+	int WatkinsStartingPly;
 };
 
 #endif // SOLUTIONDIALOG_H

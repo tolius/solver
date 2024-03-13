@@ -29,6 +29,7 @@ Results::Results(QWidget* parent)
 	m_flowLayout = new FlowLayout(ui->widget_Solution, 6, 6);
 	ui->widget_Solution->setLayout(m_flowLayout);
 	//ui->scrollArea->setWidget(ui->widget_Solution);
+	ui->label_Info->setVisible(false);
 	ui->widget_ResultInfo->setVisible(false);
 }
 
@@ -112,6 +113,10 @@ QString Results::positionChanged()
 	}
 	if (!solution_entries.empty())
 		best_score = solution_entries.front().getScore(is_book);
+
+	QString eSolution_info = solution->eSolutionInfo(board);
+	ui->label_Info->setVisible(!eSolution_info.isEmpty());
+	ui->label_Info->setText(eSolution_info);
 
 	// Create buttons
 	std::vector<QPushButton*> buttons;

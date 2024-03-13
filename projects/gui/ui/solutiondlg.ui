@@ -74,6 +74,19 @@
        </property>
       </widget>
      </item>
+     <item row="1" column="0">
+      <spacer name="verticalSpacer_5">
+       <property name="orientation">
+        <enum>Qt::Vertical</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>20</width>
+         <height>1</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
      <item row="1" column="1">
       <widget class="QLabel" name="label_Opening">
        <property name="sizePolicy">
@@ -92,6 +105,19 @@
         <bool>true</bool>
        </property>
       </widget>
+     </item>
+     <item row="2" column="0">
+      <spacer name="verticalSpacer_8">
+       <property name="orientation">
+        <enum>Qt::Vertical</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>20</width>
+         <height>1</height>
+        </size>
+       </property>
+      </spacer>
      </item>
      <item row="2" column="1">
       <spacer name="verticalSpacer_2">
@@ -113,6 +139,40 @@
        </property>
       </widget>
      </item>
+     <item row="3" column="1">
+      <layout class="QHBoxLayout" name="horizontalLayout_4">
+       <property name="topMargin">
+        <number>0</number>
+       </property>
+       <item>
+        <widget class="QLineEdit" name="line_Branch">
+         <property name="maxLength">
+          <number>500</number>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="btn_setCurrent">
+         <property name="text">
+          <string>Current</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+     <item row="4" column="0">
+      <spacer name="verticalSpacer_6">
+       <property name="orientation">
+        <enum>Qt::Vertical</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>20</width>
+         <height>1</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
      <item row="4" column="1">
       <widget class="QLabel" name="label_Branch">
        <property name="text">
@@ -125,6 +185,19 @@
         <bool>true</bool>
        </property>
       </widget>
+     </item>
+     <item row="5" column="0">
+      <spacer name="verticalSpacer_9">
+       <property name="orientation">
+        <enum>Qt::Vertical</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>20</width>
+         <height>1</height>
+        </size>
+       </property>
+      </spacer>
      </item>
      <item row="5" column="1">
       <spacer name="verticalSpacer_3">
@@ -153,45 +226,6 @@
        </property>
       </widget>
      </item>
-     <item row="7" column="1">
-      <widget class="QLabel" name="label_Tag">
-       <property name="text">
-        <string>Fill this field only if you already have a solution for this opening and for some reason you want to create another one, rather than use different branches, changing them from time to time. Note that it is currently not possible to merge different files of the same opening (with and without tag).</string>
-       </property>
-       <property name="textFormat">
-        <enum>Qt::RichText</enum>
-       </property>
-       <property name="wordWrap">
-        <bool>true</bool>
-       </property>
-      </widget>
-     </item>
-     <item row="1" column="0">
-      <spacer name="verticalSpacer_5">
-       <property name="orientation">
-        <enum>Qt::Vertical</enum>
-       </property>
-       <property name="sizeHint" stdset="0">
-        <size>
-         <width>20</width>
-         <height>1</height>
-        </size>
-       </property>
-      </spacer>
-     </item>
-     <item row="4" column="0">
-      <spacer name="verticalSpacer_6">
-       <property name="orientation">
-        <enum>Qt::Vertical</enum>
-       </property>
-       <property name="sizeHint" stdset="0">
-        <size>
-         <width>20</width>
-         <height>1</height>
-        </size>
-       </property>
-      </spacer>
-     </item>
      <item row="7" column="0">
       <spacer name="verticalSpacer_7">
        <property name="orientation">
@@ -205,52 +239,18 @@
        </property>
       </spacer>
      </item>
-     <item row="2" column="0">
-      <spacer name="verticalSpacer_8">
-       <property name="orientation">
-        <enum>Qt::Vertical</enum>
+     <item row="7" column="1">
+      <widget class="QLabel" name="label_Tag">
+       <property name="text">
+        <string>Fill this field only if you already have a solution for this opening and for some reason you want to create another one, rather than use different branches, changing them from time to time. Note that it is currently not possible to merge different files of the same opening (with and without tag).</string>
        </property>
-       <property name="sizeHint" stdset="0">
-        <size>
-         <width>20</width>
-         <height>1</height>
-        </size>
+       <property name="textFormat">
+        <enum>Qt::RichText</enum>
        </property>
-      </spacer>
-     </item>
-     <item row="5" column="0">
-      <spacer name="verticalSpacer_9">
-       <property name="orientation">
-        <enum>Qt::Vertical</enum>
+       <property name="wordWrap">
+        <bool>true</bool>
        </property>
-       <property name="sizeHint" stdset="0">
-        <size>
-         <width>20</width>
-         <height>1</height>
-        </size>
-       </property>
-      </spacer>
-     </item>
-     <item row="3" column="1">
-      <layout class="QHBoxLayout" name="horizontalLayout_4">
-       <property name="topMargin">
-        <number>0</number>
-       </property>
-       <item>
-        <widget class="QLineEdit" name="line_Branch">
-         <property name="maxLength">
-          <number>500</number>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QPushButton" name="btn_setCurrent">
-         <property name="text">
-          <string>Current</string>
-         </property>
-        </widget>
-       </item>
-      </layout>
+      </widget>
      </item>
      <item row="8" column="0">
       <widget class="QLabel" name="label_5">
@@ -259,10 +259,61 @@
        </property>
       </widget>
      </item>
+     <item row="8" column="1">
+      <layout class="QVBoxLayout" name="verticalLayout_2">
+       <item>
+        <layout class="QHBoxLayout" name="horizontalLayout_5">
+         <item>
+          <widget class="QLineEdit" name="line_Watkins"/>
+         </item>
+         <item>
+          <widget class="QPushButton" name="btn_BrowseWatkins">
+           <property name="text">
+            <string>Browse...</string>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+       <item>
+        <widget class="QLabel" name="label_WatkinsOpening">
+         <property name="font">
+          <font>
+           <weight>75</weight>
+           <italic>true</italic>
+           <bold>true</bold>
+          </font>
+         </property>
+         <property name="text">
+          <string/>
+         </property>
+         <property name="textFormat">
+          <enum>Qt::PlainText</enum>
+         </property>
+         <property name="wordWrap">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+     <item row="9" column="0">
+      <spacer name="verticalSpacer_4">
+       <property name="orientation">
+        <enum>Qt::Vertical</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>20</width>
+         <height>10</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
      <item row="9" column="1">
       <widget class="QLabel" name="label_6">
        <property name="text">
-        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Optionally, you can specify an existing Watkins solution to be used as a reference. You can download the solutions &lt;a href=&quot;https://magma.maths.usyd.edu.au/~watkins/LOSING_CHESS/&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#569de5;&quot;&gt;here&lt;/span&gt;&lt;/a&gt;. Unzip the downloaded files into the &lt;span style=&quot; font-weight:600; font-style:italic;&quot;&gt;Watkins&lt;/span&gt; subfolder. Make sure that the file name does not change. For example, the file &lt;span style=&quot; font-style:italic;&quot;&gt;e3wins.rev4.bz2&lt;/span&gt; should get the &lt;span style=&quot; font-style:italic;&quot;&gt;e3wins.rev4&lt;/span&gt; name after unpacking.&lt;/p&gt;&lt;p&gt;* Adding a Watkins's solution can slow down navigation through the positions. This may be especially noticeable immediately after opening the initial position.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+        <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Optionally, you can specify an existing Watkins solution to be used as a reference. You can download the solutions &lt;a href=&quot;https://magma.maths.usyd.edu.au/~watkins/LOSING_CHESS/&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#569de5;&quot;&gt;here&lt;/span&gt;&lt;/a&gt;. Unzip the downloaded files into the &lt;span style=&quot; font-weight:600; font-style:italic;&quot;&gt;Watkins&lt;/span&gt; subfolder.&lt;/p&gt;&lt;p&gt;* Adding a Watkins's solution can slow down navigation through the positions. This may be especially noticeable immediately after opening the initial position.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
        </property>
        <property name="textFormat">
         <enum>Qt::RichText</enum>
@@ -275,59 +326,6 @@
        </property>
       </widget>
      </item>
-     <item row="8" column="1">
-      <layout class="QHBoxLayout" name="horizontalLayout_5">
-       <item>
-        <widget class="QLineEdit" name="line_Watkins"/>
-       </item>
-       <item>
-        <widget class="QPushButton" name="btn_BrowseWatkins">
-         <property name="text">
-          <string>Browse...</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <spacer name="horizontalSpacer_2">
-         <property name="orientation">
-          <enum>Qt::Horizontal</enum>
-         </property>
-         <property name="sizeType">
-          <enum>QSizePolicy::Fixed</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>10</width>
-           <height>20</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
-       <item>
-        <widget class="QLabel" name="label_7">
-         <property name="text">
-          <string>Starting ply:</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QSpinBox" name="num_WatkinsStartingPly">
-         <property name="enabled">
-          <bool>true</bool>
-         </property>
-         <property name="readOnly">
-          <bool>true</bool>
-         </property>
-         <property name="minimum">
-          <number>1</number>
-         </property>
-         <property name="maximum">
-          <number>19</number>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </item>
      <item row="10" column="1">
       <spacer name="verticalSpacer_12">
        <property name="orientation">
@@ -337,19 +335,6 @@
         <size>
          <width>20</width>
          <height>40</height>
-        </size>
-       </property>
-      </spacer>
-     </item>
-     <item row="9" column="0">
-      <spacer name="verticalSpacer_4">
-       <property name="orientation">
-        <enum>Qt::Vertical</enum>
-       </property>
-       <property name="sizeHint" stdset="0">
-        <size>
-         <width>20</width>
-         <height>10</height>
         </size>
        </property>
       </spacer>

@@ -126,6 +126,7 @@ public:
 	std::shared_ptr<SolutionEntry> bookEntry(std::shared_ptr<Chess::Board> board, FileType type) const;
 	std::shared_ptr<SolutionEntry> bookEntry(Chess::Board* board, FileType type) const;
 	QString positionInfo(std::shared_ptr<Chess::Board> board);
+	QString eSolutionInfo(Chess::Board* board);
 	QString info() const;
 	QString nameToShow(bool include_tag = false) const;
 	std::tuple<QString, QString> branchToShow(bool include_tag = false) const;
@@ -167,6 +168,8 @@ private:
 	std::list<BranchToSkip> branchesToSkip;
 	QString Watkins;
 	int WatkinsStartingPly;
+	std::vector<Chess::Move> WatkinsOpening;
+	QString WatkinsOpeningSan;
 	WatkinsTree WatkinsSolution;
 	QString folder;
 	QString name;
@@ -191,8 +194,6 @@ public:
 	static const QString DATA_EXT;
 	static const QString TDATA_EXT;
 	static const QString BAK_EXT;
-
-	static const std::map<QString, std::vector<QString>> Watkins_solutions;
 };
 
 #endif // SOLUTION_H

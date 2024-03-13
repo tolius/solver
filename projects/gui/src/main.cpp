@@ -20,6 +20,20 @@
 
 #include "cutechessapp.h"
 
+#include "board/genericmove.h"
+#include "board/move.h"
+#include "board/side.h"
+#include "board/result.h"
+//#include "moveevaluation.h"
+#include "tb/bitboard.h"
+#include "tb/endgame.h"
+#include "tb/position.h"
+#include "tb/search.h"
+#include "tb/thread.h"
+#include "tb/tt.h"
+#include "tb/uci.h"
+#include "tb/syzygy/tbprobe.h"
+
 #include <QLoggingCategory>
 #include <QTextStream>
 #include <QStringList>
@@ -27,11 +41,10 @@
 #include <QTranslator>
 #include <QSysInfo>
 
-#include <board/genericmove.h>
-#include <board/move.h>
-#include <board/side.h>
-#include <board/result.h>
-//#include <moveevaluation.h>
+namespace PSQT {
+	void init();
+}
+
 
 int main(int argc, char* argv[])
 {
@@ -41,6 +54,17 @@ int main(int argc, char* argv[])
 	qRegisterMetaType<Chess::Side>("Chess::Side");
 	qRegisterMetaType<Chess::Result>("Chess::Result");
 	//qRegisterMetaType<MoveEvaluation>("MoveEvaluation");
+
+	CommandLine::init(argc, argv);
+	UCI::init(Options);
+	Tune::init();
+	PSQT::init();
+	Bitboards::init();
+	Position::init();
+	Bitbases::init();
+	Endgames::init();
+	Threads.set(size_t(Options["Threads"]));
+	Search::clear(); // After threads are up
 
 	QLoggingCategory::defaultCategory()->setEnabled(QtDebugMsg, true);
 
@@ -81,4 +105,6 @@ int main(int argc, char* argv[])
 	}
 	app.newDefaultGame();
 	return app.exec();
+
+	Threads.set(0);
 }

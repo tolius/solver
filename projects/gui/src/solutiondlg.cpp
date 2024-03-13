@@ -16,6 +16,7 @@
 #include <vector>
 #include <set>
 #include <type_traits>
+#include <filesystem>
 #include <assert.h>
 
 
@@ -93,6 +94,7 @@ SolutionDialog::SolutionDialog(QWidget* parent, std::shared_ptr<SolutionData> da
 	}
 
 	this->data = data;
+	WatkinsStartingPly = data->WatkinsStartingPly;
 	QStringList moves_opening, moves_branch;
 	using namespace Chess;
 	shared_ptr<Board> board(BoardFactory::create("antichess"));
@@ -143,14 +145,7 @@ SolutionDialog::SolutionDialog(QWidget* parent, std::shared_ptr<SolutionData> da
 	}
 	//ui->btn_AddBranchToSkip->setEnabled(false);
 	ui->line_Watkins->setText(data->Watkins);
-	if (data->WatkinsStartingPly >= 0) {
-		ui->num_WatkinsStartingPly->setValue(data->WatkinsStartingPly + 1);
-		auto it = Solution::Watkins_solutions.find(data->Watkins);
-		ui->num_WatkinsStartingPly->setReadOnly(it != Solution::Watkins_solutions.end());
-	}
-	else {
-		on_WatkinsSolutionChanged();
-	}
+	ui->label_WatkinsOpening->setVisible(false);
 
 	connect(ui->btn_setCurrent, &QPushButton::clicked, this, [this]() { ui->line_Branch->setText(board_position); });
 
@@ -347,8 +342,8 @@ void SolutionDialog::on_BrowseWatkinsClicked()
 	if (file_Watkins.isEmpty())
 	{
 		ui->line_Watkins->setText("");
-		ui->num_WatkinsStartingPly->setValue(1);
-		ui->num_WatkinsStartingPly->setReadOnly(true);
+		ui->label_WatkinsOpening->setText("");
+		ui->label_WatkinsOpening->setVisible(false);
 		return;
 	}
 	QFileInfo fi_selected(file_Watkins);
@@ -365,22 +360,48 @@ void SolutionDialog::on_BrowseWatkinsClicked()
 
 void SolutionDialog::on_WatkinsSolutionChanged()
 {
-	QString filename = ui->line_Watkins->text();
-	if (filename.isEmpty())
+	auto reset_opening = [this]()
 	{
-		ui->num_WatkinsStartingPly->setReadOnly(true);
+		ui->label_WatkinsOpening->setText("");
+		ui->label_WatkinsOpening->setVisible(false);
+		WatkinsStartingPly = -1;
+	};
+	QString filename = ui->line_Watkins->text();
+	if (filename.isEmpty()) {
+		reset_opening();
 		return;
 	}
-	auto it = Solution::Watkins_solutions.find(filename);
-	if (it == Solution::Watkins_solutions.end())
-	{
-		ui->num_WatkinsStartingPly->setReadOnly(false);
+	
+	QString file_Watkins = QSettings().value("solutions/path", "").toString() + "/Watkins/" + filename;
+	auto moves = WatkinsTree::opening_moves(file_Watkins.toStdString());
+	if (!moves) {
+		reset_opening();
+		return;
 	}
-	else
+
+	using namespace Chess;
+	shared_ptr<Board> board(BoardFactory::create("antichess"));
+	board->setFenString(board->defaultFenString());
+	QStringList san_moves;
+	WatkinsStartingPly = 0;
+	for (const auto& pgMove : *moves)
 	{
-		ui->num_WatkinsStartingPly->setReadOnly(true);
-		ui->num_WatkinsStartingPly->setValue(it->second.size() + 1);
+		auto move = board->moveFromGenericMove(OpeningBook::moveFromBits(pgMove));
+		if (!board->isLegalMove(move)) {
+			reset_opening();
+			return;
+		}
+		QString san = board->moveString(move, Board::StandardAlgebraic);
+		if (board->plyCount() % 2 == 0)
+			san_moves.push_back(QString("%1.%2").arg(1 + board->plyCount() / 2).arg(san));
+		else
+			san_moves.push_back(san);
+		board->makeMove(move);
+		WatkinsStartingPly++;
 	}
+	QString opening = san_moves.join(' ');
+	ui->label_WatkinsOpening->setText(opening);
+	ui->label_WatkinsOpening->setVisible(!opening.isEmpty());
 }
 
 void SolutionDialog::on_OKClicked()
@@ -494,16 +515,7 @@ void SolutionDialog::on_OKClicked()
 			return;
 		}
 		data->Watkins = file_Watkins;
-		data->WatkinsStartingPly = ui->num_WatkinsStartingPly->value() - 1;
-		auto it = Solution::Watkins_solutions.find(data->Watkins);
-		if (it != Solution::Watkins_solutions.end()) {
-			if (abs(data->WatkinsStartingPly - static_cast<int>(it->second.size())) > 1)
-				warninig(tr("Setting the first ply for the Watkins solution file \"%1\" to %2 instead of %3.")
-				             .arg(data->Watkins)
-				             .arg(it->second.size())
-				             .arg(data->WatkinsStartingPly));
-			data->WatkinsStartingPly = static_cast<int>(it->second.size());
-		}
+		data->WatkinsStartingPly = WatkinsStartingPly;
 	}
 
 	/// Accept.

@@ -5,6 +5,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <filesystem>
+#include <fstream>
 #include <fcntl.h>
 #ifdef _WIN32
 #include <io.h>
@@ -522,4 +523,40 @@ std::vector<SolutionEntry> WatkinsTree::get_solution(const std::vector<uint16_t>
 		entries.emplace_back(pgMove, ESOLUTION_VALUE, num_nodes);
 	}
 	return entries;
+}
+
+std::shared_ptr<std::vector<uint16_t>> WatkinsTree::opening_moves(const std::filesystem::path& filepath)
+{
+	using namespace std;
+	error_code err;
+	auto filesize = fs::file_size(filepath, err);
+	if (filesize < 6)
+		return nullptr;
+
+	ifstream file(filepath, ios::binary | ios::in);
+	node_t node;
+	file.read(reinterpret_cast<char*>(&node), 6);
+	if (node.move > MAX_NUM_OPENING_MOVES)
+		return nullptr;
+	if (sizeof(node) + node.move * sizeof(move_t) > filesize)
+		return nullptr;
+
+	auto moves = make_shared<vector<uint16_t>>(node.move);
+	file.read(reinterpret_cast<char*>(moves->data()), node.move * sizeof(move_t));
+	for (uint16_t& move : *moves)
+		move = wMove_to_pgMove(move);
+	return moves;
+}
+
+std::shared_ptr<std::vector<uint16_t>> WatkinsTree::opening_moves()
+{
+	using namespace std;
+	if (!is_open() || prolog_len > MAX_NUM_OPENING_MOVES)
+		return nullptr;
+
+	auto moves = make_shared<vector<uint16_t>>(prolog_len);
+	move_t* pmove = prolog;
+	for (uint16_t& move : *moves)
+		move = wMove_to_pgMove(*pmove++);
+	return moves;
 }
