@@ -475,10 +475,11 @@ void Solver::find_solution(SolverMove& move, SolverState& info, pMove& best_move
 			solver_move = nullptr;
 	}
 	shared_ptr<Position> position;
+	shared_ptr<StateInfo> state;
 	size_t num_pieces = board->numPieces();
 	bool is_endgame = (num_pieces <= 4);
 	if (!is_endgame && !to_copy_solution && num_pieces == 5) {
-		position = boardToPosition(board);
+		tie(position, state) = boardToPosition(board);
 		is_endgame = is_endgame_available(position);
 	}
 	if (solver_move && info.to_force_solver && info.alt_steps < max_alt_steps && !is_endgame && num_pieces > 4 + 1) {

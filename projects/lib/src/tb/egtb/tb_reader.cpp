@@ -342,7 +342,7 @@ tuple<bool, int16_t, uint8_t> TB_Reader::probe_tb(Position& board)
 		if (!auto_load)
 			return { true, 0, 0 };
 		auto next_tb = make_shared<TB_Reader>(tb_name);
-		if (next_tb->is_dz_open()) {
+		if (!next_tb->is_dz_open()) {
 			discard_tb(tb_name);
 			return { true, 0, 0 };
 		}

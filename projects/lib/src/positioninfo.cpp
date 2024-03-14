@@ -288,13 +288,13 @@ int get_max_depth(int score, size_t numPieces)
 	return static_cast<int>(depth);
 }
 
-std::shared_ptr<Position> boardToPosition(std::shared_ptr<Chess::Board> board)
+std::tuple<std::shared_ptr<Position>, std::shared_ptr<StateInfo>> boardToPosition(std::shared_ptr<Chess::Board> board)
 {
-	StateInfo st;
+	auto st = make_shared<StateInfo>();
 	auto pos = make_shared<Position>();
 	string fen = board->fenString().toStdString();
-	pos->set(fen, false, ANTI_VARIANT, &st, Threads.main());
-	return pos;
+	pos->set(fen, false, ANTI_VARIANT, st.get(), Threads.main());
+	return { pos, st };
 }
 
 std::tuple<std::list<SolverMove>, uint8_t> get_endgame_moves(std::shared_ptr<Chess::Board> board, std::shared_ptr<Position> pos, bool apply_50move_rule)
@@ -304,11 +304,9 @@ std::tuple<std::list<SolverMove>, uint8_t> get_endgame_moves(std::shared_ptr<Che
 	if (!init_EGTB())
 		return { moves, DTZ_NONE };
 
-	StateInfo st;
+	shared_ptr<StateInfo> st;
 	if (!pos)
-		pos = boardToPosition(board);
-	string fen = board->fenString().toStdString();
-	pos->set(fen, false, ANTI_VARIANT, &st, Threads.main());
+		tie(pos, st) = boardToPosition(board);
 	int16_t tb_val;
 	uint8_t tb_dtz;
 	bool is_error = TB_Reader::probe_EGTB(*pos, tb_val, tb_dtz);
@@ -333,7 +331,7 @@ std::tuple<std::list<SolverMove>, uint8_t> get_endgame_moves(std::shared_ptr<Che
 		}
 		else
 		{
-			pos = boardToPosition(board); //!! TODO: convert move or use pos directly
+			auto [pos, st] = boardToPosition(board); //!! TODO: convert move or use pos directly
 			int16_t value_i;
 			uint8_t dtz_i;
 			bool is_error = TB_Reader::probe_EGTB(*pos, value_i, dtz_i);

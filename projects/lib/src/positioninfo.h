@@ -30,6 +30,7 @@ namespace Chess
 	class Board;
 }
 class Position;
+struct StateInfo;
 struct SolutionEntry;
 
 
@@ -73,7 +74,7 @@ std::tuple<QString, std::shared_ptr<Chess::Board>> compose_string(const Line& li
 std::tuple<Line, bool> parse_line(const QString& line, const QString& opening = "", std::shared_ptr<Chess::Board> start_pos = nullptr, bool undo_moves = true);
 
 int get_max_depth(int score, size_t num_pieces);
-std::shared_ptr<Position> boardToPosition(std::shared_ptr<Chess::Board> board);
+std::tuple<std::shared_ptr<Position>, std::shared_ptr<StateInfo>> boardToPosition(std::shared_ptr<Chess::Board> board);
 std::tuple<std::list<SolverMove>, uint8_t> get_endgame_moves(std::shared_ptr<Chess::Board> board, std::shared_ptr<Position> position = nullptr, bool apply_50move_rule = true);
 bool init_EGTB();
 bool is_endgame_available(std::shared_ptr<const Position> pos);
