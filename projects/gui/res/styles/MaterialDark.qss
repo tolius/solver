@@ -406,7 +406,6 @@ QTreeView
 	border: 1px solid gray;
 	padding-top : 5px;
 	color: #a9b7c6;
-	font: 8pt;
 }
 QHeaderView::section {
     background-color: #1e1d23;

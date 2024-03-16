@@ -167,10 +167,10 @@ QTabBar::tab
 {
     color: #000;
     min-width: 1px;
-	padding-left: 25px;
-	margin-left:-22px;
+    padding-left: 25px;
+    margin-left:-22px;
     height: 28px;
-	border: none;
+    border: none;
 
 }
 
@@ -178,7 +178,7 @@ QTabBar::tab
 QTabBar::tab:selected 
 {
     color: #000;
-	font-weight: bold;
+    font-weight: bold;
     height: 28px;
 
 }

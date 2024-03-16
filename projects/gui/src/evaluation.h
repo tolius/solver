@@ -21,6 +21,7 @@
 #include <QThread>
 
 #include <array>
+#include <vector>
 #include <set>
 #include <chrono>
 #include <map>
@@ -69,8 +70,6 @@ class Evaluation : public QWidget
 {
 	Q_OBJECT
 
-	constexpr static int NUM_PV_LABELS = 18;
-
 public:
 	Evaluation(GameViewer* game_viewer, QWidget* parent = nullptr);
 
@@ -94,6 +93,7 @@ public slots:
 	void engineChanged(const QString& engine_filename);
 	void engineHashChanged(int hash_size);
 	void engineNumThreadsChanged(int num_threads);
+	void fontSizeChanged(int size);
 
 signals:
 	void tintChanged(QColor tint, bool to_color_move_buttons = false);
@@ -138,7 +138,7 @@ private:
 	Ui::EvaluationWidget* ui;
 	FlowLayout* m_flowLayout;
 	GameViewer* game_viewer;
-	std::array<QLabel*, NUM_PV_LABELS> move_labels;
+	std::vector<std::array<QLabel*, 3>> move_labels;
 	std::map<int, QToolButton*> multiPV_buttons;
 	//QThread solver_thread;
 

@@ -85,9 +85,17 @@ Evaluation::Evaluation(GameViewer* game_viewer, QWidget* parent)
 
 	//m_flowLayout = new FlowLayout(ui->widget_Solution, 6, 6);
 	//ui->widget_Solution->setLayout(m_flowLayout);
-	move_labels = { ui->label_m1,  ui->label_m2,  ui->label_m3,  ui->label_m4,  ui->label_m5,  ui->label_m6,
-		            ui->label_m7,  ui->label_m8,  ui->label_m9,  ui->label_m10, ui->label_m11, ui->label_m12,
-		            ui->label_m13, ui->label_m14, ui->label_m15, ui->label_m16, ui->label_m17, ui->label_m18 };
+	move_labels = {
+		{ ui->label_m01a, ui->label_m01b, ui->label_m01c }, { ui->label_m02a, ui->label_m02b, ui->label_m02c },
+		{ ui->label_m03a, ui->label_m03b, ui->label_m03c }, { ui->label_m04a, ui->label_m04b, ui->label_m04c },
+		{ ui->label_m05a, ui->label_m05b, ui->label_m05c }, { ui->label_m06a, ui->label_m06b, ui->label_m06c },
+		{ ui->label_m07a, ui->label_m07b, ui->label_m07c }, { ui->label_m08a, ui->label_m08b, ui->label_m08c },
+		{ ui->label_m09a, ui->label_m09b, ui->label_m09c }, { ui->label_m10a, ui->label_m10b, ui->label_m10c },
+		{ ui->label_m11a, ui->label_m11b, ui->label_m11c }, { ui->label_m12a, ui->label_m12b, ui->label_m12c },
+		{ ui->label_m13a, ui->label_m13b, ui->label_m13c }, { ui->label_m14a, ui->label_m14b, ui->label_m14c },
+		{ ui->label_m15a, ui->label_m15b, ui->label_m15c }, { ui->label_m16a, ui->label_m16b, ui->label_m16c },
+		{ ui->label_m17a, ui->label_m17b, ui->label_m17c }, { ui->label_m18a, ui->label_m18b, ui->label_m18c }
+	};
 
 	is_endgame = false;
 	move_score = MoveEvaluation::NULL_SCORE;
@@ -116,6 +124,12 @@ Evaluation::Evaluation(GameViewer* game_viewer, QWidget* parent)
 		multiPV_buttons[val] = btn;
 		connect(btn, &QToolButton::toggled, this, [=]() { this->onMultiPVClicked(val); });
 	}
+
+	int font_size = QSettings().value("ui/font_size", 8).toInt();
+	if (font_size <= 0)
+		font_size = 8;
+	fontSizeChanged(font_size);
+	connect(CuteChessApplication::instance(), SIGNAL(fontSizeChanged(int)), this, SLOT(fontSizeChanged(int)));
 
 	connect(ui->btn_Auto, &QPushButton::toggled, this, [&](bool flag) { this->setMode(flag); });
 	connect(ui->btn_Manual, &QPushButton::toggled, this, [&](bool flag) { this->setMode(!flag); });
@@ -204,8 +218,9 @@ void Evaluation::clearEvals()
 
 void Evaluation::clearEvalLabels()
 {
-	for (auto& label : move_labels)
-		label->clear();
+	for (auto& line : move_labels)
+		for (auto& label : line)
+			label->clear();
 	ui->label_Depth->clear();
 	ui->label_Mate->clear();
 	ui->label_BestMove->clear();
@@ -773,9 +788,11 @@ QString score_to_text(int score)
 	return SolutionEntry::score2Text(static_cast<qint16>(score));
 }
 
-QString eval_to_string(const MoveEvaluation& eval, const QString& san)
+void eval_to_string(std::array<QLabel*, 3>& labels, const MoveEvaluation& eval, const QString& san)
 {
-	return QString("%1:%2  %3").arg(eval.depth(), 2).arg(score_to_text(eval.score()), 7).arg(san);
+	labels[0]->setText(QString::number(eval.depth()) + ':');
+	labels[1]->setText(score_to_text(eval.score()));
+	labels[2]->setText(san);
 }
 
 QStringList Evaluation::process_moves(const MoveEvaluation& eval)
@@ -858,21 +875,18 @@ void Evaluation::onEngineEval(const MoveEvaluation& eval)
 	}
 	if (pv - 1 < move_labels.size())
 	{
-		if (session.multi_mode == 0 && pv == 1 && !move_labels[0]->text().endsWith(eval_best_move)) {
-			auto prev_str = move_labels[0]->text();
-			int p = prev_str.lastIndexOf(' ');
-			if (p > 0) {
-				auto move_san = prev_str.midRef(p);
-				for (int i = 1;  i < move_labels.size(); i++)
-				{
-					if (move_labels[i]->text().endsWith(move_san)) {
-						move_labels[i]->setText(prev_str);
-						break;
-					}
+		if (session.multi_mode == 0 && pv == 1 && move_labels[0][2]->text() != eval_best_move) {
+			auto move_san = move_labels[0][2]->text();
+			for (int i = 1;  i < move_labels.size(); i++)
+			{
+				if (move_labels[i][2]->text() == move_san) {
+					move_labels[i][0]->setText(move_labels[0][0]->text());
+					move_labels[i][1]->setText(move_labels[0][1]->text());
+					break;
 				}
 			}
 		}
-		move_labels[pv - 1]->setText(eval_to_string(eval, eval_best_move));
+		eval_to_string(move_labels[pv - 1], eval, eval_best_move);
 	}
 }
 
@@ -1160,4 +1174,18 @@ void Evaluation::onEvaluatePosition()
 	}
 	positionChanged();
 	startEngine();
+}
+
+void Evaluation::fontSizeChanged(int size)
+{
+	QString big = QString("font-size: %1pt; font-weight: bold;").arg(size * 12 / 8);
+	ui->label_LoadingEngine->setStyleSheet(big);
+	ui->label_Mate->setStyleSheet(big);
+	ui->label_BestMove->setStyleSheet(big);
+	QString small = QString("font-size: %1pt;").arg(size * 6 / 8);
+	QString bigger = QString("font-size: %1pt;").arg(size * 9 / 8);
+	for (auto& line : move_labels) {
+		line[0]->setStyleSheet(small);
+		line[2]->setStyleSheet(bigger);
+	}
 }

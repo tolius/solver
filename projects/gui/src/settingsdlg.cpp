@@ -203,7 +203,12 @@ SettingsDialog::SettingsDialog(QWidget* parent)
 		if (i >= 0)
 			ui->m_comboStyle->setCurrentIndex(i);
 	}
+	int font_size = QSettings().value("ui/font_size", 8).toInt();
+	if (font_size <= 8)
+		font_size = 8;
+	ui->m_comboScale->setCurrentIndex((font_size - 8) / 2);
 	connect(ui->m_comboStyle, &QComboBox::currentTextChanged, this, &SettingsDialog::onStylesChanged);
+	connect(ui->m_comboScale, &QComboBox::currentTextChanged, this, &SettingsDialog::onScaleChanged);
 }
 
 SettingsDialog::~SettingsDialog()
@@ -216,6 +221,14 @@ void SettingsDialog::onStylesChanged(QString styles)
 	styles += ".qss";
 	QSettings().setValue("ui/theme", styles);
 	emit stylesChanged(styles);
+}
+
+void SettingsDialog::onScaleChanged(QString scale)
+{
+	int stretch = scale.left(3).toInt();
+	int font_size = (stretch >= 25 && stretch < 1000) ? stretch * 2 / 25 : 8;
+	QSettings().setValue("ui/font_size", font_size);
+	emit fontSizeChanged(font_size);
 }
 
 void SettingsDialog::onEngineChanged(const QString& engine_name)

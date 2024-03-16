@@ -53,7 +53,11 @@ class CuteChessApplication : public QApplication
 		void showSettingsDialog();
 		void closeDialogs();
 		void onQuitAction();
-		void onStylesChanged(const QString& styles);
+		void onStylesChanged(const QString& styles, int fontSize = -1);
+		void onFontSizeChanged(int size);
+
+	signals:
+		void fontSizeChanged(int size);
 
 	private:
 		void showDialog(QWidget* dlg);
@@ -61,8 +65,10 @@ class CuteChessApplication : public QApplication
 		SettingsDialog* m_settingsDialog;
 		EngineManager* m_engineManager;
 		GameManager* m_gameManager;
-		QList<QPointer<MainWindow> > m_gameWindows;
+		QList<QPointer<MainWindow>> m_gameWindows;
 		bool m_initialWindowCreated;
+		QString m_styles;
+		int m_fontSize;
 
 	private slots:
 		void onLastWindowClosed();

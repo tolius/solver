@@ -249,7 +249,6 @@ QDockWidget::float-button:hover
 	border: 1px solid gray;
 	padding-top : 5px;
 	color: #fff;
-	font: 8pt;
 
 }
 

@@ -601,7 +601,6 @@ QTreeView
 	background-color: transparent;
    	border: none;
 	color: #fff;
-	font: 8pt;
 
 }
 
@@ -986,7 +985,7 @@ QScrollBar::add-page:horizontal, QScrollBar::sub-page:horizontal
 QProgressBar
 {
 	border: 1px solid #1d1d1d;
-    text-align: center;
+	text-align: center;
 	border-radius: 10px;
 	color: #fff;
 	font-weight: bold;
@@ -996,9 +995,9 @@ QProgressBar
 
 QProgressBar::chunk
 {
-    background-color: #3b86ae;
+	background-color: #3b86ae;
 	border-radius: 9px;
-    margin: 0.5px;
+	margin: 0.5px;
 
 }
 

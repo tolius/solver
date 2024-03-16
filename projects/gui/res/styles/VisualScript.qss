@@ -187,8 +187,8 @@ QTabWidget::tab-bar
 
 QTabBar::tab 
 {
-	font: 7pt "Verdana";
-	font: bold;
+	font: "Verdana";
+	font-weight: bold;
 	color: #fff;
 	padding-left: 15px; 
 	padding-right: 15px; 
@@ -358,7 +358,6 @@ QTreeWidget
 	border: 1px solid gray;
 	padding-top : 5px;
 	color: #fff;
-	font: 8pt;
 
 }
 

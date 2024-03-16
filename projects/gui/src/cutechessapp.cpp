@@ -42,11 +42,12 @@
 
 
 CuteChessApplication::CuteChessApplication(int& argc, char* argv[])
-	: QApplication(argc, argv),
-	  m_settingsDialog(nullptr),
-	  m_engineManager(nullptr),
-	  m_gameManager(nullptr),
-	  m_initialWindowCreated(false)
+    : QApplication(argc, argv),
+      m_settingsDialog(nullptr),
+      m_engineManager(nullptr),
+      m_gameManager(nullptr),
+      m_initialWindowCreated(false),
+      m_fontSize(8)
 {
 	Mersenne::initialize(QTime(0,0,0).msecsTo(QTime::currentTime()));
 
@@ -82,12 +83,17 @@ CuteChessApplication::CuteChessApplication(int& argc, char* argv[])
 	{
 		QString def_style = QSettings().value("ui/theme", "Combinear.qss").toString();
 		QString s = styles.contains(def_style) ? def_style : styles.front();
-		onStylesChanged(s);
+		int font_size = QSettings().value("ui/font_size", 8).toInt();
+		if (font_size <= 0)
+			font_size = 8;
+		onStylesChanged(s, font_size);
 	}
 
 	connect(this, SIGNAL(lastWindowClosed()), this, SLOT(onLastWindowClosed()));
 	connect(this, SIGNAL(aboutToQuit()), this, SLOT(onAboutToQuit()));
 	connect(m_settingsDialog, SIGNAL(stylesChanged(const QString&)), this, SLOT(onStylesChanged(const QString&)));
+	connect(m_settingsDialog, SIGNAL(fontSizeChanged(int)), this, SLOT(onFontSizeChanged(int)));
+	connect(m_settingsDialog, SIGNAL(fontSizeChanged(int)), this, SIGNAL(fontSizeChanged(int)));
 }
 
 CuteChessApplication::~CuteChessApplication()
@@ -244,10 +250,18 @@ void CuteChessApplication::closeDialogs()
 		m_settingsDialog->close();
 }
 
-void CuteChessApplication::onStylesChanged(const QString& styles)
+void CuteChessApplication::onStylesChanged(const QString& styles, int fontSize)
 {
-	QFile styleFile(QString(":/styles/%1").arg(styles));
+	m_styles = styles;
+	if (fontSize > 0)
+		m_fontSize = fontSize;
+	QFile styleFile(QString(":/styles/%1").arg(m_styles));
 	styleFile.open(QFile::ReadOnly);
 	QString sheet(styleFile.readAll());
-	setStyleSheet(sheet);
+	setStyleSheet(QString("QWidget { font-size : %1pt; }\n").arg(m_fontSize) + sheet);
+}
+
+void CuteChessApplication::onFontSizeChanged(int fontSize)
+{
+	onStylesChanged(m_styles, fontSize);
 }

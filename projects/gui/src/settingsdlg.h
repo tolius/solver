@@ -17,11 +17,13 @@ public:
 
 private slots:
 	void onStylesChanged(QString styles);
+	void onScaleChanged(QString scale);
 private:
 	void onEngineChanged(const QString& engine_name);
 
 signals:
-	void stylesChanged(const QString& styles);
+	void stylesChanged(QString styles);
+	void fontSizeChanged(int size);
 	void engineChanged(const QString& engine_filename);
 	void engineHashChanged(int hash_size);
 	void engineNumThreadsChanged(int num_threads);
