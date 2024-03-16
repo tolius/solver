@@ -239,6 +239,14 @@ void Solver::start(pBoard new_pos, std::function<void(QString)> message)
 		for (const auto& move : sol->branch)
 			board->makeMove(move);
 	}
+	catch (runtime_error e)
+	{
+		emit Message("Due to the error, the app may not work properly. Please restart it.");
+	}
+	catch (exception e)
+	{
+		emit Message(QString("Due to an error, the app may not work properly. Please restart it. Error: %1").arg(e.what()));
+	}
 	emit Message(QString("Finishing solving %1").arg(sol_name));
 	if (status != Status::solving)
 		return;
@@ -435,8 +443,6 @@ void Solver::analyse_position(SolverMove& move, SolverState& info)
 			move.score = best_move->score - 1;
 			if (board->isRepetition(best_move->move)) {
 				auto msg = QString("!!! Repetition %1: %2").arg(best_move->san(board)).arg(get_move_stack(board));
-				emit Message(msg);
-				assert(false);
 				throw runtime_error(msg.toStdString());
 			}
 		}
@@ -459,8 +465,6 @@ void Solver::analyse_position(SolverMove& move, SolverState& info)
 		}
 		if (num_processed > max_num_iterations) {
 			QString msg = QString("Max num iterations reached: %1").arg(max_num_iterations);
-			emit Message(msg);
-			assert(false);
 			throw runtime_error(msg.toStdString());
 		}
 	}
@@ -508,16 +512,13 @@ void Solver::find_solution(SolverMove& move, SolverState& info, pMove& best_move
 				tie(endgame_moves, tb_dtz) = get_endgame_moves(board, position, !to_copy_solution);
 			if (tb_dtz != egtb::DTZ_NONE && tb_dtz >= egtb::DTZ_MAX) {
 				QString msg = QString("No win ENDGAME: %1").arg(get_move_stack(board));
-				emit Message(msg);
-				if (!to_copy_solution) {
-					assert(false);
+				if (to_copy_solution)
+					emit Message(msg);
+				else
 					throw runtime_error(msg.toStdString());
-				}
 			}
 			if (endgame_moves.empty()) {
 				QString msg = QString("No ENDGAME moves: %1").arg(get_move_stack(board));
-				emit Message(msg);
-				assert(false);
 				throw runtime_error(msg.toStdString());
 			}
 			// From multiple best moves, select already existing one

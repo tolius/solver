@@ -8,6 +8,7 @@
 #include <QSettings>
 #include <QFileDialog>
 #include <QDir>
+#include <QTimer>
 
 #include <filesystem>
 #include <thread>
@@ -17,6 +18,7 @@
 namespace fs = std::filesystem;
 
 #ifdef WIN32
+#define NOMINMAX
 #include <windows.h>
 size_t get_total_memory()
 {
@@ -203,12 +205,17 @@ SettingsDialog::SettingsDialog(QWidget* parent)
 		if (i >= 0)
 			ui->m_comboStyle->setCurrentIndex(i);
 	}
+
 	int font_size = QSettings().value("ui/font_size", 8).toInt();
 	if (font_size <= 8)
 		font_size = 8;
 	ui->m_comboScale->setCurrentIndex((font_size - 8) / 2);
 	connect(ui->m_comboStyle, &QComboBox::currentTextChanged, this, &SettingsDialog::onStylesChanged);
 	connect(ui->m_comboScale, &QComboBox::currentTextChanged, this, &SettingsDialog::onScaleChanged);
+
+	int tint = QSettings().value("ui/status_highlighting", 5).toInt();
+	ui->m_slider_WinLossHighlighting->setValue(tint);
+	connect(ui->m_slider_WinLossHighlighting, &QSlider::valueChanged, this, &SettingsDialog::onTintChanged);
 }
 
 SettingsDialog::~SettingsDialog()
@@ -216,11 +223,18 @@ SettingsDialog::~SettingsDialog()
 	delete ui;
 }
 
+void SettingsDialog::showEvent(QShowEvent* event)
+{
+	onTintChanged(-1);
+	QWidget::showEvent(event);
+}
+
 void SettingsDialog::onStylesChanged(QString styles)
 {
 	styles += ".qss";
 	QSettings().setValue("ui/theme", styles);
 	emit stylesChanged(styles);
+	QTimer::singleShot(0, this, [this]() { onTintChanged(-1); });
 }
 
 void SettingsDialog::onScaleChanged(QString scale)
@@ -259,4 +273,21 @@ void SettingsDialog::readSettings()
 	s.beginGroup("solutions");
 	ui->m_openLastSolution->setChecked(s.value("open_last_solution", true).toBool());
 	s.endGroup();
+}
+
+void SettingsDialog::onTintChanged(int value)
+{
+	if (value < 0)
+		value = ui->m_slider_WinLossHighlighting->value();
+	else
+		QSettings().setValue("ui/status_highlighting", value);
+	ui->m_label_WinLossHighlighting->setText(QString("%1").arg(value, 2, 10, QChar(' ')));
+	auto win = palette().color(QWidget::backgroundRole());
+	auto loss = win;
+	loss.setRed(std::min(255, loss.red() + 4 * value));
+	win.setGreen(std::min(255, win.green() + 4 * value));
+	ui->m_widget_WinHighlighting->setStyleSheet(
+	    QString("background-color: rgba(%1, %2, %3, %4);").arg(win.red()).arg(win.green()).arg(win.blue()).arg(win.alpha()));
+	ui->m_widget_LossHighlighting->setStyleSheet(
+	    QString("background-color: rgba(%1, %2, %3, %4);").arg(loss.red()).arg(loss.green()).arg(loss.blue()).arg(loss.alpha()));
 }

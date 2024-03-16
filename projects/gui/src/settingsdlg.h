@@ -15,9 +15,13 @@ public:
 	SettingsDialog(QWidget* parent = nullptr);
 	virtual ~SettingsDialog();
 
+protected:
+	void showEvent(QShowEvent* event) override;
+
 private slots:
 	void onStylesChanged(QString styles);
 	void onScaleChanged(QString scale);
+	void onTintChanged(int value);
 private:
 	void onEngineChanged(const QString& engine_name);
 

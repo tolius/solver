@@ -473,7 +473,7 @@ void Evaluation::onSaveClicked()
 
 void Evaluation::onOverrideToggled(bool flag)
 {
-	constexpr static int add_tint = 20;
+	int add_tint = 4 * std::max(1, QSettings().value("ui/status_highlighting", 5).toInt());
 	if (flag)
 	{
 		auto bkg = ui->btn_Override->palette().color(QWidget::backgroundRole());
@@ -760,19 +760,21 @@ void Evaluation::reportWinStatus(WinStatus status)
 	if (ui->btn_Override->isChecked())
 		return;
 
+	int tint = QSettings().value("ui/status_highlighting", 5).toInt();
+
 	switch (status)
 	{
 	case WinStatus::Win:
-		emit tintChanged(QColor(0, 20, 0, 0));
+		emit tintChanged(QColor(0, tint * 4, 0, 0));
 		break;
 	case WinStatus::EGWin:
-		emit tintChanged(QColor(0, 10, 5, 0));
+		emit tintChanged(QColor(0, tint * 2, tint, 0));
 		break;
 	case WinStatus::EGLoss:
-		emit tintChanged(QColor(10, 0, 5, 0));
+		emit tintChanged(QColor(tint * 2, 0, tint, 0));
 		break;
 	case WinStatus::Loss:
-		emit tintChanged(QColor(20, 0, 0, 0));
+		emit tintChanged(QColor(tint * 4, 0, 0, 0));
 		break;
 	case WinStatus::Unknown:
 	default:
