@@ -34,6 +34,11 @@ struct StateInfo;
 struct SolutionEntry;
 
 
+enum class MessageType
+{
+	std, info, warning, error, success
+};
+
 struct LIB_EXPORT SolverMove
 {
 	SolverMove();

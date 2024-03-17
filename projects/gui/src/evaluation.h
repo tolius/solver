@@ -6,6 +6,7 @@
 #include "movecommenttoken.h"
 #include "board/move.h"
 #include "moveevaluation.h"
+#include "positioninfo.h"
 
 #include <QWidget>
 #include <QPointer>
@@ -97,7 +98,7 @@ public slots:
 
 signals:
 	void tintChanged(QColor tint, bool to_color_move_buttons = false);
-	void Message(const QString& msg);
+	void Message(const QString& msg, MessageType type = MessageType::std);
 	void ShortMessage(const QString& msg);
 	void reportGoodMoves(const std::set<QString>& good_moves);
 	void reportBadMove(const QString& bad_move);

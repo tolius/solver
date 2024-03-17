@@ -458,11 +458,17 @@ void MoveList::setTint(QColor tint)
 	if (!tint.isValid() || tint == QColor(0, 0, 0, 0))
 		return;
 
+	auto bkg_color_style = [](QColor& bkg, const QColor& tint)
+	{
+		bkg.setRed(bkg.red() + tint.red());
+		bkg.setGreen(bkg.green() + tint.green());
+		bkg.setBlue(bkg.blue() + tint.blue());
+		return QString("background-color: rgba(%1, %2, %3, %4);").arg(bkg.red()).arg(bkg.green()).arg(bkg.blue()).arg(bkg.alpha());
+	};
+
 	auto bkg = palette().color(QWidget::backgroundRole());
-	bkg.setRed(std::min(255, bkg.red() + tint.red()));
-	bkg.setGreen(std::min(255, bkg.green() + tint.green()));
-	bkg.setBlue(std::min(255, bkg.blue() + tint.blue()));
-	ui->widget_Moves->setStyleSheet(tr("background-color: rgba(%1, %2, %3, %4);").arg(bkg.red()).arg(bkg.green()).arg(bkg.blue()).arg(bkg.alpha()));
+	QString style = bkg_color_style(bkg, tint);
+	ui->widget_Moves->setStyleSheet(style);
 }
 
 void MoveList::goodMovesReported(const std::set<QString>& good_moves)

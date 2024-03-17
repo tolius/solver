@@ -709,7 +709,7 @@ QString Solution::eSolutionInfo(Chess::Board* board)
 		filepath /= Watkins.toStdString();
 		auto moves = WatkinsTree::opening_moves(filepath);
 		if (!moves) {
-			emit Message(QString("Failed to read the solution file \"%1\".").arg(Watkins));
+			emit Message(QString("Failed to read the solution file \"%1\".").arg(Watkins), MessageType::warning);
 			Watkins = "";
 			return "";
 		}
@@ -721,7 +721,7 @@ QString Solution::eSolutionInfo(Chess::Board* board)
 		{
 			auto move = temp_board->moveFromGenericMove(OpeningBook::moveFromBits(pgMove));
 			if (!temp_board->isLegalMove(move)) {
-				emit Message(QString("Error: wrong move in the Watkins solution \"%1\".").arg(Watkins));
+				emit Message(QString("Error: wrong move in the Watkins solution \"%1\".").arg(Watkins), MessageType::warning);
 				Watkins = "";
 				return "";
 			}
@@ -1062,7 +1062,7 @@ bool Solution::mergeAllFiles()
 	{
 		bool is_ok = mergeFiles(FileType(i));
 		if (!is_ok) {
-			emit Message(QString("Failed to merge solution files: %1").arg(nameToShow(true)));
+			emit Message(QString("Failed to merge solution files: %1").arg(nameToShow(true)), MessageType::warning);
 			return false;
 		}
 	}
@@ -1174,7 +1174,7 @@ std::vector<SolutionEntry> Solution::eSolutionEntries(Chess::Board* board)
 				{
 					if (opening_moves->size() != WatkinsStartingPly) {
 						WatkinsStartingPly = static_cast<int>(opening_moves->size());
-						emit Message(QString("The starting ply for the Watkins solution changed to %1").arg(WatkinsStartingPly));
+						emit Message(QString("The starting ply for the Watkins solution changed to %1").arg(WatkinsStartingPly), MessageType::info);
 					}
 					shared_ptr<Board> temp_board(BoardFactory::create("antichess"));
 					temp_board->setFenString(temp_board->defaultFenString());
@@ -1186,7 +1186,7 @@ std::vector<SolutionEntry> Solution::eSolutionEntries(Chess::Board* board)
 					{
 						auto move = temp_board->moveFromGenericMove(OpeningBook::moveFromBits(pgMove));
 						if (!temp_board->isLegalMove(move)) {
-							emit Message(QString("Error: wrong move in the Watkins solution \"%1\".").arg(Watkins));
+							emit Message(QString("Error: wrong move in the Watkins solution \"%1\".").arg(Watkins), MessageType::warning);
 							Watkins = "";
 							return entries;
 						}
@@ -1205,7 +1205,7 @@ std::vector<SolutionEntry> Solution::eSolutionEntries(Chess::Board* board)
 				}
 			}
 			if (!is_ok) {
-				emit Message(QString("Failed to open the solution file \"%1\".").arg(Watkins));
+				emit Message(QString("Failed to open the solution file \"%1\".").arg(Watkins), MessageType::warning);
 				Watkins = "";
 				return entries;
 			}
@@ -1233,7 +1233,7 @@ std::vector<SolutionEntry> Solution::eSolutionEntries(Chess::Board* board)
 #if defined(DEBUG) || defined(_DEBUG)
 		for (auto& entry : entries) {
 			if ((entry.pgMove & 0x7000) >= 0x6000)
-				emit Message(QString("Error: wrong promotion 0x%1 from Watkins's solution: %2").arg((entry.pgMove & 0x7000) >> 12).arg(entry.san(temp_board)));
+				emit Message(QString("Error: wrong promotion 0x%1 from Watkins's solution: %2").arg((entry.pgMove & 0x7000) >> 12).arg(entry.san(temp_board)), MessageType::warning);
 		}
 #endif
 		for (auto it = entries.begin(); it != entries.end();)
@@ -1247,7 +1247,8 @@ std::vector<SolutionEntry> Solution::eSolutionEntries(Chess::Board* board)
 				emit Message(QString("Error: wrong move %1 (%2) from Watkins's solution, ZS=0x%3")
 				                 .arg(it->san(board))
 				                 .arg(it->pgMove)
-				                 .arg(board->key(), 16, 16, QChar('0')));
+				                 .arg(board->key(), 16, 16, QChar('0')),
+				             MessageType::warning);
 				it = entries.erase(it);
 			}
 		}
@@ -1263,7 +1264,7 @@ std::vector<SolutionEntry> Solution::eSolutionEntries(Chess::Board* board)
 	}
 	catch (exception e)
 	{
-		emit Message(QString("Failed to read from the solution file \"%1\".\n\n%2").arg(Watkins).arg(e.what()));
+		emit Message(QString("Failed to read from the solution file \"%1\".\n\n%2").arg(Watkins).arg(e.what()), MessageType::warning);
 	}
 	return entries;
 }

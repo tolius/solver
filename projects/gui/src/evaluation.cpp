@@ -17,7 +17,6 @@
 #include "enginebuilder.h"
 #include "board/board.h"
 #include "board/boardfactory.h"
-#include "positioninfo.h"
 #include "cutechessapp.h"
 
 #include <QVBoxLayout>
@@ -473,12 +472,16 @@ void Evaluation::onSaveClicked()
 
 void Evaluation::onOverrideToggled(bool flag)
 {
-	int add_tint = 4 * std::max(1, QSettings().value("ui/status_highlighting", 5).toInt());
+	auto bkg_color_style = [](const QColor& bkg)
+	{
+		return QString("background-color: rgba(%1, %2, %3, %4);").arg(bkg.red()).arg(bkg.green()).arg(bkg.blue()).arg(bkg.alpha());
+	};
+	int add_tint = 4 * std::max(3, QSettings().value("ui/status_highlighting", 5).toInt());
 	if (flag)
 	{
 		auto bkg = ui->btn_Override->palette().color(QWidget::backgroundRole());
-		bkg.setBlue(std::min(255, bkg.blue() + add_tint));
-		ui->btn_Override->setStyleSheet(tr("background-color: rgba(%1, %2, %3, %4);").arg(bkg.red()).arg(bkg.green()).arg(bkg.blue()).arg(bkg.alpha()));
+		bkg.setBlue(bkg.blue() + add_tint);
+		ui->btn_Override->setStyleSheet(bkg_color_style(bkg));
 		emit tintChanged(QColor(0, 0, add_tint, 0), true);
 	}
 	else
@@ -827,7 +830,7 @@ QStringList Evaluation::process_moves(const MoveEvaluation& eval)
 	}
 	catch (std::exception e)
 	{
-		emit Message(QString("Evaluation exception: %1").arg(e.what()));
+		emit Message(QString("Evaluation exception: %1").arg(e.what()), MessageType::error);
 	}
 	return san_moves;
 }
@@ -918,7 +921,7 @@ void Evaluation::processEngineOutput(const MoveEvaluation& eval, const QString& 
 		best_score = curr_score;
 		abs_score = is_endgame ? abs(best_score) : best_score;
 		if (solver && abs_score < s->min_score && board_->sideToMove() == solver->sideToWin())
-			emit Message(tr("...NOT WINNING at depth=%1! %2 in %3").arg(depth).arg(str_move).arg(get_move_stack(board_)));
+			emit Message(tr("...NOT WINNING at depth=%1! %2 in %3").arg(depth).arg(str_move).arg(get_move_stack(board_)), MessageType::warning);
 		is_score_ok = (!solver || !s->dont_lose_winning_sequence || move_score == NULL_SCORE
 					   || abs(move_score) <= WIN_THRESHOLD || abs_score > abs(move_score));
 		depth_limit = get_max_depth(best_score, num_pieces);
@@ -949,7 +952,7 @@ void Evaluation::processEngineOutput(const MoveEvaluation& eval, const QString& 
 	/// Check the results
 	bool no_progress = (best_time - t_progress > NO_PROGRESS_TIME || best_time == 0 || (solver && best_score >= s->multiPV_stop_score));
 	if (best_move.isEmpty())
-		emit Message(tr("!!NONE MOVE in %1").arg(get_move_stack(board_, false, 400)));
+		emit Message(tr("!!NONE MOVE in %1").arg(get_move_stack(board_, false, 400)), MessageType::warning);
 	if (session.is_auto && no_progress && pv == 1 && is_only_move && solver && best_score < s->score_limit
 	    && (move_score == NULL_SCORE || abs(move_score) < s->score_limit - 1))
 	{
@@ -1047,7 +1050,8 @@ void Evaluation::checkProgress(quint64 nodes, bool no_progress, int depth)
 				                 .arg(score_to_text(abs_score))
 				                 .arg(score_to_text(move_score))
 				                 .arg(best_move)
-				                 .arg(move_stack));
+				                 .arg(move_stack),
+				             MessageType::warning);
 			}
 			if (is_auto) {
 				stopEngine();

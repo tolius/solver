@@ -275,6 +275,11 @@ void SettingsDialog::readSettings()
 	s.endGroup();
 }
 
+QString bkg_color_style(const QColor& bkg)
+{
+	return QString("background-color: rgba(%1, %2, %3, %4);").arg(bkg.red()).arg(bkg.green()).arg(bkg.blue()).arg(bkg.alpha());
+}
+
 void SettingsDialog::onTintChanged(int value)
 {
 	if (value < 0)
@@ -284,10 +289,8 @@ void SettingsDialog::onTintChanged(int value)
 	ui->m_label_WinLossHighlighting->setText(QString("%1").arg(value, 2, 10, QChar(' ')));
 	auto win = palette().color(QWidget::backgroundRole());
 	auto loss = win;
-	loss.setRed(std::min(255, loss.red() + 4 * value));
-	win.setGreen(std::min(255, win.green() + 4 * value));
-	ui->m_widget_WinHighlighting->setStyleSheet(
-	    QString("background-color: rgba(%1, %2, %3, %4);").arg(win.red()).arg(win.green()).arg(win.blue()).arg(win.alpha()));
-	ui->m_widget_LossHighlighting->setStyleSheet(
-	    QString("background-color: rgba(%1, %2, %3, %4);").arg(loss.red()).arg(loss.green()).arg(loss.blue()).arg(loss.alpha()));
+	loss.setRed(loss.red() + 4 * value);
+	win.setGreen(win.green() + 4 * value);
+	ui->m_widget_WinHighlighting->setStyleSheet(bkg_color_style(win));
+	ui->m_widget_LossHighlighting->setStyleSheet(bkg_color_style(loss));
 }

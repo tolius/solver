@@ -29,12 +29,14 @@ PlainTextLog::PlainTextLog(QWidget* parent)
 	: QPlainTextEdit(parent)
 {
 	setReadOnly(true);
+	setLineWrapMode(NoWrap);
 }
 
 PlainTextLog::PlainTextLog(const QString& text, QWidget* parent)
 	: QPlainTextEdit(text, parent)
 {
 	setReadOnly(true);
+	setLineWrapMode(NoWrap);
 }
 
 void PlainTextLog::contextMenuEvent(QContextMenuEvent* event)
@@ -42,9 +44,13 @@ void PlainTextLog::contextMenuEvent(QContextMenuEvent* event)
 	QMenu* menu = createStandardContextMenu();
 
 	menu->addSeparator();
+	QAction* lineWrap = menu->addAction(tr("Line wrap"), this, [this]() { setLineWrapMode(lineWrapMode() == NoWrap ? WidgetWidth : NoWrap); });
+	lineWrap->setCheckable(true);
+	lineWrap->setChecked(lineWrapMode() == WidgetWidth);
+	menu->addSeparator();
+
 	menu->addAction(tr("Clear Log"), this, SLOT(clear()));
 
-	menu->addSeparator();
 	auto saveAct = menu->addAction(tr("Save Log to File..."));
 	connect(saveAct, &QAction::triggered, this, [=]()
 	{

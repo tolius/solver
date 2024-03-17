@@ -36,6 +36,7 @@
 #include <QDesktopWidget>
 #endif
 #include <QSysInfo>
+#include <QScrollBar>
 
 #include "board/boardfactory.h"
 #include "chessgame.h"
@@ -388,7 +389,7 @@ void MainWindow::createDockWindows()
 	logDock->setWidget(m_log);
 	logDock->close();
 	addDockWidget(Qt::BottomDockWidgetArea, logDock);
-	connect(m_evaluation, SIGNAL(Message(const QString&)), m_log, SLOT(appendPlainText(QString)));
+	connect(m_evaluation, SIGNAL(Message(const QString&, MessageType)), this, SLOT(logMessage(const QString&, MessageType)));
 	connect(m_evaluation, &Evaluation::ShortMessage, m_log, 
 		[this](const QString& msg)
 		{
@@ -1110,10 +1111,10 @@ void MainWindow::openSolution(QModelIndex index, SolutionItem* item)
 
 	if (m_solution) {
 		m_solution->deactivate();
-		disconnect(m_solution.get(), SIGNAL(Message(const QString&)), m_log, SLOT(appendPlainText(QString)));
+		disconnect(m_solution.get(), SIGNAL(Message(const QString&, MessageType)), this, SLOT(logMessage(const QString&, MessageType)));
 	}
 	m_solution = item->solution();
-	connect(m_solution.get(), SIGNAL(Message(const QString&)), m_log, SLOT(appendPlainText(QString)));
+	connect(m_solution.get(), SIGNAL(Message(const QString&, MessageType)), this, SLOT(logMessage(const QString&, MessageType)));
 	if (m_solution) {
 		if (m_solutionsWidget) {
 			m_solutionsWidget->setEnabled(false);
@@ -1123,9 +1124,9 @@ void MainWindow::openSolution(QModelIndex index, SolutionItem* item)
 		m_solutionsModel->dataChanged(QModelIndex(), QModelIndex());
 		QSettings().setValue("solutions/last_solution", m_solution->nameToShow(true));
 		if (m_solver)
-			disconnect(m_solver.get(), SIGNAL(Message(const QString&)), m_log, SLOT(appendPlainText(QString)));
+			disconnect(m_solver.get(), SIGNAL(Message(const QString&, MessageType)), this, SLOT(logMessage(const QString&, MessageType)));
 		m_solver = std::make_shared<Solver>(m_solution);
-		connect(m_solver.get(), SIGNAL(Message(const QString&)), m_log, SLOT(appendPlainText(QString)));
+		connect(m_solver.get(), SIGNAL(Message(const QString&, MessageType)), this, SLOT(logMessage(const QString&, MessageType)));
 		connect(m_solver.get(), SIGNAL(updateCurrentSolution()), this, SLOT(updateCurrentSolution()));
 	}
 	m_results->setSolution(m_solution);
@@ -1163,6 +1164,14 @@ void MainWindow::updateCurrentSolution()
 	m_results->positionChanged();
 }
 
+QString bkg_color_style(QColor& bkg, const QColor& tint)
+{
+	bkg.setRed(bkg.red() + tint.red());
+	bkg.setGreen(bkg.green() + tint.green());
+	bkg.setBlue(bkg.blue() + tint.blue());
+	return QString("background-color: rgba(%1, %2, %3, %4);").arg(bkg.red()).arg(bkg.green()).arg(bkg.blue()).arg(bkg.alpha());
+}
+
 void MainWindow::setTint(QColor tint, bool to_color_move_buttons)
 {
 	if (tint == m_tint)
@@ -1179,9 +1188,37 @@ void MainWindow::setTint(QColor tint, bool to_color_move_buttons)
 
 	auto central_widget = this->centralWidget();
 	auto bkg = central_widget->palette().color(QWidget::backgroundRole());
-	bkg.setRed(std::min(255, bkg.red() + tint.red()));
-	bkg.setGreen(std::min(255, bkg.green() + tint.green()));
-	bkg.setBlue(std::min(255, bkg.blue() + tint.blue()));
-	this->centralWidget()->setStyleSheet(tr("background-color: rgba(%1, %2, %3, %4);").arg(bkg.red()).arg(bkg.green()).arg(bkg.blue()).arg(bkg.alpha()));
-	//tint.setAlpha(bkg.alpha());
+	QString style = bkg_color_style(bkg, tint);
+	this->centralWidget()->setStyleSheet(style);
+}
+
+void MainWindow::logMessage(const QString& message, MessageType type)
+{
+	auto style = [this](int red, int green, int blue)
+	{
+		int val = std::max(5, QSettings().value("ui/status_highlighting", 5).toInt());
+		QColor bkg = this->centralWidget()->palette().color(QWidget::backgroundRole());
+		QColor tint(red * val, green * val, blue * val);
+		QColor color = this->centralWidget()->palette().color(QWidget::foregroundRole());
+		return QString("%1 color: rgba(%2, %3, %4, %5);")
+		              .arg(bkg_color_style(bkg, tint))
+		              .arg(color.red()).arg(color.green()).arg(color.blue()).arg(color.alpha());
+	};
+
+	QString msg = message.toHtmlEscaped();
+	QTextCursor cursor = m_log->textCursor();
+	cursor.movePosition(QTextCursor::End);
+	if (!cursor.atStart())
+		cursor.insertBlock();
+	if (type == MessageType::error)
+		cursor.insertHtml(QString("<span style=\"background-color:red;color:white\">%1</span>").arg(msg));
+	else if (type == MessageType::warning)
+		cursor.insertHtml(QString("<b style=\"%1\">%2</b>").arg(style(8, 8, 0)).arg(msg));
+	else if (type == MessageType::info)
+		cursor.insertHtml(QString("<b>%1</b>").arg(msg));
+	else if (type == MessageType::success)
+		cursor.insertHtml(QString("<b style=\"%1\">%2</b>").arg(style(0, 8, 0)).arg(msg));
+	else
+		cursor.insertHtml(QString("<span>%1</span>").arg(msg)); // cursor.insertText(msg);
+	m_log->verticalScrollBar()->setValue(m_log->verticalScrollBar()->maximum());
 }

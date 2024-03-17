@@ -138,7 +138,7 @@ public:
 	void process(pBoard pos, Chess::Move move, std::shared_ptr<SolutionEntry> data, bool is_only_move);
 
 signals:
-	void Message(const QString& message);
+	void Message(const QString& message, MessageType type = MessageType::std);
 	void evaluatePosition();
 	void updateCurrentSolution();
 

@@ -107,7 +107,7 @@ QString SolutionEntry::score2Text(qint16 score)
 	qint16 abs_score = abs(score);
 	if (abs_score > WIN_THRESHOLD)
 		return (score < 0 ? "#-" : "#") + QString::number(MATE_VALUE - abs_score);
-	if (abs_score >= MATE_VALUE - MANUAL_VALUE && abs_score <= WIN_THRESHOLD)
+	if (abs_score >= MATE_VALUE - MANUAL_VALUE - 1 && abs_score <= WIN_THRESHOLD)  // -1 for nextEntries()
 		return score < 0 ? "**" : "*";
 	if (abs_score < 15200)
 		return (score > 0 ? "+" : "") + QString::number(float(score) / 100.f, 'f', 1);

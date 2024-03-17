@@ -22,6 +22,7 @@
 #define MAINWINDOW_H
 
 #include "board/side.h"
+#include "positioninfo.h"
 
 #include <QMainWindow>
 #include <QPointer>
@@ -105,6 +106,7 @@ class MainWindow : public QMainWindow
 		void importSolution(const std::filesystem::path&);
 		void updateCurrentSolution();
 		void setTint(QColor tint, bool to_color_move_buttons);
+	    void logMessage(const QString& msg, MessageType type);
 
 	private:
 		struct TabData

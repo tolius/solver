@@ -151,7 +151,7 @@ public:
 	std::vector<SolutionEntry> eSolutionEntries(Chess::Board* board);
 
 signals:
-	void Message(const QString&);
+	void Message(const QString&, MessageType type = MessageType::std);
 
 private:
 	QString path(FileType type, FileSubtype subtype = FileSubtype::Std) const;
