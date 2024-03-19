@@ -177,6 +177,7 @@ void MainWindow::createActions()
 //	m_pasteFenAct->setShortcut(QKeySequence(QKeySequence::Paste));
 
 	m_copyPgnAct = new QAction(tr("Copy PG&N"), this);
+	m_copyZsAct = new QAction(tr("Copy &ZS"), this);
 
 	m_flipBoardAct = new QAction(tr("&Flip Board"), this);
 	m_flipBoardAct->setShortcut(Qt::CTRL + Qt::Key_F);
@@ -219,6 +220,7 @@ void MainWindow::createActions()
 //	connect(m_pasteFenAct, SIGNAL(triggered()), this, SLOT(pasteFen()));
 	connect(copyFenSequence, SIGNAL(triggered()), this, SLOT(copyFen()));
 	connect(m_copyPgnAct, SIGNAL(triggered()), this, SLOT(copyPgn()));
+	connect(m_copyZsAct, SIGNAL(triggered()), this, SLOT(copyZS()));
 	connect(m_flipBoardAct, SIGNAL(triggered()), m_gameViewer->boardScene(), SLOT(flip()));
 	connect(m_closeGameAct, &QAction::triggered, this, [=]()
 	{
@@ -271,6 +273,7 @@ void MainWindow::createMenus()
 	m_toolsMenu = menuBar()->addMenu(tr("T&ools"));
 	m_toolsMenu->addAction(m_copyFenAct);
 	m_toolsMenu->addAction(m_copyPgnAct);
+	m_toolsMenu->addAction(m_copyZsAct);
 //	m_toolsMenu->addAction(m_pasteFenAct);
 	m_toolsMenu->addSeparator();
 	m_toolsMenu->addAction(m_showSettingsAct);
@@ -364,7 +367,7 @@ void MainWindow::createSolutionsModel()
 								auto solution = item->solution();
 								if (solution && solution->nameString() == name)
 								{
-									openSolution(parent_index.child(j, 0), item);
+									openSolution(m_solutionsModel->index(j, 0, parent_index), item);
 									break;
 								}
 							}

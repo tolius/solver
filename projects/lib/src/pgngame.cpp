@@ -325,7 +325,7 @@ int PgnGame::writeMoves(QTextStream& out, bool addVariantTag, PgnMode mode) cons
 	{
 		QString variant = m_tags.value("Variant");
 		if (!variant.isEmpty())
-			out << "[Variant \"" << variant << "\"] ";
+			out << "[Variant \"" << variant[0].toUpper() << variant.midRef(1) << "\"] ";
 	}
 
 	QString str;

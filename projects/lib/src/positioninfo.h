@@ -2,12 +2,14 @@
 #define POSITIONINFO_H
 
 #include "board/move.h"
+#include "solutionbook.h"
 
 #include <QString>
 #include <QStringList>
 
 #include <memory>
 #include <list>
+#include <vector>
 #include <tuple>
 #include <string>
 #include <array>
@@ -31,7 +33,6 @@ namespace Chess
 }
 class Position;
 struct StateInfo;
-struct SolutionEntry;
 
 
 enum class MessageType
@@ -39,32 +40,27 @@ enum class MessageType
 	std, info, warning, error, success
 };
 
-struct LIB_EXPORT SolverMove
+struct SolverMove : public SolutionEntry
 {
 	SolverMove();
-	SolverMove(Chess::Move move, qint16 score, quint32 depth_time);
-	SolverMove(std::shared_ptr<SolutionEntry> entry, std::shared_ptr<Chess::Board> board);
-	SolverMove(const SolutionEntry& entry, std::shared_ptr<Chess::Board> board);
+	SolverMove(Chess::Move move, std::shared_ptr<Chess::Board> board, qint16 score, quint32 depth_time);
+	SolverMove(const SolutionEntry& entry);
+	SolverMove(std::shared_ptr<SolutionEntry> entry);
+	SolverMove(uint64_t bytes);
 
-	bool isNull() const;
-	quint32 depth() const;
-	quint32 time() const;
-	quint32 version() const;
+	qint16 score() const;
+	const quint32& depth_time() const;
 	bool is_old_version() const;
-	bool is_overridden() const;
-
-	QString san(std::shared_ptr<Chess::Board> board) const;
 	QString scoreText() const;
 
+	void set_score(qint16 score);
+	void set_depth_time(quint32 depth_time);
 	void set_time(quint32 time);
 
-	quint64 toBytes(std::shared_ptr<Chess::Board> board) const;
-	static std::shared_ptr<SolverMove> fromBytes(quint64 bytes, std::shared_ptr<Chess::Board> board);
+	quint64 toBytes() const;
+	static std::shared_ptr<SolverMove> fromBytes(quint64 bytes);
 
-	Chess::Move move;
-	qint16 score;
-	quint32 depth_time;
-	std::list<SolverMove> moves;
+	std::vector<SolverMove> moves;
 };
 
 

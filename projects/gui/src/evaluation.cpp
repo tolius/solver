@@ -42,7 +42,7 @@ constexpr static quint64 NODES_PER_S = 1'500'000;
 constexpr static int NO_PROGRESS_TIME = 12; // [s]
 constexpr static int EG_WIN_THRESHOLD = 15200;
 constexpr static int START_DEPTH = 8;
-constexpr static uint8_t UNKNOWN_ENGINE_VERSION = 0xFF;
+constexpr static uint8_t UNKNOWN_ENGINE_VERSION = 0xFE;
 
 EngineSession::EngineSession()
 {
@@ -368,7 +368,7 @@ void Evaluation::onEngineReady()
 			int num = str_num.toInt(&ok);
 			if (ok) {
 				engine_version = 
-				      (240226 <= num && num <= 240229) ? 3
+				      (240226 <= num && num <= 240331) ? 3
 				    : (num == 230811)                  ? 2
 				    : (num == 230803)                  ? 1
 				    : (230409 <= num && num <= 230415) ? 1

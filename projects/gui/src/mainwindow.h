@@ -162,6 +162,7 @@ class MainWindow : public QMainWindow
 		QAction* m_copyFenAct;
 		QAction* m_pasteFenAct;
 		QAction* m_copyPgnAct;
+		QAction* m_copyZsAct;
 		QAction* m_flipBoardAct;
 		QAction* m_minimizeAct;
 		QAction* m_showPreviousTabAct;

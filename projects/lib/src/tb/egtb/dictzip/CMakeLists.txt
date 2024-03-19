@@ -45,5 +45,11 @@ if (WIN32)
 else()
 	target_compile_definitions(${PROJECT_NAME}
 		PRIVATE HAVE_UNISTD_H
+		PRIVATE NDEBUG
+	)
+	target_compile_options(${PROJECT_NAME}
+		PRIVATE "-Ofast"
+		PRIVATE "-flto"
+		PRIVATE "-march=native"
 	)
 endif()

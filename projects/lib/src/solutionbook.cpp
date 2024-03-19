@@ -28,6 +28,11 @@ SolutionEntry::SolutionEntry(uint64_t bytes)
 	learn = static_cast<quint32>(bytes & 0x00000000FFFFFFFF);
 }
 
+bool SolutionEntry::isNull() const
+{
+	return pgMove == 0;
+}
+
 qint16 SolutionEntry::score(qint16 add_plies) const
 {
 	qint16 w = reinterpret_cast<const qint16&>(weight);

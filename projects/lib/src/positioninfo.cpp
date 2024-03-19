@@ -22,38 +22,34 @@ namespace
 }
 
 
-SolverMove::SolverMove() : score(UNKNOWN_SCORE), depth_time(0)
+SolverMove::SolverMove() 
+	: SolutionEntry()
 {}
 
-SolverMove::SolverMove(Chess::Move move, qint16 score, quint32 depth_time) : move(move), score(score), depth_time(depth_time)
+SolverMove::SolverMove(Chess::Move move, std::shared_ptr<Chess::Board> board, qint16 score, quint32 depth_time)
+    : SolutionEntry(OpeningBook::moveToBits(board->genericMove(move)), reinterpret_cast<quint16&>(score), depth_time)
 {}
 
-SolverMove::SolverMove(std::shared_ptr<SolutionEntry> entry, std::shared_ptr<Chess::Board> board)
-    : SolverMove(entry->move(board), entry->weight, entry->learn)
+SolverMove::SolverMove(const SolutionEntry& entry)
+	: SolutionEntry(entry.pgMove, entry.weight, entry.learn)
 {}
 
-SolverMove::SolverMove(const SolutionEntry& entry, std::shared_ptr<Chess::Board> board)
-    : SolverMove(entry.move(board), entry.weight, entry.learn)
+SolverMove::SolverMove(std::shared_ptr<SolutionEntry> entry) 
+	: SolutionEntry(*entry)
 {}
 
-bool SolverMove::isNull() const
+SolverMove::SolverMove(uint64_t bytes)
+	: SolutionEntry(bytes)
+{}
+
+qint16 SolverMove::score() const
 {
-	return move.isNull();
+	return reinterpret_cast<const qint16&>(weight);
 }
 
-quint32 SolverMove::depth() const
+const quint32& SolverMove::depth_time() const
 {
-	return depth_time & 0x00FF;
-}
-
-quint32 SolverMove::time() const
-{
-	return depth_time >> 16;
-}
-
-quint32 SolverMove::version() const
-{
-	return (depth_time & 0xFF00) >> 8;
+	return learn;
 }
 
 bool SolverMove::is_old_version() const
@@ -61,46 +57,37 @@ bool SolverMove::is_old_version() const
 	return (version() == 0) && (depth() <= REAL_DEPTH_LIMIT);
 }
 
-bool SolverMove::is_overridden() const
+void SolverMove::set_score(qint16 score)
 {
-	return (depth_time & OVERRIDE_MASK) == OVERRIDE_MASK;
+	weight = reinterpret_cast<quint16&>(score);
+}
+
+void SolverMove::set_depth_time(quint32 depth_time)
+{
+	learn = depth_time;
 }
 
 void SolverMove::set_time(quint32 time)
 {
-	depth_time = (depth_time & 0xFFFF) | (time << 16);
+	learn = (learn & 0xFFFF) | (time << 16);
 }
 
-std::shared_ptr<SolverMove> SolverMove::fromBytes(quint64 bytes, std::shared_ptr<Chess::Board> board)
+std::shared_ptr<SolverMove> SolverMove::fromBytes(quint64 bytes)
 {
-	quint32 depth = static_cast<quint32>(bytes & 0x00000000FFFFFFFF);
-	uint16_t val = static_cast<uint16_t>((bytes >> 32) & 0xFFFF);
-	qint16 score = reinterpret_cast<qint16&>(val);
-	quint16 pgMove = bytes >> 48;
-	auto generic_move = OpeningBook::moveFromBits(pgMove);
-	auto move = board->moveFromGenericMove(generic_move);
-	return make_shared<SolverMove>(move, score, depth);
+	return make_shared<SolverMove>(bytes);
 }
 
-quint64 SolverMove::toBytes(std::shared_ptr<Chess::Board> board) const
+quint64 SolverMove::toBytes() const
 {
-	quint64 bytes = depth_time;
-	uint16_t val = reinterpret_cast<const uint16_t&>(score);
-	bytes |= static_cast<quint64>(val) << 32;
-	auto generic_move = board->genericMove(move);
-	quint16 pgMove = OpeningBook::moveToBits(generic_move);
+	quint64 bytes = learn;
+	bytes |= static_cast<quint64>(weight) << 32;
 	bytes |= static_cast<quint64>(pgMove) << 48;
 	return bytes;
 }
 
-QString SolverMove::san(std::shared_ptr<Chess::Board> board) const
-{
-	return board->moveString(move, Chess::Board::StandardAlgebraic);
-}
-
 QString SolverMove::scoreText() const
 {
-	return SolutionEntry::score2Text(score);
+	return SolutionEntry::score2Text(score());
 }
 
 
@@ -327,7 +314,8 @@ std::tuple<std::list<SolverMove>, uint8_t> get_endgame_moves(std::shared_ptr<Che
 		//pos.do_move(posMove, st_i);
 		if (tb_val == 1 && board->result().winner() == our_color)
 		{
-			moves.emplace_back(move, -MATE_VALUE, depth_time(1));
+			board->undoMove();
+			moves.emplace_back(move, board, -MATE_VALUE, depth_time(1));
 		}
 		else
 		{
@@ -340,14 +328,14 @@ std::tuple<std::list<SolverMove>, uint8_t> get_endgame_moves(std::shared_ptr<Che
 			//is_zeroing = board_i.is_zeroing(move_i)
 			//if to_apply_50move_rule:
 			//...
+			board->undoMove();
 			if ((abs(value_i) == abs(tb_val) - 1) && ((value_i > 0) != (tb_val > 0)) && (!apply_50move_rule || dtz_i < dtz || dtz_i == 100))
 			{
-				int16_t add_ply = (board->sideToMove() == Chess::Side::White) ? 0 : 1; //?? TODO: check
+				int16_t add_ply = (board->sideToMove() == Chess::Side::White) ? 1 : 0; //?? TODO: check
 				int16_t score = (value_i > 0) ? (MATE_VALUE - (value_i + add_ply) / 2) : (-MATE_VALUE - (value_i - add_ply) / 2);
-				moves.emplace_back(move, -score, depth_time(dtz_i));
+				moves.emplace_back(move, board, -score, depth_time(dtz_i));
 			}
 		}
-		board->undoMove();
 	}
 	return { moves, tb_dtz };
 }

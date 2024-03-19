@@ -23,6 +23,7 @@ struct LIB_EXPORT SolutionEntry : public OpeningBook::Entry
 	SolutionEntry(quint16 pgMove, quint16 weight, quint32 learn);
 	SolutionEntry(uint64_t bytes);
 
+	bool isNull() const;
 	qint16 score(qint16 add_plies = 0) const;
 	bool is_overridden() const;
 	quint32 depth() const;
