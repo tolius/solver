@@ -184,6 +184,8 @@ void Solver::init()
 	for (const auto& move : sol->branch)
 		board->makeMove(move);
 	our_color = board->sideToMove();
+	tree.clear();
+	tree_state = SolverState();
 }
 
 void Solver::start(pBoard new_pos, std::function<void(QString)> message)
@@ -224,11 +226,12 @@ void Solver::start(pBoard new_pos, std::function<void(QString)> message)
 		status = Status::idle;
 		return;
 	}
-	tree = SolverMove();
-	SolverState info(false);
+	tree.clear();
+	tree.push_back(make_shared<SolverMove>());
+	tree_state = SolverState(false);
 	try
 	{
-		process_move(tree, info);
+		process_move(tree, tree_state);
 	}
 	catch (stopProcessing e)
 	{
@@ -258,7 +261,7 @@ void Solver::start(pBoard new_pos, std::function<void(QString)> message)
 	
 	emit Message(QString("Success for %1:").arg(sol_name), MessageType::success);
 	emit Message(QString("Mate in #%1").arg(max_num_moves));
-	qint16 mate_score = MATE_VALUE - tree.score() - 1;
+	qint16 mate_score = MATE_VALUE - tree.front()->score() - 1;
 	int num_opening_moves = (sol->opening.size() + sol->branch.size() + 1) / 2;
 	emit Message(QString("Mate score %1 = %2 + %3").arg(num_opening_moves + mate_score).arg(num_opening_moves).arg(mate_score));
 	emit Message(QString("Number of transpositions: %1").arg(trans.size()));
@@ -342,10 +345,15 @@ void Solver::process(pBoard pos, Chess::Move move, std::shared_ptr<SolutionEntry
 	eval_result = { data, move, is_only_move };
 }
 
-void Solver::process_move(SolverMove& move, SolverState& info)
+void Solver::process_move(std::vector<pMove>& tree, SolverState& info)
 {
 	if (status == Status::idle)
 		throw stopProcessing();
+	if (tree.empty())
+		throw runtime_error("Error: empty tree while processing.");
+	auto move = tree.back();
+	if (!move)
+		throw runtime_error("Error: null move while processing.");
 
 	bool is_their_turn = (board->sideToMove() != our_color);
 	if (is_their_turn)
@@ -353,32 +361,39 @@ void Solver::process_move(SolverMove& move, SolverState& info)
 		int16_t worst_score = MATE_VALUE;
 		auto legal_moves = board->legalMoves();
 		assert(!legal_moves.isEmpty()); // otherwise it's a loss
-		move.moves.resize(legal_moves.size());
-		for (int i =0; i < legal_moves.size(); i++)
-			move.moves[i] = SolverMove(legal_moves[i], board, move.score(), move.depth_time());
-		for (auto& m : move.moves) {
-			board->makeMove(m.move(board));
-			process_move(m, info);
-			if (m.score() < worst_score)
-				worst_score = m.score();
-			board->undoMove();
+		if (move->moves.empty()) {
+			move->moves.resize(legal_moves.size());
+			for (int i = 0; i < legal_moves.size(); i++)
+				move->moves[i] = make_shared<SolverMove>(legal_moves[i], board, move->score(), move->depth_time());
+		}
+		for (auto& m : move->moves) {
+			if (!m->is_solved()) {
+				tree.push_back(m);
+				board->makeMove(m->move(board));
+				process_move(tree, info);
+				board->undoMove();
+				tree.pop_back();
+				m->set_solved();
+			}
+			if (m->score() < worst_score)
+				worst_score = m->score();
 			if (info.is_alt() && info.alt_steps < 0)
 				break;
 		}
-		//assert(move.score() <= worst_score);
-		if (move.score() != UNKNOWN_SCORE && move.score() > ABOVE_EG && move.score() > worst_score 
-				&& !info.is_alt() && move.score() != FORCED_MOVE) {
+		//assert(move->score() <= worst_score);
+		if (move->score() != UNKNOWN_SCORE && move->score() > ABOVE_EG && move->score() > worst_score 
+				&& !info.is_alt() && move->score() != FORCED_MOVE) {
 			QString move_stack = get_move_stack(board);
-			emit Message(QString("...NOT BEST %1! Moves in %2").arg(move.score() - worst_score).arg(move_stack), MessageType::info);
+			emit Message(QString("...NOT BEST %1! Moves in %2").arg(move->score() - worst_score).arg(move_stack), MessageType::info);
 			//assert(move.score() <= worst_score + 1);  // error no greater than 1
 		}
-		move.set_score(worst_score);
+		move->set_score(worst_score);
 	}
 	else
 	{
 		auto result = board->result();
 		if (result.winner() == our_color) {
-			move.set_score(MATE_VALUE - 1);
+			move->set_score(MATE_VALUE - 1);
 			update_max_move(MATE_VALUE);
 		}
 		else {
@@ -387,36 +402,39 @@ void Solver::process_move(SolverMove& move, SolverState& info)
 				assert(info.alt_steps <= max_alt_steps);
 			}
 			bool prev_is_solver_path = is_solver_path;
-			analyse_position(move, info);
-			assert(move.moves.size() <= 1);
-			for (auto& m : move.moves) {
-				if (!is_stop_move(m, info) && (!info.is_alt() || (info.alt_steps < max_alt_steps 
-						&& (move.score() == UNKNOWN_SCORE || move.score() - info.alt_steps < info.score_to_skip)))) {
-					board->makeMove(m.move(board));
-					process_move(m, info);
+			analyse_position(*move, info);
+			assert(move->moves.size() <= 1);
+			for (auto& m : move->moves) {
+				if (!is_stop_move(*m, info) && (!info.is_alt() || (info.alt_steps < max_alt_steps 
+						&& (move->score() == UNKNOWN_SCORE || move->score() - info.alt_steps < info.score_to_skip)))) {
+					tree.push_back(m);
+					board->makeMove(m->move(board));
+					process_move(tree, info);
 					board->undoMove();
+					tree.pop_back();
+					m->set_solved();
 				}
-				//assert (move.score() <= ABOVE_EG || move.score() <= m.score() - 1);
-				if (move.score() != UNKNOWN_SCORE 
-						&& move.score() > ABOVE_EG 
-						&& move.score() > m.score() - 1 
+				//assert (move->score() <= ABOVE_EG || move->score() <= m->score() - 1);
+				if (move->score() != UNKNOWN_SCORE 
+						&& move->score() > ABOVE_EG 
+						&& move->score() > m->score() - 1 
 						&& !info.is_alt() 
-						&& move.score() != FORCED_MOVE) {
-					emit Message(QString("...NOT BEST %1! %2 in %3").arg(move.score() - (m.score() - 1)).arg(m.san(board)).arg(get_move_stack(board, false, 400)), MessageType::info);
-					//assert(move.score() <= m.score());  // error no greater than 1
+						&& move->score() != FORCED_MOVE) {
+					emit Message(QString("...NOT BEST %1! %2 in %3").arg(move->score() - (m->score() - 1)).arg(m->san(board)).arg(get_move_stack(board, false, 400)), MessageType::info);
+					//assert(move->score() <= m->score());  // error no greater than 1
 				}
-				if (m.score() != FAKE_DRAW_SCORE)
-					move.set_score(m.score() - 1);
+				if (m->score() != FAKE_DRAW_SCORE)
+					move->set_score(m->score() - 1);
 			}
-			//if (move.score() <= ABOVE_EG && s.score_limit == MATE_VALUE && info.alt_steps == NO_ALT_STEPS)
-			//	emit Message(QString("...Not winning or just a transposition: %1 in %2").arg(move.move(board)).arg(get_move_stack(board)));
+			//if (move->score() <= ABOVE_EG && s.score_limit == MATE_VALUE && info.alt_steps == NO_ALT_STEPS)
+			//	emit Message(QString("...Not winning or just a transposition: %1 in %2").arg(move->move(board)).arg(get_move_stack(board)));
 			is_solver_path = prev_is_solver_path;
 			if (info.is_alt()) {
-				if (move.score() != UNKNOWN_SCORE && move.score() - info.alt_steps < info.score_to_skip) //  && info.alt_steps == max_alt_steps)
-					info.score_to_skip = move.score() - info.alt_steps;
+				if (move->score() != UNKNOWN_SCORE && move->score() - info.alt_steps < info.score_to_skip) //  && info.alt_steps == max_alt_steps)
+					info.score_to_skip = move->score() - info.alt_steps;
 				if (info.alt_steps == max_alt_steps && info.score_to_beat > ABOVE_EG
-				    && (move.score() - max_alt_steps + 1 < info.score_to_beat
-				        || (info.to_force_solver && move.score() - max_alt_steps + 1 == info.score_to_beat)))
+				    && (move->score() - max_alt_steps + 1 < info.score_to_beat
+				        || (info.to_force_solver && move->score() - max_alt_steps + 1 == info.score_to_beat)))
 					info.alt_steps = -1;
 				else
 					info.alt_steps -= 1;
@@ -582,7 +600,7 @@ void Solver::find_solution(SolverMove& move, SolverState& info, pMove& best_move
 		|| (info.is_alt() && info.alt_steps >= max_alt_steps))
 		move.set_score(best_move->score() - 1);
 	else
-		move.moves.push_back(*best_move);
+		move.moves.push_back(best_move);
 }
 
 void Solver::evaluate_position(SolverMove& move, SolverState& info, pMove& best_move, pMove& solver_move)
@@ -650,27 +668,29 @@ void Solver::evaluate_position(SolverMove& move, SolverState& info, pMove& best_
 	if (is_already_in_cache)
 		return;
 
-	auto alt_solver_move = *solver_move;
-	board->makeMove(alt_solver_move.move(board));
+	auto alt_solver_move = make_shared<SolverMove>(*solver_move);
+	board->makeMove(alt_solver_move->move(board));
+	vector<pMove> alt_solver_tree({ alt_solver_move });
 	SolverState alt_solver_info(true, 0, best_move->score());
-	process_move(alt_solver_move, alt_solver_info);
+	process_move(alt_solver_tree, alt_solver_info);
 	board->undoMove();
 	is_solver_path = false;
-	if (best_move->score() < alt_solver_move.score() || best_move->score() <= ABOVE_EG)
+	if (best_move->score() < alt_solver_move->score() || best_move->score() <= ABOVE_EG)
 	{
-		auto alt_engine_move = *best_move;
-		board->makeMove(alt_engine_move.move(board));
-		SolverState alt_engine_info(false, 0, alt_solver_move.score());
-		process_move(alt_engine_move, alt_engine_info);
+		auto alt_engine_move = make_shared<SolverMove>(*best_move);
+		board->makeMove(alt_engine_move->move(board));
+		vector<pMove> alt_engine_tree({ alt_engine_move });
+		SolverState alt_engine_info(false, 0, alt_solver_move->score());
+		process_move(alt_engine_tree, alt_engine_info);
 		board->undoMove();
-		if (alt_solver_move.score() > alt_engine_move.score()
-			|| (alt_engine_move.score() < ABOVE_EG && alt_solver_move.score() + min_diff_to_select_engine_move > alt_engine_move.score()))
+		if (alt_solver_move->score() > alt_engine_move->score()
+		    || (alt_engine_move->score() < ABOVE_EG && alt_solver_move->score() + min_diff_to_select_engine_move > alt_engine_move->score()))
 		{
 			emit Message(QString("..SolutionMove %1->%2: %3->%4: %5")
-								.arg(alt_engine_move.san(board))
-								.arg(alt_solver_move.san(board))
-								.arg(alt_engine_move.scoreText())
-								.arg(alt_solver_move.scoreText())
+								.arg(alt_engine_move->san(board))
+								.arg(alt_solver_move->san(board))
+								.arg(alt_engine_move->scoreText())
+								.arg(alt_solver_move->scoreText())
 								.arg(get_move_stack(board, false, 400)),
 			             MessageType::info);
 			best_move = solver_move; // alt_solver_move
@@ -1018,12 +1038,12 @@ void Solver::create_book()
 	MapT saved_positions;
 	MapT transpositions;
 	num_processed = 0;
-	auto [num_nodes, score] = prepare_moves(tree, saved_positions, transpositions);
+	auto [num_nodes, score] = prepare_moves(tree.front(), saved_positions, transpositions);
 	bool is_their_turn = (board->sideToMove() != our_color);
 	qint16 tree_score = UNKNOWN_SCORE;
-	correct_score(tree_score, score, is_their_turn, tree);
+	correct_score(tree_score, score, is_their_turn, tree.front());
 	emit Message(QString("Number of nodes: %1").arg(num_nodes));
-	qint16 mate_score = MATE_VALUE - tree.score();
+	qint16 mate_score = MATE_VALUE - tree.front()->score();
 	bool is_mate_fake = (MATE_VALUE - FAKE_MATE_VALUE < mate_score && mate_score <= MATE_VALUE - FAKE_DRAW_SCORE);
 	if (is_mate_fake)
 		mate_score -= MATE_VALUE - FAKE_MATE_VALUE;
@@ -1077,7 +1097,7 @@ void Solver::create_book()
 	emit updateCurrentSolution();
 }
 
-std::tuple<quint32, qint16> Solver::prepare_moves(SolverMove& move, MapT& saved_positions, MapT& transpositions)
+std::tuple<quint32, qint16> Solver::prepare_moves(pMove& move, MapT& saved_positions, MapT& transpositions)
 {
 	// trans           - transpositions from the processing procedure
 	// positions       - all positions from the processing procedure
@@ -1086,11 +1106,11 @@ std::tuple<quint32, qint16> Solver::prepare_moves(SolverMove& move, MapT& saved_
 	// transpositions  - transpositions used in this branch
 
 	bool is_their_turn = (board->sideToMove() != our_color);
-	assert(is_their_turn || move.moves.size() <= 1);
+	assert(is_their_turn || move->moves.size() <= 1);
 	quint32 num_new_nodes = 0;
 	qint16 score = UNKNOWN_SCORE;
 	uint64_t key = board->key();
-	if (move.moves.empty())
+	if (move->moves.empty())
 	{
 		if (!is_their_turn)
 		{
@@ -1110,9 +1130,9 @@ std::tuple<quint32, qint16> Solver::prepare_moves(SolverMove& move, MapT& saved_
 	}
 	else
 	{
-		for (auto& m : move.moves)
+		for (auto& m : move->moves)
 		{
-			board->makeMove(m.move(board));
+			board->makeMove(m->move(board));
 			MapT new_transpositions;
 			MapT new_saved_positions;
 			auto [sub_num_nodes, sub_score] = prepare_moves(m, new_saved_positions, new_transpositions);
@@ -1128,7 +1148,7 @@ std::tuple<quint32, qint16> Solver::prepare_moves(SolverMove& move, MapT& saved_
 			if (is_their_turn)
 				continue;
 			// ONLY if not is_their_turn:
-			assert(move.moves.size() == 1);
+			assert(move->moves.size() == 1);
 			num_new_nodes++;
 			quint32 num_nodes = num_new_nodes;
 			for (auto& d : transpositions)
@@ -1136,11 +1156,11 @@ std::tuple<quint32, qint16> Solver::prepare_moves(SolverMove& move, MapT& saved_
 			if (trans.find(key) != trans.end())
 			{
 				assert(saved_positions.find(key) == saved_positions.end() && prepared_transpositions.find(key) == prepared_transpositions.end());
-				auto new_t = make_shared<Transposition>(num_new_nodes, new_saved_positions, new_transpositions, m.score());
+				auto new_t = make_shared<Transposition>(num_new_nodes, new_saved_positions, new_transpositions, m->score());
 				prepared_transpositions[key] = new_t;
 				saved_positions[key] = new_t;
 			}
-			auto row = entry_to_bytes(board->key(), m.pgMove, m.score(), num_nodes);
+			auto row = entry_to_bytes(board->key(), m->pgMove, m->score(), num_nodes);
 			all_entries.push_back(row);
 			num_processed++;
 			if (num_processed % 5000 == 0)
@@ -1150,29 +1170,29 @@ std::tuple<quint32, qint16> Solver::prepare_moves(SolverMove& move, MapT& saved_
 	return { num_new_nodes, score };
 }
 
-void Solver::correct_score(qint16& score, qint16 sub_score, bool is_their_turn, SolverMove& m)
+void Solver::correct_score(qint16& score, qint16 sub_score, bool is_their_turn, pMove& m)
 {
 	qint16 new_score;
 	if (sub_score == UNKNOWN_SCORE)
 	{
-		new_score = m.score();
+		new_score = m->score();
 	}
 	else
 	{
 		new_score = is_their_turn ? (sub_score - 1) : sub_score;
-		//assert(m.score <= new_score);
-		if (m.score() > new_score) {
+		//assert(m->score <= new_score);
+		if (m->score() > new_score) {
 			emit Message(QString("...Wrong trans score %1: %2 > %3! in %4")
-				                .arg(m.score() - new_score)
-				                .arg(m.score())
+				                .arg(m->score() - new_score)
+				                .arg(m->score())
 				                .arg(new_score)
 				                .arg(get_move_stack(board)),
 			             MessageType::info);
 		}
-		//else if (m.score() < new_score) {
-		//	//emit Message(QString("Correct score from %1 to %2 for %3").arg(m.score()).arg(new_score).arg(get_move_stack(board)));
+		//else if (m->score() < new_score) {
+		//	//emit Message(QString("Correct score from %1 to %2 for %3").arg(m->score()).arg(new_score).arg(get_move_stack(board)));
 		//}
-		m.set_score(new_score);
+		m->set_score(new_score);
 	}
 
 	if (score == UNKNOWN_SCORE || new_score < score)

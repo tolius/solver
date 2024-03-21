@@ -21,6 +21,8 @@ namespace
     static uint32_t EGTB_VERSION;
 }
 
+constexpr static uint8_t SOLVED_MOVE = 0xFD;
+
 
 SolverMove::SolverMove() 
 	: SolutionEntry()
@@ -57,6 +59,11 @@ bool SolverMove::is_old_version() const
 	return (version() == 0) && (depth() <= REAL_DEPTH_LIMIT);
 }
 
+bool SolverMove::is_solved() const
+{
+	return version() == SOLVED_MOVE;
+}
+
 void SolverMove::set_score(qint16 score)
 {
 	weight = reinterpret_cast<quint16&>(score);
@@ -70,6 +77,11 @@ void SolverMove::set_depth_time(quint32 depth_time)
 void SolverMove::set_time(quint32 time)
 {
 	learn = (learn & 0xFFFF) | (time << 16);
+}
+
+void SolverMove::set_solved()
+{
+	learn = (learn & 0xFFFF00FF) | (SOLVED_MOVE << 8);
 }
 
 std::shared_ptr<SolverMove> SolverMove::fromBytes(quint64 bytes)

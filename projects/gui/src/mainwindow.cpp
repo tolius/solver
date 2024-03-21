@@ -1093,6 +1093,7 @@ void MainWindow::addSolution(std::shared_ptr<SolutionData> data)
 	if (!solution || !solution->isValid())
 		return;
 	m_solutionsModel->addSolution(solution);
+	openSolution(solution);
 }
 
 void MainWindow::deleteSolution(QModelIndex index)
@@ -1154,6 +1155,56 @@ void MainWindow::importSolution(const std::filesystem::path& filepath)
 		m_solutionsModel->addSolution(solution);
 	else
 		QMessageBox::warning(this, QApplication::applicationName(), tr("Failed to merge files in the \"%1\" solution").arg(solution->nameToShow()));
+}
+
+void MainWindow::openSolution(std::shared_ptr<Solution> solution)
+{
+	if (!solution)
+		return;
+
+	auto tag = solution->subTag();
+	if (tag.isEmpty())
+	{
+		for (int i = 0; i < m_solutionsModel->rowCount(); i++)
+		{
+			auto idx = m_solutionsModel->index(i, 0);
+			auto item = m_solutionsModel->item(idx);
+			if (item)
+			{
+				auto solution_i = item->solution();
+				if (solution_i == solution)
+				{
+					openSolution(idx, item);
+					return;
+				}
+			}
+		}
+	}
+	else
+	{
+		for (int i = 0; i < m_solutionsModel->rowCount(); i++)
+		{
+			auto parent_index = m_solutionsModel->index(i, 0);
+			auto parent_item = m_solutionsModel->item(parent_index);
+			if (parent_item && parent_item->hasChildren() && parent_item->name() == tag)
+			{
+				for (int j = 0; j < parent_item->childCount(); j++)
+				{
+					auto item = parent_item->child(j);
+					if (item)
+					{
+						auto solution_i = item->solution();
+						if (solution_i == solution)
+						{
+							openSolution(m_solutionsModel->index(j, 0, parent_index), item);
+							return;
+						}
+					}
+				}
+				return;
+			}
+		}
+	}
 }
 
 void MainWindow::updateCurrentSolution()

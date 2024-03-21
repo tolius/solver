@@ -144,7 +144,7 @@ signals:
 
 protected:
 	void init();
-	void process_move(SolverMove& move, SolverState& info);
+	void process_move(std::vector<pMove>& tree, SolverState& info);
 	void analyse_position(SolverMove& move, SolverState& info);
 	void find_solution(SolverMove& move, SolverState& info, pMove& best_move);
 	void evaluate_position(SolverMove& move, SolverState& info, pMove& best_move, pMove& solver_move);
@@ -162,8 +162,8 @@ protected:
 	void save_data(pcMove move, bool to_save = true);
 	void save_alt(pcMove move);
 	void create_book();
-	std::tuple<quint32, qint16> prepare_moves(SolverMove& move, MapT& saved_positions, MapT& transpositions);
-	void correct_score(qint16& score, qint16 sub_score, bool is_their_turn, SolverMove& m);
+	std::tuple<quint32, qint16> prepare_moves(pMove& move, MapT& saved_positions, MapT& transpositions);
+	void correct_score(qint16& score, qint16 sub_score, bool is_their_turn, pMove& m);
 	void expand_positions(MapT& saved_positions, MapT& transpositions);
 
 protected:
@@ -171,7 +171,8 @@ protected:
 	pBoard board;
 	std::map<uint64_t, int16_t> skip_branches;
 	Chess::Side our_color;
-	SolverMove tree;
+	std::vector<pMove> tree;
+	SolverState tree_state;
 	Status status;
 	int16_t max_num_moves;
 	std::map<uint64_t, quint64> positions;

@@ -51,16 +51,18 @@ struct SolverMove : public SolutionEntry
 	qint16 score() const;
 	const quint32& depth_time() const;
 	bool is_old_version() const;
+	bool is_solved() const;
 	QString scoreText() const;
 
 	void set_score(qint16 score);
 	void set_depth_time(quint32 depth_time);
 	void set_time(quint32 time);
+	void set_solved();
 
 	quint64 toBytes() const;
 	static std::shared_ptr<SolverMove> fromBytes(quint64 bytes);
 
-	std::vector<SolverMove> moves;
+	std::vector<std::shared_ptr<SolverMove>> moves;
 };
 
 
