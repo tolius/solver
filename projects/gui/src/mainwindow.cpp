@@ -412,6 +412,8 @@ void MainWindow::createDockWindows()
 	solutionsDock->setWidget(m_solutionsWidget);
 	solutionsDock->setContentsMargins(0, 0, 9, 0);
 	addDockWidget(Qt::RightDockWidgetArea, solutionsDock);
+	if (m_solver)
+		m_solutionsWidget->setSolver(m_solver);
 	connect(m_solutionsWidget, SIGNAL(solutionSelected(QModelIndex)), this, SLOT(selectSolution(QModelIndex)));
 	connect(m_solutionsWidget, SIGNAL(solutionDeleted(QModelIndex)), this, SLOT(deleteSolution(QModelIndex)));
 	connect(m_solutionsWidget, SIGNAL(solutionAdded(std::shared_ptr<SolutionData>)), this, SLOT(addSolution(std::shared_ptr<SolutionData>)));
@@ -1093,7 +1095,8 @@ void MainWindow::addSolution(std::shared_ptr<SolutionData> data)
 	if (!solution || !solution->isValid())
 		return;
 	m_solutionsModel->addSolution(solution);
-	openSolution(solution);
+	if (m_solver && !m_solver->isSolving())
+		openSolution(solution);
 }
 
 void MainWindow::deleteSolution(QModelIndex index)
@@ -1128,13 +1131,15 @@ void MainWindow::openSolution(QModelIndex index, SolutionItem* item)
 		m_solutionsModel->dataChanged(QModelIndex(), QModelIndex());
 		QSettings().setValue("solutions/last_solution", m_solution->nameToShow(true));
 		if (m_solver)
-			disconnect(m_solver.get(), SIGNAL(Message(const QString&, MessageType)), this, SLOT(logMessage(const QString&, MessageType)));
+			disconnect(m_solver.get(), nullptr, this, nullptr);
 		m_solver = std::make_shared<Solver>(m_solution);
 		connect(m_solver.get(), SIGNAL(Message(const QString&, MessageType)), this, SLOT(logMessage(const QString&, MessageType)));
 		connect(m_solver.get(), SIGNAL(updateCurrentSolution()), this, SLOT(updateCurrentSolution()));
 	}
 	m_results->setSolution(m_solution);
 	m_evaluation->setSolver(m_solver);
+	if (m_solutionsWidget)
+		m_solutionsWidget->setSolver(m_solver);
 	m_gameViewer->titleBar()->setSolution(m_solution);
 	initSolutionGame();
 
@@ -1169,11 +1174,9 @@ void MainWindow::openSolution(std::shared_ptr<Solution> solution)
 		{
 			auto idx = m_solutionsModel->index(i, 0);
 			auto item = m_solutionsModel->item(idx);
-			if (item)
-			{
+			if (item) {
 				auto solution_i = item->solution();
-				if (solution_i == solution)
-				{
+				if (solution_i == solution) {
 					openSolution(idx, item);
 					return;
 				}
@@ -1188,14 +1191,11 @@ void MainWindow::openSolution(std::shared_ptr<Solution> solution)
 			auto parent_item = m_solutionsModel->item(parent_index);
 			if (parent_item && parent_item->hasChildren() && parent_item->name() == tag)
 			{
-				for (int j = 0; j < parent_item->childCount(); j++)
-				{
+				for (int j = 0; j < parent_item->childCount(); j++) {
 					auto item = parent_item->child(j);
-					if (item)
-					{
+					if (item) {
 						auto solution_i = item->solution();
-						if (solution_i == solution)
-						{
+						if (solution_i == solution) {
 							openSolution(m_solutionsModel->index(j, 0, parent_index), item);
 							return;
 						}

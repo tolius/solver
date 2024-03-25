@@ -61,15 +61,15 @@ void EngineSession::reset()
 }
 
 Evaluation::Evaluation(GameViewer* game_viewer, QWidget* parent)
-    : QWidget(parent)
+	: QWidget(parent)
 	, ui(new Ui::EvaluationWidget)
-    , game_viewer(game_viewer)
+	, game_viewer(game_viewer)
 	, engine(nullptr)
-    , engine_version(UNKNOWN_ENGINE_VERSION)
+	, engine_version(UNKNOWN_ENGINE_VERSION)
 	, game(nullptr)
 	, opponent(new HumanPlayer(nullptr))
-	, is_auto(false)
-    , is_position_update(false)
+	, solver_status(SolverStatus::Manual)
+	, is_position_update(false)
 	, is_restart(false)
 	, to_keep_solving(false)
 {
@@ -108,8 +108,10 @@ Evaluation::Evaluation(GameViewer* game_viewer, QWidget* parent)
 	ui->btn_Start->setEnabled(false);
 	ui->btn_Stop->setEnabled(false);
 	ui->btn_Auto->setEnabled(false);
+	ui->btn_AutoFromHere->setEnabled(false);
 	ui->btn_Manual->setEnabled(false);
 	ui->btn_Auto->setChecked(false);
+	ui->btn_AutoFromHere->setChecked(false);
 	ui->btn_Manual->setChecked(true);
 	ui->btn_Save->setEnabled(false);
 	ui->btn_Override->setEnabled(false);
@@ -130,8 +132,9 @@ Evaluation::Evaluation(GameViewer* game_viewer, QWidget* parent)
 	fontSizeChanged(font_size);
 	connect(CuteChessApplication::instance(), SIGNAL(fontSizeChanged(int)), this, SLOT(fontSizeChanged(int)));
 
-	connect(ui->btn_Auto, &QPushButton::toggled, this, [&](bool flag) { this->setMode(flag); });
-	connect(ui->btn_Manual, &QPushButton::toggled, this, [&](bool flag) { this->setMode(!flag); });
+	connect(ui->btn_Auto, &QPushButton::toggled, this, [&](bool flag) { this->setMode(flag ? SolverStatus::Auto : SolverStatus::Manual); });
+	connect(ui->btn_AutoFromHere, &QPushButton::toggled, this, [&](bool flag) { this->setMode(flag ? SolverStatus::AutoFromHere : SolverStatus::Manual); });
+	connect(ui->btn_Manual, &QPushButton::toggled, this, [&](bool flag) { this->setMode(flag ? SolverStatus::Manual : SolverStatus::Auto); });
 	connect(ui->btn_Save, SIGNAL(clicked()), this, SLOT(onSaveClicked()));
 	connect(ui->btn_Override, SIGNAL(toggled(bool)), this, SLOT(onOverrideToggled(bool)));
 	connect(ui->btn_Start, &QPushButton::clicked, this, [this]() { onEngineToggled(true); });
@@ -151,42 +154,46 @@ void Evaluation::updateBoard(Chess::Board* board)
 	board_.reset(board->copy());
 }
 
-void Evaluation::setMode(bool is_auto)
+void Evaluation::setMode(SolverStatus new_status)
 {
 	auto update_ui = [&]() {
 		ui->btn_Auto->blockSignals(true);
+		ui->btn_AutoFromHere->blockSignals(true);
 		ui->btn_Manual->blockSignals(true);
-		ui->btn_Auto->setChecked(is_auto);
-		ui->btn_Manual->setChecked(!is_auto);
+		ui->btn_Auto->setChecked(new_status == SolverStatus::Auto);
+		ui->btn_AutoFromHere->setChecked(new_status == SolverStatus::AutoFromHere);
+		ui->btn_Manual->setChecked(new_status == SolverStatus::Manual);
 		ui->btn_Auto->blockSignals(false);
+		ui->btn_AutoFromHere->blockSignals(false);
 		ui->btn_Manual->blockSignals(false);
-		ui->btn_Auto->setEnabled(solver && engine && !is_auto && engine->isReady() && engine->state() != ChessPlayer::State::Thinking);
-		ui->btn_Manual->setEnabled(solver && engine && is_auto && engine->isReady());
+		bool is_auto_enabled = solver && engine && new_status == SolverStatus::Manual && engine->isReady() && engine->state() != ChessPlayer::State::Thinking;
+		ui->btn_Auto->setEnabled(is_auto_enabled);
+		ui->btn_AutoFromHere->setEnabled(is_auto_enabled && game && game->board() && game->board()->sideToMove() == solver->sideToWin() && solver->isCurrentBranch(game->board()));
+		ui->btn_Manual->setEnabled(solver && engine && new_status != SolverStatus::Manual && engine->isReady());
 		updateStartStop();
-		ui->widget_NumBestMoves->setVisible(engine && !is_auto && engine->isReady());
+		ui->widget_NumBestMoves->setVisible(engine && new_status == SolverStatus::Manual && engine->isReady());
 		ui->label_LoadingEngine->setVisible(!engine || !engine->isReady());
-		//if (ui->btn_Auto->isChecked())
+		//if (ui->btn_Auto->isChecked() || ui->btn_AutoFromHere->isChecked())
 		//	ui->btn_MultiPV_Auto->setChecked(true);
 	};
 
 	if (!solver)
-		is_auto = false;
-	if (solver && is_auto != this->is_auto)
+		new_status = SolverStatus::Manual;
+	bool is_changed = (new_status != solver_status);
+	solver_status = new_status;
+	update_ui();
+	if (solver && is_changed)
 	{
-		this->is_auto = is_auto;
-		update_ui();
-		if (!is_auto)
+		if (solver_status == SolverStatus::Manual)
 			solver->stop();
 		else if (engine)
-			solver->start(board_, [this](const QString& text) { QMessageBox::warning(this, QApplication::applicationName(), text); });
-	}
-	else
-	{
-		this->is_auto = is_auto;
-		update_ui();
+		{
+			auto pos = (solver_status == SolverStatus::AutoFromHere && game) ? game->board() : nullptr;
+			solver->start(pos, [this](const QString& text) { QMessageBox::warning(this, QApplication::applicationName(), text); });
+		}
 	}
 	
-	if (!is_auto && engine) // && game && board_ != game->board())
+	if (solver_status == SolverStatus::Manual && engine) // && game && board_ != game->board())
 		positionChanged();
 }
 
@@ -194,9 +201,11 @@ void Evaluation::updateStartStop()
 {
 	bool is_ok = engine && engine->isReady();
 	using s = ChessPlayer::State;
-	ui->btn_Start->setEnabled(is_ok && !is_auto && ((engine->state() == s::Observing) || (engine->state() == s::Idle)));
+	ui->btn_Start->setEnabled(is_ok && solver_status == SolverStatus::Manual && ((engine->state() == s::Observing) || (engine->state() == s::Idle)));
 	ui->btn_Stop->setEnabled(is_ok && engine->state() == ChessPlayer::State::Thinking);
-	ui->btn_Auto->setEnabled(solver && is_ok && !is_auto && engine->state() != ChessPlayer::State::Thinking);
+	bool is_auto_enabled = solver && is_ok && solver_status == SolverStatus::Manual && engine->state() != ChessPlayer::State::Thinking;
+	ui->btn_Auto->setEnabled(is_auto_enabled);
+	ui->btn_AutoFromHere->setEnabled(is_auto_enabled && game && game->board() && game->board()->sideToMove() == solver->sideToWin() && solver->isCurrentBranch(game->board()));
 }
 
 void Evaluation::clearEvals()
@@ -240,12 +249,12 @@ void Evaluation::setSolver(std::shared_ptr<Solver> solver)
 	this->solver = solver;
 	//solver->moveToThread(&solver_thread);
 	connect(solver.get(), &Solver::evaluatePosition, this, &Evaluation::onEvaluatePosition);
-	//connect(this, &Evaluation::startSolver, solver.get(), &Solver::onStart);
+	connect(solver.get(), &Solver::solvingStatusChanged, this, &Evaluation::onSolvingStatusChanged);
 	//solver_thread.start();
 	ui->label_SolutionInfo->setText("");
 	ui->widget_SolutionInfo->setVisible(false);
 	//ui->widget_Solution->setVisible(solution && !solution->isEmpty());
-	setMode(false);
+	setMode(SolverStatus::Manual);
 }
 
 void Evaluation::setGame(ChessGame* game)
@@ -279,7 +288,7 @@ void Evaluation::setEngine(const QString* filename)
 		if (!filename)
 			QMessageBox::warning(this, QApplication::applicationName(),
 				tr("Failed to load engine. Please select the engine in settings."));
-		setMode(is_auto);
+		setMode(SolverStatus::Manual);
 		return;
 	}
 	EngineConfiguration config;
@@ -297,7 +306,7 @@ void Evaluation::setEngine(const QString* filename)
 	if (!fi_engine.exists()) {
 		QMessageBox::warning(this, QApplication::applicationName(),
 		    tr("Failed to load engine: %1\n\n Please select the engine in settings.").arg(fi_engine.filePath()));
-		setMode(is_auto);
+		setMode(SolverStatus::Manual);
 		return;
 	}
 	QFileInfo fi_egtb(QDir::toNativeSeparators(path_exe + "/EGTB"));
@@ -305,7 +314,7 @@ void Evaluation::setEngine(const QString* filename)
 	if (!fi_egtb.exists()) {
 		QMessageBox::warning(this, QApplication::applicationName(),
 		                     tr("Failed to load EGTB: %1\n\n Please check the paths in settings.").arg(path_egtb));
-		setMode(is_auto);
+		setMode(SolverStatus::Manual);
 		return;
 	}
 	config.setWorkingDirectory(path_engines_dir);
@@ -317,7 +326,7 @@ void Evaluation::setEngine(const QString* filename)
 	engine = qobject_cast<UciEngine*>(builder.create(nullptr, nullptr, this, &error));
 	if (engine == nullptr) {
 		QMessageBox::critical(this, tr("Engine Error"), error);
-		setMode(is_auto);
+		setMode(SolverStatus::Manual);
 		return;
 	}
 	/// Options
@@ -337,7 +346,7 @@ void Evaluation::setEngine(const QString* filename)
 	//connect(engine, SIGNAL(debugMessage(QString)), this, SIGNAL(Message(const QString&)));
 	connect(engine, SIGNAL(moveMade(const Chess::Move&)), this, SLOT(onEngineFinished()));
 
-	setMode(is_auto);
+	setMode(SolverStatus::Manual);
 }
 
 void Evaluation::onEngineReady()
@@ -394,7 +403,7 @@ void Evaluation::onEngineReady()
 		ui->label_EngineVersion->setText("");
 	}
 	positionChanged();
-	setMode(false);
+	setMode(SolverStatus::Manual);
 }
 
 void Evaluation::onEngineInfo(const QString& info)
@@ -434,7 +443,7 @@ void Evaluation::onEngineQuit()
 		QMessageBox::critical(this, tr("Engine Error"), engine->errorString());
 	engine->deleteLater();
 	engine = nullptr;
-	setMode(is_auto);
+	setMode(SolverStatus::Manual);
 }
 
 std::tuple<std::shared_ptr<SolutionEntry>, Chess::Move> Evaluation::currData() const
@@ -505,7 +514,7 @@ void Evaluation::positionChanged()
 		solver->save_override(game->board(), data);
 		ui->btn_Override->setChecked(false);
 	}
-	Chess::Board* new_board = (is_auto && solver) ? solver->positionToSolve().get() : game->board();
+	Chess::Board* new_board = (solver_status != SolverStatus::Manual && solver) ? solver->positionToSolve().get() : game->board();
 	if (!new_board)
 		new_board = game->board();
 	using s = ChessPlayer::State;
@@ -530,6 +539,7 @@ void Evaluation::positionChanged()
 	                             && solver->solution() 
 	                             && game->board()->sideToMove() == solver->solution()->winSide()
 	                             && solver->isCurrentBranch(game->board()));
+	ui->btn_AutoFromHere->setEnabled(ui->btn_Auto->isEnabled() && solver && game->board() && game->board()->sideToMove() == solver->sideToWin() && solver->isCurrentBranch(game->board()));
 	if (!board_)
 		return;
 	engine->write(tr("position fen %1").arg(board_->fenString()));
@@ -618,6 +628,8 @@ void Evaluation::sync_positions()
 		for (; i < solver_history.size(); i++)
 		{
 			ChessPlayer* player(game->player(side));
+			while (!game_board->isLegalMove(solver_history[i].move))
+				qApp->processEvents();
 			auto generic_move = game_board->genericMove(solver_history[i].move);
 			((HumanPlayer*)player)->onHumanMove(generic_move, side);
 			side = side.opposite();
@@ -638,8 +650,8 @@ void Evaluation::startEngine()
 		return;
 
 	eval_pv_1 = "";
-	session.is_auto = is_auto; // ui->btn_Auto->isChecked(); //!! multiPV_buttons...
-	to_keep_solving = is_auto && solver;
+	session.is_auto = (solver_status != SolverStatus::Manual); //!! multiPV_buttons...
+	to_keep_solving = session.is_auto && solver;
 	int mate = 0;
 	bool to_repeat = session.to_repeat;
 	if (to_repeat)
@@ -744,7 +756,7 @@ void Evaluation::stopEngine(bool to_repeat)
 
 void Evaluation::onEngineToggled(bool flag)
 {
-	if (is_auto && flag)
+	if (solver_status != SolverStatus::Manual && flag)
 		return;
 
 	if (flag) {
@@ -753,8 +765,8 @@ void Evaluation::onEngineToggled(bool flag)
 	else {
 		to_keep_solving = false;
 		stopEngine();
-	//	if (is_auto)
-	//		setMode(false);
+	//	if (solver_status != SolverStatus::Manual)
+	//		setMode(SolverStatus::Manual);
 	}
 }
 
@@ -916,7 +928,7 @@ void Evaluation::processEngineOutput(const MoveEvaluation& eval, const QString& 
 			                                    : 0;
 		best_time = curr_time;
 		if (best_score != NULL_SCORE && (abs(best_score - curr_score) >= 100 || (curr_score >= 20'000 && best_score != curr_score)))
-            t_progress = best_time;
+			t_progress = best_time;
 		best_move = str_move;
 		best_score = curr_score;
 		abs_score = is_endgame ? abs(best_score) : best_score;
@@ -995,7 +1007,7 @@ void Evaluation::checkProgress(quint64 nodes, bool no_progress, int depth)
 		if (session.is_auto && no_progress && is_score_good && depth > depth_limit)
 		{
 			ui->progressBar->setValue(100);
-			if (is_auto) {
+			if (solver_status != SolverStatus::Manual) {
 				stopEngine();
 				return;
 			}
@@ -1053,7 +1065,7 @@ void Evaluation::checkProgress(quint64 nodes, bool no_progress, int depth)
 				                 .arg(move_stack),
 				             MessageType::warning);
 			}
-			if (is_auto) {
+			if (solver_status != SolverStatus::Manual) {
 				stopEngine();
 				return;
 			}
@@ -1117,14 +1129,14 @@ void Evaluation::onEngineFinished()
 	else {
 		timer_engine.stop();
 		session.reset();
-		if (is_auto && solver) {
+		if (solver_status != SolverStatus::Manual && solver) {
 			if (to_keep_solving /*|| ui->progressBar->value() == 100*/) {
 				auto [data, move] = currData();
 				solver->process(board_, move, data, is_only_move);
 			}
 			else {
 				solver->stop();
-				setMode(false);
+				setMode(SolverStatus::Manual);
 			}
 		}
 	}
@@ -1158,7 +1170,7 @@ void Evaluation::onMultiPVClicked(int multiPV)
 	btn->blockSignals(true);
 	btn->setChecked(true);
 	btn->blockSignals(false);
-	if (!is_auto && multiPV > 0 && engine && engine->state() == ChessPlayer::State::Thinking)
+	if (solver_status == SolverStatus::Manual && multiPV > 0 && engine && engine->state() == ChessPlayer::State::Thinking)
 	{
 		is_restart = true;
 		to_keep_solving = false;
@@ -1168,7 +1180,7 @@ void Evaluation::onMultiPVClicked(int multiPV)
 
 void Evaluation::onEvaluatePosition()
 {
-	if (!is_auto)
+	if (solver_status == SolverStatus::Manual)
 	{
 		solver->stop();
 		return;
@@ -1180,6 +1192,12 @@ void Evaluation::onEvaluatePosition()
 	}
 	positionChanged();
 	startEngine();
+}
+
+void Evaluation::onSolvingStatusChanged()
+{
+	if (!solver || !solver->isSolving())
+		setMode(SolverStatus::Manual);
 }
 
 void Evaluation::fontSizeChanged(int size)

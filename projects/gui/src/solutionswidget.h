@@ -14,6 +14,7 @@ namespace Ui {
 }
 class GameViewer;
 struct SolutionData;
+class Solver;
 
 
 class SolutionsWidget : public QWidget
@@ -40,6 +41,7 @@ public slots:
 	void on_deleteSolution();
 	void on_itemSelected(QModelIndex index);
 	void on_selectedItemChanged(const QItemSelection& selected, const QItemSelection& deselected);
+	void on_solvingStatusChanged();
 
 private:
 	void setDirectory(const QString& dir, bool to_fix = true);
@@ -47,12 +49,14 @@ private:
 	void updateEditButton(bool visible);
 
 public:
+	void setSolver(std::shared_ptr<Solver> solver);
 	static QString fixDirectory(const QString& dir);
 
 private:
 	QString directory;
 	SolutionsModel* solutionsModel;
 	GameViewer* gameViewer;
+	std::shared_ptr<Solver> solver;
 
 	Ui::SolutionsWidget* ui;
 };

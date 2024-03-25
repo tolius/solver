@@ -4,6 +4,7 @@
 #include "solutionsmodel.h"
 #include "solutionitem.h"
 #include "solutiondlg.h"
+#include "solver.h"
 #include "importdlg.h"
 #include "gameviewer.h"
 
@@ -100,6 +101,16 @@ void SolutionsWidget::setDirectory(const QString& dir, bool to_fix)
 
 	for (int i = 0; i < SolutionItem::NUM_COLUMNS; i++)
 		ui->treeView->resizeColumnToContents(i);
+}
+
+void SolutionsWidget::setSolver(std::shared_ptr<Solver> solver)
+{
+	if (this->solver)
+		disconnect(this->solver.get(), nullptr, this, nullptr);
+	this->solver = solver;
+	if (solver)
+		connect(solver.get(), SIGNAL(solvingStatusChanged()), this, SLOT(on_solvingStatusChanged()));
+	on_solvingStatusChanged();
 }
 
 void SolutionsWidget::on_openAll()
@@ -290,4 +301,10 @@ void SolutionsWidget::updateEditButton(bool visible)
 		ui->btn_Edit->setVisible(false);
 		ui->btn_Open->setVisible(true);
 	}
+}
+
+void SolutionsWidget::on_solvingStatusChanged()
+{
+	bool is_solving = solver && solver->isSolving();
+	ui->btn_Edit->setEnabled(!is_solving);
 }

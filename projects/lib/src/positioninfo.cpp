@@ -28,6 +28,18 @@ SolverMove::SolverMove()
 	: SolutionEntry()
 {}
 
+SolverMove::SolverMove(quint16 pgMove)
+	: SolutionEntry()
+{
+	this->pgMove = pgMove;
+}
+
+SolverMove::SolverMove(Chess::Move move, std::shared_ptr<Chess::Board> board)
+	: SolutionEntry()
+{
+	pgMove = OpeningBook::moveToBits(board->genericMove(move));
+}
+
 SolverMove::SolverMove(Chess::Move move, std::shared_ptr<Chess::Board> board, qint16 score, quint32 depth_time)
     : SolutionEntry(OpeningBook::moveToBits(board->genericMove(move)), reinterpret_cast<quint16&>(score), depth_time)
 {}
@@ -43,6 +55,13 @@ SolverMove::SolverMove(std::shared_ptr<SolutionEntry> entry)
 SolverMove::SolverMove(uint64_t bytes)
 	: SolutionEntry(bytes)
 {}
+
+void SolverMove::clearData()
+{
+	weight = reinterpret_cast<const quint16&>(UNKNOWN_SCORE);
+	learn = 0;
+	moves.clear();
+}
 
 qint16 SolverMove::score() const
 {

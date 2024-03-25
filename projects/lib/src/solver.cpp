@@ -129,6 +129,9 @@ Solver::Solver(std::shared_ptr<Solution> solution)
 	status = Status::idle;
 	solver_session = make_shared<SolverSession>();
 	init();
+	tree.clear();
+	tree.push_back(make_shared<SolverMove>());
+	tree_state = SolverState();
 	//our_color = board->sideToMove();
 }
 
@@ -181,36 +184,26 @@ void Solver::init()
 		while (num_moves--)
 			board->undoMove();
 	}
-	for (const auto& move : sol->branch)
-		board->makeMove(move);
 	our_color = board->sideToMove();
-	tree.clear();
-	tree_state = SolverState();
 }
 
-void Solver::start(pBoard new_pos, std::function<void(QString)> message)
+void Solver::start(Chess::Board* new_pos, std::function<void(QString)> message)
 {
-	if (!new_pos)
-		return;
 	if (status != Status::idle) {
 		message("It's already been started.");
 		return;
 	}
-
-	init(); //!! TODO: move (partially) to the constructor? Note: solution branch may be changed by the user
 	
-	if (false) // --> if (!new_pos_history.isEmpty() && !isCurrentBranch())
-	{//!! TODO: implement starting from any position
+	if (new_pos && !isCurrentBranch(new_pos))
+	{
 		message("You cannot start from a position that does not belong to the solution you have selected.\n\n"
 			    "Either set a position that belongs to the current solution branch, or set a starting position on the chessboard.");
 		return;
 	}
 
 	status = Status::solving;
+	emit solvingStatusChanged();
 
-	auto [str_opening, str_branch] = sol->branchToShow(false);
-	QString sol_name = str_branch.isEmpty() ? str_opening : QString("%1 %2").arg(str_opening).arg(str_branch);
-	emit Message(QString("Starting to solve %1").arg(sol_name));
 	positions.clear();
 	trans.clear();
 	new_positions.clear();
@@ -222,16 +215,86 @@ void Solver::start(pBoard new_pos, std::function<void(QString)> message)
 	num_new_moves = 0;
 	bool is_ok = sol->mergeAllFiles();
 	if (!is_ok) {
-		emit Message(QString("Error: Failed to merge files."), MessageType::error);
+		message(QString("Error: Failed to merge files.\n\nSolving aborted."));
 		status = Status::idle;
+		emit solvingStatusChanged();
 		return;
 	}
-	tree.clear();
-	tree.push_back(make_shared<SolverMove>());
-	tree_state = SolverState(false);
+
+	init(); //!! TODO: move (partially) to the constructor? Note: solution branch / branches to skip may be changed by the user
+	QString sol_name = "1." + sol->nameToShow();
+	int num_line_plies = 0;
+	pMove t = tree.front();
 	try
 	{
-		process_move(tree, tree_state);
+		QStringList san_moves;
+		auto make_move = [&](Chess::Move move)
+		{
+			auto pgMove = OpeningBook::moveToBits(board->genericMove(move));
+			for (auto& m : t->moves) {
+				if (m->pgMove == pgMove) {
+					QString san = board->moveString(move, Chess::Board::StandardAlgebraic);
+					if (board->plyCount() % 2 == 0)
+						san_moves.push_back(QString("%1.%2").arg(1 + board->plyCount() / 2).arg(san));
+					else
+						san_moves.push_back(san);
+					t = m;
+					board->makeMove(move);
+					return;
+				}
+			}
+			QString msg = "Error: Failed to make a move.\n\nSolving aborted.";
+			message(msg);
+			throw runtime_error(msg.toStdString());
+		};
+		auto add_move = [&](Chess::Move move)
+		{
+			bool is_their_turn = (board->sideToMove() != our_color);
+			if (is_their_turn)
+			{
+				if (!t->moves.empty()) {
+					make_move(move);
+					return;
+				}
+				auto legal_moves = board->legalMoves();
+				assert(!legal_moves.isEmpty()); // otherwise it's a loss
+				t->moves.resize(legal_moves.size());
+				for (int i = 0; i < legal_moves.size(); i++)
+					t->moves[i] = make_shared<SolverMove>(legal_moves[i], board);
+				make_move(move);
+			}
+			else
+			{
+				auto pgMove = OpeningBook::moveToBits(board->genericMove(move));
+				for (auto& m : t->moves) {
+					if (m->pgMove == pgMove) {
+						make_move(move);
+						return;
+					}
+				}
+				t->moves.clear();
+				t->moves.push_back(make_shared<SolverMove>(pgMove));
+				make_move(move);
+			}
+		};
+
+		for (const auto& move : sol->branch)
+			add_move(move);
+		if (new_pos) {
+			auto& moves = new_pos->MoveHistory();
+			for (int i = sol->opening.size() + sol->branch.size(); i < moves.size(); i++)
+				add_move(moves[i].move);
+			if (moves.size() > sol->opening.size() + sol->branch.size())
+				num_line_plies = static_cast<int>(moves.size() - sol->opening.size() - sol->branch.size());
+		}
+		if (!san_moves.empty())
+			sol_name = QString("%1 %2").arg(sol_name).arg(san_moves.join(' '));
+		emit Message(QString("Starting to solve %1").arg(sol_name));
+		tree_state = SolverState(false);
+		vector<pMove> tree_to_solve;
+		t->clearData();
+		tree_to_solve.push_back(t);
+		process_move(tree_to_solve, tree_state);
 	}
 	catch (stopProcessing e)
 	{
@@ -256,22 +319,26 @@ void Solver::start(pBoard new_pos, std::function<void(QString)> message)
 		status = Status::idle;
 	}
 	emit Message(QString("Finishing solving %1").arg(sol_name), MessageType::info);
-	if (status != Status::solving)
+	if (status != Status::solving) {
+		emit solvingStatusChanged();
 		return;
+	}
 	
 	emit Message(QString("Success for %1:").arg(sol_name), MessageType::success);
-	emit Message(QString("Mate in #%1").arg(max_num_moves));
-	qint16 mate_score = MATE_VALUE - tree.front()->score() - 1;
-	int num_opening_moves = (sol->opening.size() + sol->branch.size() + 1) / 2;
+	if (max_num_moves) // can be 0 if re-running while it's already solved
+		emit Message(QString("Mate in #%1").arg(max_num_moves));
+	qint16 mate_score = MATE_VALUE - t->score() - 1;
+	int num_opening_moves = (sol->opening.size() + sol->branch.size() + num_line_plies + 1) / 2;
 	emit Message(QString("Mate score %1 = %2 + %3").arg(num_opening_moves + mate_score).arg(num_opening_moves).arg(mate_score));
 	emit Message(QString("Number of transpositions: %1").arg(trans.size()));
 	emit Message(QString("Number of solver moves: %1").arg(num_moves_from_solver));
 	emit Message(QString("Number of evaluated endgames: %1").arg(num_evaluated_endgames));
 
-	create_book();
+	create_book(t, num_opening_moves);
 	sol->mergeAllFiles();
 	status = Status::idle;
 	init();
+	emit solvingStatusChanged();
 }
 
 void Solver::stop()
@@ -402,7 +469,9 @@ void Solver::process_move(std::vector<pMove>& tree, SolverState& info)
 				assert(info.alt_steps <= max_alt_steps);
 			}
 			bool prev_is_solver_path = is_solver_path;
-			analyse_position(*move, info);
+			assert(move->moves.size() <= 1);
+			if (move->moves.empty())
+				analyse_position(*move, info);
 			assert(move->moves.size() <= 1);
 			for (auto& m : move->moves) {
 				if (!is_stop_move(*m, info) && (!info.is_alt() || (info.alt_steps < max_alt_steps 
@@ -412,8 +481,8 @@ void Solver::process_move(std::vector<pMove>& tree, SolverState& info)
 					process_move(tree, info);
 					board->undoMove();
 					tree.pop_back();
-					m->set_solved();
 				}
+				m->set_solved();
 				//assert (move->score() <= ABOVE_EG || move->score() <= m->score() - 1);
 				if (move->score() != UNKNOWN_SCORE 
 						&& move->score() > ABOVE_EG 
@@ -1029,21 +1098,25 @@ std::shared_ptr<Chess::Board> Solver::positionToSolve() const
 	return board;
 }
 
-void Solver::create_book()
+bool Solver::isSolving() const
 {
-	int num_opening_moves = (sol->opening.size() + sol->branch.size() + 1) / 2;
+	return status != Status::idle;
+}
+
+void Solver::create_book(pMove tree_front, int num_opening_moves)
+{
 	positions.clear();
 	prepared_transpositions.clear();
 	all_entries.clear();
 	MapT saved_positions;
 	MapT transpositions;
 	num_processed = 0;
-	auto [num_nodes, score] = prepare_moves(tree.front(), saved_positions, transpositions);
+	auto [num_nodes, score] = prepare_moves(tree_front, saved_positions, transpositions);
 	bool is_their_turn = (board->sideToMove() != our_color);
 	qint16 tree_score = UNKNOWN_SCORE;
-	correct_score(tree_score, score, is_their_turn, tree.front());
+	correct_score(tree_score, score, is_their_turn, tree_front);
 	emit Message(QString("Number of nodes: %1").arg(num_nodes));
-	qint16 mate_score = MATE_VALUE - tree.front()->score();
+	qint16 mate_score = MATE_VALUE - tree_front->score();
 	bool is_mate_fake = (MATE_VALUE - FAKE_MATE_VALUE < mate_score && mate_score <= MATE_VALUE - FAKE_DRAW_SCORE);
 	if (is_mate_fake)
 		mate_score -= MATE_VALUE - FAKE_MATE_VALUE;

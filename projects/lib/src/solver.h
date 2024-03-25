@@ -130,8 +130,9 @@ public:
 	Chess::Side sideToWin() const;
 	std::shared_ptr<SolverSession> whatToSolve() const;
 	pBoard positionToSolve() const;
+	bool isSolving() const;
 
-	void start(pBoard new_pos, std::function<void(QString)> message);
+	void start(Chess::Board* new_pos, std::function<void(QString)> message);
 	void stop();
 	void save(pBoard pos, Chess::Move move, std::shared_ptr<SolutionEntry> data, bool is_only_move, Solution::FileType type);
 	void save_override(Chess::Board* pos, std::shared_ptr<SolutionEntry> data);
@@ -141,6 +142,7 @@ signals:
 	void Message(const QString& message, MessageType type = MessageType::std);
 	void evaluatePosition();
 	void updateCurrentSolution();
+	void solvingStatusChanged();
 
 protected:
 	void init();
@@ -161,7 +163,7 @@ protected:
 	void add_existing(const SolverMove& move, bool is_stop_move);
 	void save_data(pcMove move, bool to_save = true);
 	void save_alt(pcMove move);
-	void create_book();
+	void create_book(pMove tree_front, int num_opening_moves);
 	std::tuple<quint32, qint16> prepare_moves(pMove& move, MapT& saved_positions, MapT& transpositions);
 	void correct_score(qint16& score, qint16 sub_score, bool is_their_turn, pMove& m);
 	void expand_positions(MapT& saved_positions, MapT& transpositions);

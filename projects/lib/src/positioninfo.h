@@ -43,10 +43,14 @@ enum class MessageType
 struct SolverMove : public SolutionEntry
 {
 	SolverMove();
+	SolverMove(quint16 pgMove);
+	SolverMove(Chess::Move move, std::shared_ptr<Chess::Board> board);
 	SolverMove(Chess::Move move, std::shared_ptr<Chess::Board> board, qint16 score, quint32 depth_time);
 	SolverMove(const SolutionEntry& entry);
 	SolverMove(std::shared_ptr<SolutionEntry> entry);
 	SolverMove(uint64_t bytes);
+
+	void clearData();
 
 	qint16 score() const;
 	const quint32& depth_time() const;

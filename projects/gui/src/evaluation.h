@@ -87,6 +87,12 @@ private:
 		EGLoss,
 		Loss
 	};
+	enum class SolverStatus
+	{
+		Manual,
+		Auto,
+		AutoFromHere
+	};
 
 public slots:
 	void positionChanged();
@@ -116,12 +122,13 @@ private slots:
 	void onOverrideToggled(bool flag);
 	void onMultiPVClicked(int multiPV);
 	void onEvaluatePosition();
+	void onSolvingStatusChanged();
 private:
 	void onEngineToggled(bool flag);
 
 private:
 	void updateBoard(Chess::Board* board);
-	void setMode(bool is_auto);
+	void setMode(SolverStatus new_status);
 	void updateStartStop();
 	void clearEvals();
 	void clearEvalLabels();
@@ -143,7 +150,7 @@ private:
 	std::map<int, QToolButton*> multiPV_buttons;
 	//QThread solver_thread;
 
-	bool is_auto;
+	SolverStatus solver_status;
 	std::shared_ptr<Solver> solver;
 	UciEngine* engine;
 	uint8_t engine_version;
