@@ -183,6 +183,11 @@ QToolButton::checked
 
 }
 
+QToolButton::menu-button
+{
+	background-color: transparent;
+}
+
 
 /*-----QToolTip-----*/
 QToolTip

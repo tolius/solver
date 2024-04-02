@@ -63,28 +63,6 @@ const QString Solution::BAK_EXT   = "bak";
 //};
 
 
-MoveEntry::MoveEntry(const QString& san, const SolutionEntry& entry)
-	: SolutionEntry(entry)
-	, san(san)
-	, is_best(false)
-{}
-
-MoveEntry::MoveEntry(const QString& san, quint16 pgMove, quint16 weight, quint32 learn)
-	: SolutionEntry(pgMove, weight, learn)
-	, san(san)
-	, is_best(false)
-{}
-
-bool comp_book_moves(const SolutionEntry& a, const SolutionEntry& b)
-{ 
-	if (a.score() < b.score())
-		return true;
-	if (a.score() > b.score())
-		return false;
-	return a.nodes() > b.nodes();
-}
-
-
 Solution::Solution(std::shared_ptr<SolutionData> data, const QString& basename, int version, bool is_imported)
 {
 	opening = data->opening;
@@ -438,61 +416,35 @@ std::list<MoveEntry> Solution::entries(Chess::Board* board) const
 		return list<MoveEntry>();
 	auto book_entries = book_main->bookEntries(board->key());
 	//book_entries.remove_if([](const SolutionEntry& entry) { return entry.nodes() == 0; });
-	book_entries.sort(std::not_fn(comp_book_moves));
+	book_entries.sort(std::not_fn(SolutionEntry::compare));
 	std::list<MoveEntry> solution_entries;
 	for (auto& entry : book_entries)
 	{
 		QString san = entry.pgMove ? entry.san(board) : "";
-		MoveEntry move_entry(san, entry);
+		MoveEntry move_entry(EntrySource::book, san, entry);
 		move_entry.is_best = true;
 		solution_entries.push_back(move_entry);
 	}
 	return solution_entries;
 }
 
-void set_best_moves(std::list<MoveEntry>& entries)
-{
-	if (entries.empty())
-		return;
-
-	auto& best = entries.front();
-	best.is_best = true;
-	int best_dtw = static_cast<int>(MATE_VALUE) - best.score();
-	auto best_nodes = best.nodes();
-	for (auto& entry : entries)
-	{
-		if (entry.score() == UNKNOWN_SCORE) {
-			entry.is_best = false;
-			continue;
-		}
-		auto dtw_i = MATE_VALUE - entry.score();
-		auto nodes_i = entry.nodes();
-		int bonus_nodes = 0;
-		if (best_nodes >= 100 && nodes_i >= 100)
-		{
-			float factor = ((float)std::min(nodes_i, best_nodes)) / std::max(nodes_i, best_nodes); // 100%...0%
-			bool is_worse = (dtw_i > best_dtw) == (nodes_i > best_nodes);
-			if (is_worse) {
-				if (factor > 0.97f) // tolerance 3%
-					bonus_nodes = 0;
-				else
-					bonus_nodes = best_dtw * (1 - factor) / 3; // +33%...-33%
-			}
-			else {
-				bonus_nodes = -best_dtw * (1 - factor) / 3; // -33%...+33%
-			}
-		}
-		int delta = abs(best_dtw - dtw_i) + bonus_nodes;
-		if (delta <= 0)
-			entry.is_best = true;
-	}
-}
-
 std::list<MoveEntry> Solution::nextEntries(Chess::Board* board, std::list<MoveEntry>* missing_entries) const
 {
 	list<MoveEntry> entries;
-	if (!board || !book_main)
+	if (!board)
 		return entries;
+	if (!book_main)
+	{
+		if (!missing_entries)
+			return entries;
+		auto legal_moves = board->legalMoves();
+		for (auto& m : legal_moves) {
+			auto pgMove = OpeningBook::moveToBits(board->genericMove(m));
+			QString san = board->moveString(m, Chess::Board::StandardAlgebraic);
+			missing_entries->emplace_back(EntrySource::none, san, pgMove, (quint16)UNKNOWN_SCORE, 0);
+		}
+		return entries;
+	}
 	auto legal_moves = board->legalMoves();
 	for (auto& m : legal_moves)
 	{
@@ -500,22 +452,20 @@ std::list<MoveEntry> Solution::nextEntries(Chess::Board* board, std::list<MoveEn
 		QString san = board->moveString(m, Chess::Board::StandardAlgebraic);
 		board->makeMove(m);
 		auto book_entries = book_main->bookEntries(board->key());
-		if (!book_entries.empty())
-		{
-			auto it = std::min_element(book_entries.begin(), book_entries.end(), comp_book_moves);
+		if (!book_entries.empty()) {
+			auto it = std::min_element(book_entries.begin(), book_entries.end(), SolutionEntry::compare);
 			if (it->weight > MATE_THRESHOLD + 1)
 				it->weight--;
 			it->pgMove = pgMove;
-			entries.emplace_back(san, *it);
+			entries.emplace_back(EntrySource::book, san, *it);
 		}
-		else if (missing_entries)
-		{
-			missing_entries->emplace_back(san, pgMove, (quint16)UNKNOWN_SCORE, 0);
+		else if (missing_entries) {
+			missing_entries->emplace_back(EntrySource::none, san, pgMove, (quint16)UNKNOWN_SCORE, 0);
 		}
 		board->undoMove();
 	}
-	entries.sort(comp_book_moves);
-	set_best_moves(entries);
+	entries.sort(SolutionEntry::compare);
+	MoveEntry::set_best_moves(entries);
 	return entries;
 }
 
@@ -546,7 +496,7 @@ std::list<MoveEntry> Solution::positionEntries(Chess::Board* board, bool use_eso
 
 	std::list<MoveEntry> position_entries;
 	if (entry) {
-		position_entries.emplace_back(entry->san(board), *entry);
+		position_entries.emplace_back(EntrySource::positions, entry->san(board), *entry);
 		auto& e = position_entries.back();
 		e.is_best = true;
 		if (alt_entry && alt_entry->pgMove == entry->pgMove) {
@@ -559,7 +509,7 @@ std::list<MoveEntry> Solution::positionEntries(Chess::Board* board, bool use_eso
 		}
 	}
 	if (alt_entry) {
-		position_entries.emplace_back(alt_entry->san(board), *alt_entry);
+		position_entries.emplace_back(EntrySource::positions, alt_entry->san(board), *alt_entry);
 		auto& e = position_entries.back();
 		e.is_best = !entry;
 		//e.weight = MATE_VALUE - MANUAL_VALUE;
@@ -571,7 +521,7 @@ std::list<MoveEntry> Solution::positionEntries(Chess::Board* board, bool use_eso
 	}
 	if (sol_entry) {
 		sol_entry->weight = reinterpret_cast<const quint16&>(UNKNOWN_SCORE);
-		position_entries.emplace_back(sol_entry->san(board), *sol_entry);
+		position_entries.emplace_back(EntrySource::positions, sol_entry->san(board), *sol_entry);
 		auto& e = position_entries.back();
 		e.is_best = !entry && !alt_entry;
 		e.info = w();
@@ -599,24 +549,24 @@ std::list<MoveEntry> Solution::nextPositionEntries(Chess::Board* board, std::lis
 			if (e.weight > MATE_THRESHOLD + 1)
 				e.weight--;
 			e.pgMove = pgMove;
-			next_entries.emplace_back(san, e);
+			next_entries.emplace_back(EntrySource::positions, san, e);
 		}
 		auto it = esol.find(OpeningBook::moveToBits(board->genericMove(m)));
 		if (it != esol.end()) {
 			if (entries.empty()) {
 				it->second.weight = reinterpret_cast<const quint16&>(UNKNOWN_SCORE);
-				next_entries.emplace_back(san, it->second);
+				next_entries.emplace_back(EntrySource::positions, san, it->second);
 			}
 			if (it->second.learn > 1)
 				next_entries.back().info = QString("W=%1").arg(Watkins_nodes(it->second));
 		}
 		else if (entries.empty() && missing_entries) {
-			missing_entries->emplace_back(san, pgMove, (quint16)UNKNOWN_SCORE, 0);
+			missing_entries->emplace_back(EntrySource::none, san, pgMove, (quint16)UNKNOWN_SCORE, 0);
 		}
 		board->undoMove();
 	}
-	next_entries.sort(comp_book_moves);
-	set_best_moves(next_entries);
+	next_entries.sort(SolutionEntry::compare);
+	MoveEntry::set_best_moves(next_entries);
 	return next_entries;
 }
 

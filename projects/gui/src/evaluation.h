@@ -47,6 +47,7 @@ class Solution;
 class Solver;
 class QHBoxLayout;
 class QLabel;
+class QAction;
 
 namespace Ui {
 	class EvaluationWidget;
@@ -101,6 +102,7 @@ public slots:
 	void engineHashChanged(int hash_size);
 	void engineNumThreadsChanged(int num_threads);
 	void fontSizeChanged(int size);
+	void boardUpdateFrequencyChanged(UpdateFrequency frequency);
 
 signals:
 	void tintChanged(QColor tint, bool to_color_move_buttons = false);
@@ -120,21 +122,24 @@ private slots:
 	void onTimerEngine();
 	void onSaveClicked();
 	void onOverrideToggled(bool flag);
+	void onSyncToggled(bool flag);
 	void onMultiPVClicked(int multiPV);
 	void onEvaluatePosition();
 	void onSolvingStatusChanged();
+	void onSyncPositions(std::shared_ptr<Chess::Board> ref_board = nullptr);
 private:
 	void onEngineToggled(bool flag);
 
 private:
 	void updateBoard(Chess::Board* board);
+	void updateSync();
+	void updateOverride();
 	void setMode(SolverStatus new_status);
 	void updateStartStop();
 	void clearEvals();
 	void clearEvalLabels();
 	std::tuple<std::shared_ptr<SolutionEntry>, Chess::Move> currData() const;
 	void reportWinStatus(WinStatus status);
-	void sync_positions();
 	void startEngine();
 	void stopEngine(bool restart = false);
 	QStringList process_moves(const MoveEvaluation& eval);
@@ -148,6 +153,7 @@ private:
 	GameViewer* game_viewer;
 	std::vector<std::array<QLabel*, 3>> move_labels;
 	std::map<int, QToolButton*> multiPV_buttons;
+	QAction* sync_action;
 	//QThread solver_thread;
 
 	SolverStatus solver_status;
@@ -186,6 +192,10 @@ private:
 	QTimer timer_engine;
 	QString eval_pv_1;
 	std::chrono::steady_clock::time_point t_last_T1_change;
+
+	QTimer timer_sync;
+	UpdateFrequency frequency_sync;
+	std::chrono::steady_clock::time_point t_last_sync;
 };
 
 #endif // EVALUATION_H

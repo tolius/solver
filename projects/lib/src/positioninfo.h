@@ -35,9 +35,56 @@ class Position;
 struct StateInfo;
 
 
+enum class EntrySource
+{
+	none,
+	solver,
+	book,
+	positions
+};
+
+struct LIB_EXPORT MoveEntry : SolutionEntry
+{
+public:
+	MoveEntry(EntrySource source, const QString& san, const SolutionEntry& entry);
+	MoveEntry(EntrySource source, const QString& san, quint16 pgMove, quint16 weight, quint32 learn);
+
+	static void set_best_moves(std::list<MoveEntry>& entries);
+
+public:
+	EntrySource source;
+	QString san;
+	QString info;
+	bool is_best;
+};
+
+
 enum class MessageType
 {
 	std, info, warning, error, success
+};
+
+enum class UpdateFrequency : int
+{
+	never = 1,
+	infrequently = 2,
+	standard = 3,
+	frequently = 4,
+	always = 5
+};
+
+UpdateFrequency value_to_frequency(int val);
+
+struct LineToLog
+{
+	QString text;
+	qint16 win_len;
+
+public:
+	LineToLog();
+
+	void clear();
+	bool empty() const;
 };
 
 struct SolverMove : public SolutionEntry
@@ -48,7 +95,7 @@ struct SolverMove : public SolutionEntry
 	SolverMove(Chess::Move move, std::shared_ptr<Chess::Board> board, qint16 score, quint32 depth_time);
 	SolverMove(const SolutionEntry& entry);
 	SolverMove(std::shared_ptr<SolutionEntry> entry);
-	SolverMove(uint64_t bytes);
+	SolverMove(quint64 bytes);
 
 	void clearData();
 

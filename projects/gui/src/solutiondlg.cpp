@@ -150,6 +150,7 @@ SolutionDialog::SolutionDialog(QWidget* parent, std::shared_ptr<SolutionData> da
 	connect(ui->btn_setCurrent, &QPushButton::clicked, this, [this]() { ui->line_Branch->setText(board_position); });
 
 	updateButtons();
+	on_BranchToSkipChanged();
 
 	connect(ui->line_Opening, &QLineEdit::editingFinished, this, &SolutionDialog::on_OpeningChanged);
 	connect(ui->line_Branch, &QLineEdit::editingFinished, this, &SolutionDialog::on_BranchChanged);
@@ -250,7 +251,7 @@ void SolutionDialog::on_OpeningEdited()
 	}
 	else
 	{
-		QTimer::singleShot(duration_cast<milliseconds>(UPDATE_TIME_MS - elapsed).count(), [=]() { this->on_OpeningEdited(); });
+		QTimer::singleShot(duration_cast<milliseconds>(UPDATE_TIME_MS - elapsed), [this]() { on_OpeningEdited(); });
 	}
 }
 
@@ -266,7 +267,7 @@ void SolutionDialog::on_BranchEdited()
 	}
 	else
 	{
-		QTimer::singleShot(duration_cast<milliseconds>(UPDATE_TIME_MS - elapsed), [=]() { this->on_BranchEdited(); });
+		QTimer::singleShot(duration_cast<milliseconds>(UPDATE_TIME_MS - elapsed), [this]() { on_BranchEdited(); });
 	}
 }
 

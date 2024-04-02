@@ -4,6 +4,7 @@
 #include "flowlayout/flowlayout.h"
 #include "chessgame.h"
 #include "solution.h"
+#include "solver.h"
 #include "solutionbook.h"
 #include "humanplayer.h"
 
@@ -17,6 +18,7 @@
 #include <QMenu>
 
 #include <list>
+#include <algorithm>
 
 
 Results::Results(QWidget* parent)
@@ -39,6 +41,12 @@ void Results::setSolution(std::shared_ptr<Solution> solution)
 	bool is_available = solution && solution->isBookOpen();
 	ui->widget_Solution->setVisible(is_available);
 	ui->widget_ResultInfo->setVisible(false);
+	ui->widget_SolutionResult->setVisible(false);
+}
+
+void Results::setSolver(std::shared_ptr<Solver> solver)
+{
+	this->solver = solver;
 }
 
 void Results::setGame(ChessGame* game)
@@ -87,32 +95,51 @@ QString Results::positionChanged()
 		return best_score;
 	// Find entries in the book
 	std::list<MoveEntry> solution_entries;
-	bool is_book = true;
-	if (board->sideToMove() == solution->winSide())
+	if (solver)
+		solution_entries = solver->entries(board);
+	if (solution_entries.empty())
 	{
-		solution_entries = solution->entries(board);
-		if (solution_entries.empty()) {
-			is_book = false;
-			solution_entries = solution->positionEntries(board);
+		if (board->sideToMove() == solution->winSide())
+		{
+			solution_entries = solution->entries(board);
+			if (solution_entries.empty())
+			{
+				solution_entries = solution->positionEntries(board);
+				if (solution_entries.empty())
+				{
+					auto legal_moves = board->legalMoves();
+					for (auto& m : legal_moves) {
+						auto pgMove = OpeningBook::moveToBits(board->genericMove(m));
+						QString san = board->moveString(m, Chess::Board::StandardAlgebraic);
+						solution_entries.emplace_back(EntrySource::none, san, pgMove, (quint16)UNKNOWN_SCORE, 0);
+					}
+					if (solution_entries.size() == 1)
+						solution_entries.front().info = "only move";
+				}
+			}
+		}
+		else
+		{
+			std::list<MoveEntry> missing_entries;
+			solution_entries = solution->nextEntries(board, &missing_entries);
+			if (solution_entries.empty()) {
+				missing_entries.clear();
+				solution_entries = solution->nextPositionEntries(board, &missing_entries);
+				if (!solution_entries.empty())
+					solution_entries.splice(solution_entries.begin(), missing_entries);
+			}
+			else {
+				solution_entries.splice(solution_entries.end(), missing_entries);
+			}
 		}
 	}
-	else
-	{
-		std::list<MoveEntry> missing_entries;
-		solution_entries = solution->nextEntries(board, &missing_entries);
-		if (solution_entries.empty()) {
-			is_book = false;
-			missing_entries.clear();
-			solution_entries = solution->nextPositionEntries(board, &missing_entries);
-			if (!solution_entries.empty())
-				solution_entries.splice(solution_entries.begin(), missing_entries);
-		}
-		else {
-			solution_entries.splice(solution_entries.end(), missing_entries);
-		}
-	}
-	if (!solution_entries.empty())
+	if (!solution_entries.empty()) {
+		auto& best = solution_entries.front();
+		bool is_book = (best.source == EntrySource::book || best.source == EntrySource::solver);
 		best_score = solution_entries.front().getScore(is_book);
+	}
+	bool all_unknown = std::all_of(solution_entries.cbegin(), solution_entries.cend(), 
+	                               [](const MoveEntry& me) { return me.score() == UNKNOWN_SCORE; });
 
 	QString eSolution_info = solution->eSolutionInfo(board);
 	ui->label_Info->setVisible(!eSolution_info.isEmpty());
@@ -128,16 +155,17 @@ QString Results::positionChanged()
 		//btn->setMinimumWidth(1);
 		//btn->setSizePolicy(QSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum));
 		//btn->setMaximumWidth(50);
-		if (btn) {
+		if (btn && entry.score() != UNKNOWN_SCORE && entry.source == EntrySource::book) {
 			quint32 nodes_threshold = (board->sideToMove() == solution->winSide()) ? 1 : 0;
 			if (entry.nodes() <= nodes_threshold)
 				btn->setEnabled(false);
 		}
 		buttons.push_back(btn);
-		QString score = entry.getScore(is_book);
-		QString info = !is_book ? entry.info : (entry.score() == UNKNOWN_SCORE || entry.nodes() == 0) ? "" : entry.getNodes();
-		//if (entry.nodes() == 0)
-		//	btn->setEnabled(false);
+		QString score = (all_unknown || (entry.source == EntrySource::positions && entry.info == "only move"))
+		    ? ""
+		    : entry.getScore(entry.source == EntrySource::book || entry.source == EntrySource::solver);
+		if (entry.info.isEmpty() && entry.source == EntrySource::book && entry.score() != UNKNOWN_SCORE && entry.nodes()) 
+			entry.info = entry.getNodes();
 		auto label_score = new QLabel(score, ui->widget_Solution);
 		if (entry.is_best)
 		{
@@ -149,7 +177,7 @@ QString Results::positionChanged()
 			font.setPointSize(9);
 			label_score->setFont(font);
 		}
-		auto label_nodes = new QLabel(info, ui->widget_Solution);
+		auto label_nodes = new QLabel(entry.info, ui->widget_Solution);
 		QVector<QWidget*> element;
 		if (btn)
 			element.append(btn);

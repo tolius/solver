@@ -81,6 +81,10 @@ Evaluation::Evaluation(GameViewer* game_viewer, QWidget* parent)
 	session.reset();
 	timer_engine.setInterval(1s);
 	connect(&timer_engine, SIGNAL(timeout()), this, SLOT(onTimerEngine()));
+	timer_sync.setSingleShot(true);
+	connect(&timer_sync, SIGNAL(timeout()), this, SLOT(onSyncPositions()));
+	int board_update = QSettings().value("solver/board_update", (int)UpdateFrequency::standard).toInt();
+	frequency_sync = value_to_frequency(board_update);
 
 	//m_flowLayout = new FlowLayout(ui->widget_Solution, 6, 6);
 	//ui->widget_Solution->setLayout(m_flowLayout);
@@ -116,6 +120,14 @@ Evaluation::Evaluation(GameViewer* game_viewer, QWidget* parent)
 	ui->btn_Save->setEnabled(false);
 	ui->btn_Override->setEnabled(false);
 	ui->btn_Override->setChecked(false);
+	ui->btn_Sync->setEnabled(false);
+
+	sync_action = new QAction("Auto sync", this);
+	sync_action->setCheckable(true);
+	sync_action->setChecked(true);
+	auto syncMenu = new QMenu;
+	syncMenu->addAction(sync_action);
+	ui->btn_Sync->setMenu(syncMenu);
 
 	std::array<QToolButton*, 8> buttons = { ui->btn_MultiPV_Auto, ui->btn_MultiPV_1, ui->btn_MultiPV_2,  ui->btn_MultiPV_3,
 		                                    ui->btn_MultiPV_4,    ui->btn_MultiPV_6, ui->btn_MultiPV_12, ui->btn_MultiPV_18 };
@@ -139,6 +151,8 @@ Evaluation::Evaluation(GameViewer* game_viewer, QWidget* parent)
 	connect(ui->btn_Override, SIGNAL(toggled(bool)), this, SLOT(onOverrideToggled(bool)));
 	connect(ui->btn_Start, &QPushButton::clicked, this, [this]() { onEngineToggled(true); });
 	connect(ui->btn_Stop, &QPushButton::clicked, this, [this]() { onEngineToggled(false); });
+	connect(ui->btn_Sync, &QToolButton::clicked, this, [this]() { onSyncPositions(board_); });
+	connect(sync_action, SIGNAL(toggled(bool)), this, SLOT(onSyncToggled(bool)));
 
 	setEngine();
 }
@@ -147,11 +161,44 @@ void Evaluation::updateBoard(Chess::Board* board)
 {
 	if (!board)
 		return;
-	if (board_->key() == board->key())
+	if (board_->key() == board->key()) {
+		setStyleSheet("");
 		return;
+	}
 	ui->btn_Save->setEnabled(false);
+	ui->btn_Save->setText("Save move");
 	ui->btn_Override->setChecked(false);
 	board_.reset(board->copy());
+	updateSync();
+}
+
+QString bkg_color_style(const QColor& bkg)
+{
+	return QString("background-color: rgba(%1, %2, %3, %4);").arg(bkg.red()).arg(bkg.green()).arg(bkg.blue()).arg(bkg.alpha());
+}
+
+void Evaluation::updateSync()
+{
+	bool is_on = engine && engine->isReady() && game && game->board();
+	ui->btn_Sync->setEnabled(is_on);
+	ui->widget_Engine->setStyleSheet("");
+	bool needs_sync = is_on && game->board()->key() != board_->key();
+	if (!needs_sync)
+		return;
+
+	int add_tint = 20; // 4 * std::max(3, QSettings().value("ui/status_highlighting", 5).toInt());
+	auto bkg = ui->widget_Engine->palette().color(QWidget::backgroundRole());
+	bkg = QColor(bkg.red() + add_tint, bkg.green() + add_tint, bkg.blue() + add_tint);
+	ui->widget_Engine->setStyleSheet(bkg_color_style(bkg));
+}
+
+void Evaluation::updateOverride()
+{
+	ui->btn_Override->setEnabled(solver 
+	                             && solver->solution() 
+	                             && game->board()
+	                             && game->board()->sideToMove() == solver->solution()->winSide()
+	                             && solver->isCurrentBranch(game->board()));
 }
 
 void Evaluation::setMode(SolverStatus new_status)
@@ -184,8 +231,10 @@ void Evaluation::setMode(SolverStatus new_status)
 	update_ui();
 	if (solver && is_changed)
 	{
-		if (solver_status == SolverStatus::Manual)
+		if (solver_status == SolverStatus::Manual) {
+			timer_sync.stop();
 			solver->stop();
+		}
 		else if (engine)
 		{
 			auto pos = (solver_status == SolverStatus::AutoFromHere && game) ? game->board() : nullptr;
@@ -235,6 +284,7 @@ void Evaluation::clearEvalLabels()
 	ui->label_EngineMoves->clear();
 	ui->label_Speed->setText("0 kn/s");
 	ui->label_EGTB->setText("0 n/s");
+	ui->btn_Save->setText("Save move");
 	ui->progressBar->setValue(0);
 }
 
@@ -476,15 +526,16 @@ void Evaluation::onSaveClicked()
 		return;
 	t_last_T1_change = now;
 	auto [data, move] = currData();
-	solver->save(board_, move, data, is_only_move, Solution::FileType_positions_upper);
+	bool is_action = solver->save(board_, move, data, is_only_move, Solution::FileType_positions_upper);
+	if (is_action || move.isNull() || !board_ || curr_key != board_->key())
+		return;
+	std::shared_ptr<Chess::Board> ref_board(board_->copy());
+	ref_board->makeMove(move);
+	onSyncPositions(ref_board);
 }
 
 void Evaluation::onOverrideToggled(bool flag)
 {
-	auto bkg_color_style = [](const QColor& bkg)
-	{
-		return QString("background-color: rgba(%1, %2, %3, %4);").arg(bkg.red()).arg(bkg.green()).arg(bkg.blue()).arg(bkg.alpha());
-	};
 	int add_tint = 4 * std::max(3, QSettings().value("ui/status_highlighting", 5).toInt());
 	if (flag)
 	{
@@ -503,8 +554,11 @@ void Evaluation::onOverrideToggled(bool flag)
 void Evaluation::positionChanged()
 {
 	ui->btn_Override->setEnabled(false);
-	if (!game || !engine)
+	if (!game || !engine) {
+		ui->btn_Sync->setEnabled(false);
+		setStyleSheet("");
 		return;
+	}
 	if (ui->btn_Override->isChecked() && game->board() && !game->board()->MoveHistory().empty())
 	{
 		auto prev_key = game->board()->MoveHistory().back().key;
@@ -521,6 +575,8 @@ void Evaluation::positionChanged()
 	bool is_ready = engine->isReady() && (engine->state() == s::Observing || engine->state() == s::Idle);
 	if (!is_ready)
 	{
+		updateSync();
+		updateOverride();
 		if (engine->state() == s::Thinking) {
 			if (board_->key() == new_board->key())
 				return;
@@ -534,11 +590,8 @@ void Evaluation::positionChanged()
 	reportWinStatus(WinStatus::Unknown);//?? check the solution if it's winning?
 	ui->label_SolutionInfo->setText("");
 	ui->widget_SolutionInfo->setVisible(false);
-	updateBoard(new_board);
-	ui->btn_Override->setEnabled(solver 
-	                             && solver->solution() 
-	                             && game->board()->sideToMove() == solver->solution()->winSide()
-	                             && solver->isCurrentBranch(game->board()));
+	updateBoard(new_board); // updateSync() is called here
+	updateOverride();
 	ui->btn_AutoFromHere->setEnabled(ui->btn_Auto->isEnabled() && solver && game->board() && game->board()->sideToMove() == solver->sideToWin() && solver->isCurrentBranch(game->board()));
 	if (!board_)
 		return;
@@ -558,7 +611,7 @@ void Evaluation::gotoCurrentMove()
 {
 	if (!solver)// || !solver->solution())
 		return;
-	sync_positions();
+	onSyncPositions();
 }
 
 void Evaluation::engineChanged(const QString& engine_filename)
@@ -593,28 +646,38 @@ void Evaluation::engineNumThreadsChanged(int num_threads)
 	engine->setOption("Threads", QSettings().value("engine/threads", 2).toInt());
 }
 
-void Evaluation::sync_positions()
+void Evaluation::onSyncToggled(bool flag)
+{
+	if (flag)
+		onSyncPositions(board_);
+}
+
+void Evaluation::onSyncPositions(std::shared_ptr<Chess::Board> ref_board)
 {
 	if (!game)
 		return;
 	auto game_board = game->board();
 	if (!game_board)
 		return;
-	if (!solver)
+	if (!ref_board) {
+		if (!solver)
+			return;
+		ref_board = solver->positionToSolve();
+	}
+	if (!ref_board)
 		return;
-	auto solver_board = solver->positionToSolve();
-	if (!solver_board)
-		return;
+	timer_sync.stop();
+	t_last_sync = steady_clock::now();
 	disconnect(this->game, SIGNAL(moveMade(Chess::GenericMove, QString, QString)), this, SLOT(positionChanged()));
 	try
 	{
 		auto& game_history = game_board->MoveHistory();
-		auto& solver_history = solver_board->MoveHistory();
+		auto& ref_history = ref_board->MoveHistory();
 		int i = 0;
 		if (!game_history.isEmpty())
 		{
-			for (; i < std::min(solver_history.size(), game_history.size()); i++) {
-				if (game_history[i].move != solver_history[i].move)
+			for (; i < std::min(ref_history.size(), game_history.size()); i++) {
+				if (game_history[i].move != ref_history[i].move)
 					break;
 			}
 			int num_back = game_history.size() - i;
@@ -625,23 +688,32 @@ void Evaluation::sync_positions()
 		}
 
 		auto side = game_board->sideToMove();
-		for (; i < solver_history.size(); i++)
+		for (; i < ref_history.size(); i++)
 		{
 			ChessPlayer* player(game->player(side));
-			while (!game_board->isLegalMove(solver_history[i].move))
+			int num_attempts = 20;
+			for (; num_attempts > 0; num_attempts--)
+			{
+				if (game_board->key() == ref_history[i].key && game_board->isLegalMove(ref_history[i].move))
+					break;
 				qApp->processEvents();
-			auto generic_move = game_board->genericMove(solver_history[i].move);
+			}
+			if (num_attempts == 0)
+				throw std::runtime_error("the position may have been changed during the update");
+			auto generic_move = game_board->genericMove(ref_history[i].move);
 			((HumanPlayer*)player)->onHumanMove(generic_move, side);
 			side = side.opposite();
 			qApp->processEvents();
 		}
-	
 	}
 	catch (std::exception e)
 	{
-		QMessageBox::warning(this, QApplication::applicationName(), tr("Failed to set up the current position:\n\n%1").arg(e.what()));
+		emit Message(tr("Failed to synchronise the chessboard: %1.").arg(e.what()), MessageType::std);
 	}
 	connect(this->game, SIGNAL(moveMade(Chess::GenericMove, QString, QString)), this, SLOT(positionChanged()));
+	//updateSync();
+	//updateOverride();
+	positionChanged();
 }
 
 void Evaluation::startEngine()
@@ -736,6 +808,7 @@ void Evaluation::startEngine()
 		if (enabled)
 			enabled = solver->whatToSolve() ? solver->whatToSolve()->alt_step == NO_ALT_STEPS : solver->isCurrentBranch(board_);
 		ui->btn_Save->setEnabled(enabled);
+		ui->btn_Save->setText("Save move");
 	}
 	num_pieces = board_->numPieces();
 	engine->setOption("MultiPV", session.multi_pv);
@@ -875,6 +948,7 @@ void Evaluation::onEngineEval(const MoveEvaluation& eval)
 			ui->label_Mate->setText(score_to_text(eval_score));
 			if (san_moves.size() > 1) {
 				ui->label_BestMove->setText(eval_best_move);
+				ui->btn_Save->setText("Save " + eval_best_move);
 				QString move_sequence = get_san_sequence(board_->plyCount() + 3, san_moves);
 				ui->label_EngineMoves->setText(move_sequence);
 			}
@@ -939,14 +1013,16 @@ void Evaluation::processEngineOutput(const MoveEvaluation& eval, const QString& 
 		depth_limit = get_max_depth(best_score, num_pieces);
 		if (is_good_moves)
 			good_moves.clear();
-		if (eval.score() >= WIN_THRESHOLD)
-			reportWinStatus(WinStatus::Win);
-		else if (eval.score() <= -WIN_THRESHOLD)
-			reportWinStatus(WinStatus::Loss);
-		else if (eval.score() >= EG_WIN_THRESHOLD)
-			reportWinStatus(WinStatus::EGWin);
-		else if (eval.score() <= -EG_WIN_THRESHOLD)
-			reportWinStatus(WinStatus::EGLoss);
+		if (game && !game->isFinished() && game->board() && game->board()->key() == board_->key()) {
+			if (eval.score() >= WIN_THRESHOLD)
+				reportWinStatus(WinStatus::Win);
+			else if (eval.score() <= -WIN_THRESHOLD)
+				reportWinStatus(WinStatus::Loss);
+			else if (eval.score() >= EG_WIN_THRESHOLD)
+				reportWinStatus(WinStatus::EGWin);
+			else if (eval.score() <= -EG_WIN_THRESHOLD)
+				reportWinStatus(WinStatus::EGLoss);
+		}
 	}
 	else if (!is_endgame && (move_score == NULL_SCORE || !solver || abs(move_score) < s->score_limit - 1))
 	{
@@ -954,9 +1030,9 @@ void Evaluation::processEngineOutput(const MoveEvaluation& eval, const QString& 
 			is_only_move = true;
 		is_only_move = is_only_move && is_bad_move;
 	}
-	if (/* session.multi_mode > 0 &&*/ !is_endgame && (!solver || s->show_gui))
+	if (/* session.multi_mode > 0 &&*/ !is_endgame && (!solver || s->show_gui) && game && game->board() && game->board()->key() == board_->key())
 	{
-		if (is_bad_move)
+		if (is_bad_move && (!solver || board_->sideToMove() == solver->sideToWin()))
 			updateBadMove(str_move);
 		else if (is_good_moves)
 			good_moves.insert(str_move);
@@ -1187,8 +1263,22 @@ void Evaluation::onEvaluatePosition()
 	}
 	if (solver) {
 		auto solver_board = solver->positionToSolve();
-		if (solver_board && game->board()->key() != solver_board->key())
-			sync_positions();
+		if (solver_board && game->board() && game->board()->key() != solver_board->key())
+		{
+			if (frequency_sync != UpdateFrequency::never && sync_action->isChecked())
+			{
+				auto delay = (frequency_sync == UpdateFrequency::always) ? 500ms
+				    : (frequency_sync == UpdateFrequency::frequently)    ? 1s
+				    : (frequency_sync == UpdateFrequency::infrequently)  ? 30s
+				                                                         : 4s;
+				auto now = steady_clock::now();
+				auto elapsed = now - t_last_sync;
+				if (elapsed >= delay)
+					onSyncPositions();
+				else if (!timer_sync.isActive())
+					timer_sync.start(duration_cast<milliseconds>(delay - elapsed));
+			}
+		}
 	}
 	positionChanged();
 	startEngine();
@@ -1212,4 +1302,9 @@ void Evaluation::fontSizeChanged(int size)
 		line[0]->setStyleSheet(small);
 		line[2]->setStyleSheet(bigger);
 	}
+}
+
+void Evaluation::boardUpdateFrequencyChanged(UpdateFrequency frequency)
+{
+	frequency_sync = frequency;
 }

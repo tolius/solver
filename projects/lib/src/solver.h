@@ -8,6 +8,7 @@
 
 #include <QString>
 #include <QPointer>
+#include <QTimer>
 
 #include <memory>
 #include <list>
@@ -131,10 +132,11 @@ public:
 	std::shared_ptr<SolverSession> whatToSolve() const;
 	pBoard positionToSolve() const;
 	bool isSolving() const;
+	std::list<MoveEntry> entries(Chess::Board* board) const;
 
 	void start(Chess::Board* new_pos, std::function<void(QString)> message);
 	void stop();
-	void save(pBoard pos, Chess::Move move, std::shared_ptr<SolutionEntry> data, bool is_only_move, Solution::FileType type);
+	bool save(pBoard pos, Chess::Move move, std::shared_ptr<SolutionEntry> data, bool is_only_move, Solution::FileType type);
 	void save_override(Chess::Board* pos, std::shared_ptr<SolutionEntry> data);
 	void process(pBoard pos, Chess::Move move, std::shared_ptr<SolutionEntry> data, bool is_only_move);
 
@@ -143,6 +145,10 @@ signals:
 	void evaluatePosition();
 	void updateCurrentSolution();
 	void solvingStatusChanged();
+
+public slots:
+	void onLogUpdate();
+	void onLogUpdateFrequencyChanged(UpdateFrequency frequency);
 
 protected:
 	void init();
@@ -184,6 +190,11 @@ protected:
 	SolverEvalResult eval_result;
 	MapT prepared_transpositions;
 	std::vector<EntryRow> all_entries;
+
+	QTimer timer_log_update;
+	UpdateFrequency frequency_log_update;
+	std::chrono::steady_clock::time_point t_log_update;
+	LineToLog line_to_log;
 
 private:
 	bool to_copy_solution;

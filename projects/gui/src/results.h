@@ -26,6 +26,7 @@ class ChessGame;
 class QTimer;
 class FlowLayout;
 class Solution;
+class Solver;
 class QHBoxLayout;
 
 namespace Ui {
@@ -40,6 +41,7 @@ public:
 	Results(QWidget* parent = nullptr);
 
 	void setSolution(std::shared_ptr<Solution> solution);
+	void setSolver(std::shared_ptr<Solver> solver);
 	void setGame(ChessGame* game);
 
 public slots:
@@ -56,6 +58,7 @@ private:
 	FlowLayout* m_flowLayout;
 
 	std::shared_ptr<Solution> solution;
+	std::shared_ptr<Solver> solver;
 	ChessGame* game;
 };
 

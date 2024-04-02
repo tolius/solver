@@ -41,7 +41,7 @@ QLabel
 
 
 /*-----QPushButton-----*/
-QPushButton
+QPushButton, QToolButton[popupMode="1"]
 {
 	background-color: #5c55e9;
 	color: #fff;
@@ -56,24 +56,30 @@ QPushButton
 }
 
 
-QPushButton::disabled
+QPushButton::disabled, QToolButton[popupMode="1"]::disabled
 {
 	background-color: #5c5c5c;
 
 }
 
 
-QPushButton::hover
+QPushButton::hover, QToolButton[popupMode="1"]::hover
 {
 	background-color: #5564f2;
 
 }
 
 
-QPushButton::pressed
+QPushButton::pressed, QToolButton[popupMode="1"]::pressed
 {
 	background-color: #3d4ef2;
 
+}
+
+
+QToolButton::menu-button
+{
+	background-color: transparent;
 }
 
 

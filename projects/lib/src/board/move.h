@@ -77,6 +77,8 @@ class Move
 		/*! Returns true if \a other is different from this move. */
 		bool operator!=(const Move& other) const;
 
+	    bool operator<(const Move& other) const;
+
 	private:
 		quint32 m_data;
 };
@@ -112,6 +114,11 @@ inline bool Move::operator==(const Move& other) const
 inline bool Move::operator!=(const Move& other) const
 {
 	return (m_data != other.m_data);
+}
+
+inline bool Move::operator<(const Move& other) const
+{
+	return (m_data < other.m_data);
 }
 
 inline int Move::sourceSquare() const

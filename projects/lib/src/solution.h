@@ -21,19 +21,6 @@
 #include <functional>
 
 
-struct LIB_EXPORT MoveEntry : SolutionEntry
-{
-public:
-	MoveEntry(const QString& san, const SolutionEntry& entry);
-	MoveEntry(const QString& san, quint16 pgMove, quint16 weight, quint32 learn);
-
-public:
-	QString san;
-	QString info;
-	bool is_best;
-};
-
-
 struct LIB_EXPORT BranchToSkip
 {
 	BranchToSkip(const Line& branch, int score)

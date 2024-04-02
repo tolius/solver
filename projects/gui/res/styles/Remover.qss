@@ -79,6 +79,11 @@ QToolButton
 
 }
 
+QToolButton::menu-button
+{
+	background-color: transparent;
+}
+
 
 QToolButton::hover
 {

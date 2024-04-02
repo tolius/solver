@@ -24,6 +24,84 @@ namespace
 constexpr static uint8_t SOLVED_MOVE = 0xFD;
 
 
+MoveEntry::MoveEntry(EntrySource source, const QString& san, const SolutionEntry& entry)
+	: SolutionEntry(entry)
+	, source(source)
+	, san(san)
+	, is_best(false)
+{}
+
+MoveEntry::MoveEntry(EntrySource source, const QString& san, quint16 pgMove, quint16 weight, quint32 learn)
+	: SolutionEntry(pgMove, weight, learn)
+	, source(source)
+	, san(san)
+	, is_best(false)
+{}
+
+void MoveEntry::set_best_moves(std::list<MoveEntry>& entries)
+{
+	if (entries.empty())
+		return;
+
+	auto& best = entries.front();
+	best.is_best = true;
+	int best_dtw = static_cast<int>(MATE_VALUE) - best.score();
+	auto best_nodes = best.nodes();
+	for (auto& entry : entries)
+	{
+		if (entry.score() == UNKNOWN_SCORE) {
+			entry.is_best = false;
+			continue;
+		}
+		auto dtw_i = MATE_VALUE - entry.score();
+		auto nodes_i = entry.nodes();
+		int bonus_nodes = 0;
+		if (best_nodes >= 100 && nodes_i >= 100)
+		{
+			float factor = ((float)std::min(nodes_i, best_nodes)) / std::max(nodes_i, best_nodes); // 100%...0%
+			bool is_worse = (dtw_i > best_dtw) == (nodes_i > best_nodes);
+			if (is_worse) {
+				if (factor > 0.97f) // tolerance 3%
+					bonus_nodes = 0;
+				else
+					bonus_nodes = best_dtw * (1 - factor) / 3; // +33%...-33%
+			}
+			else {
+				bonus_nodes = -best_dtw * (1 - factor) / 3; // -33%...+33%
+			}
+		}
+		int delta = abs(best_dtw - dtw_i) + bonus_nodes;
+		if (delta <= 0)
+			entry.is_best = true;
+	}
+}
+
+
+UpdateFrequency value_to_frequency(int val)
+{
+	if (val < static_cast<int>(UpdateFrequency::never))
+		return UpdateFrequency::never;
+	if (val > static_cast<int>(UpdateFrequency::always))
+		return UpdateFrequency::always;
+	return static_cast<UpdateFrequency>(val);
+}
+
+
+LineToLog::LineToLog()
+	: win_len(UNKNOWN_SCORE)
+{}
+
+void LineToLog::clear()
+{
+	text = "";
+	win_len = UNKNOWN_SCORE;
+}
+
+bool LineToLog::empty() const
+{
+	return text.isEmpty();
+}
+
 SolverMove::SolverMove() 
 	: SolutionEntry()
 {}
@@ -52,7 +130,7 @@ SolverMove::SolverMove(std::shared_ptr<SolutionEntry> entry)
 	: SolutionEntry(*entry)
 {}
 
-SolverMove::SolverMove(uint64_t bytes)
+SolverMove::SolverMove(quint64 bytes)
 	: SolutionEntry(bytes)
 {}
 

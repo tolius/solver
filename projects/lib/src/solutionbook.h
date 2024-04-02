@@ -41,6 +41,7 @@ struct LIB_EXPORT SolutionEntry : public OpeningBook::Entry
 	QString getNodes() const;
 
 	static QString score2Text(qint16 score);
+	static bool compare(const SolutionEntry& a, const SolutionEntry& b);
 };
 
 class LIB_EXPORT SolutionBook : public PolyglotBook

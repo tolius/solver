@@ -2,6 +2,7 @@
 #include "solutionbook.h"
 #include "board/board.h"
 #include "board/boardfactory.h"
+#include "board/move.h"
 #include "tb/egtb/tb_reader.h"
 #include "moveevaluation.h"
 
@@ -15,6 +16,7 @@
 #include <fstream>
 
 using namespace std;
+using namespace std::chrono;
 
 constexpr static qint16 FORCED_MOVE = MATE_VALUE - 255;
 constexpr static qint16 ABOVE_EG = 20000;
@@ -95,10 +97,6 @@ Solver::Solver(std::shared_ptr<Solution> solution)
 	endgame5_score_limit = MATE_VALUE - limit_win; // -20  // MATE_VALUE - 0 --> to evaluate all known 5-men endgames
 	to_recheck_endgames = false;
 	rechecked_good_endgames = 0;
-	update_step = (!sol->branch.empty() && s.score_limit < MATE_VALUE - 10) ? 2
-	    : (s.score_limit < MATE_VALUE - 10)                                 ? 10
-	    : (!to_copy_solution)                                               ? 100
-	                                                                        : 2000;
 	max_num_iterations = to_copy_solution ? 6'000'000 : 6'000'000 * 10;
 	is_solver_Watkins = true;
 	use_extended_solution_first = true;
@@ -133,6 +131,10 @@ Solver::Solver(std::shared_ptr<Solution> solution)
 	tree.push_back(make_shared<SolverMove>());
 	tree_state = SolverState();
 	//our_color = board->sideToMove();
+	timer_log_update.setSingleShot(true);
+	connect(&timer_log_update, SIGNAL(timeout()), this, SLOT(onLogUpdate()));
+	int log_update = QSettings().value("solver/log_update", (int)UpdateFrequency::standard).toInt();
+	frequency_log_update = value_to_frequency(log_update);
 }
 
 Solver::~Solver() 
@@ -224,6 +226,8 @@ void Solver::start(Chess::Board* new_pos, std::function<void(QString)> message)
 	init(); //!! TODO: move (partially) to the constructor? Note: solution branch / branches to skip may be changed by the user
 	QString sol_name = "1." + sol->nameToShow();
 	int num_line_plies = 0;
+	line_to_log.clear();
+	t_log_update = steady_clock::now();
 	pMove t = tree.front();
 	try
 	{
@@ -318,6 +322,8 @@ void Solver::start(Chess::Board* new_pos, std::function<void(QString)> message)
 		emit Message("Due to the error, the app may not work properly. Please restart it.");
 		status = Status::idle;
 	}
+	timer_log_update.stop();
+	line_to_log.clear();
 	emit Message(QString("Finishing solving %1").arg(sol_name), MessageType::info);
 	if (status != Status::solving) {
 		emit solvingStatusChanged();
@@ -346,26 +352,29 @@ void Solver::stop()
 	status = Status::idle;
 }
 
-void Solver::save(pBoard pos, Chess::Move move, std::shared_ptr<SolutionEntry> data, bool is_only_move, Solution::FileType type)
+bool Solver::save(pBoard pos, Chess::Move move, std::shared_ptr<SolutionEntry> data, bool is_only_move, Solution::FileType type)
 {
 	if (!pos)
-		return;
+		return false;
 	bool is_waiting = (status == Status::waitingEval) && (pos->key() == board->key());
 	if (is_waiting && type == Solution::FileType_positions_upper)
 	{
 		process(pos, move, data, is_only_move);
-		return;
+		return true;
 	}
 
 	if (!data
 		|| pos->sideToMove() != our_color
 		|| move.isNull()
 		|| !isCurrentBranch(pos))
-		return;
+		return false;
 
 	sol->addToBook(pos, *data, type);
-	if (is_waiting && type == Solution::FileType_alts_upper)
+	if (is_waiting && type == Solution::FileType_alts_upper) {
 		eval_result = { data, move, is_only_move };
+		return true;
+	}
+	return false;
 }
 
 void Solver::save_override(Chess::Board* pos, std::shared_ptr<SolutionEntry> data)
@@ -547,13 +556,33 @@ void Solver::analyse_position(SolverMove& move, SolverState& info)
 	if (!info.is_alt())
 	{
 		num_processed++;
-		if (num_processed % update_step == 0) {
+		if (frequency_log_update != UpdateFrequency::never)
+		{
+			constexpr static qint16 win_threshold = WIN_THRESHOLD - 1000;
 			qint16 score = best_move ? best_move->score() : (move.score() + 1);
-			emit Message(QString("%1 #%2: %3  %4")
-			                 .arg(num_processed)
-			                 .arg(max_num_moves)
-			                 .arg(get_move_stack(board, false))
-			                 .arg(SolutionEntry::score2Text(score)));
+			qint16 win_len = (score >= WIN_THRESHOLD) ? score - board->plyCount() : score;
+			if (line_to_log.empty()
+			    || (win_len >= win_threshold && line_to_log.win_len <  win_threshold)
+			    || (win_len >= win_threshold && line_to_log.win_len >= win_threshold && win_len <= line_to_log.win_len)
+			    || (win_len <  win_threshold && line_to_log.win_len <  win_threshold && win_len >= line_to_log.win_len))
+			{
+				line_to_log.text = QString("%1 #%2: %3  %4")
+			                          .arg(num_processed)
+			                          .arg(max_num_moves)
+			                          .arg(get_move_stack(board, false))
+			                          .arg(SolutionEntry::score2Text(score));
+				line_to_log.win_len = win_len;
+			}
+			auto delay = (frequency_log_update == UpdateFrequency::always) ?   0s
+			    : (frequency_log_update == UpdateFrequency::frequently)    ?  10s
+			    : (frequency_log_update == UpdateFrequency::infrequently)  ? 300s
+			                                                               :  60s;
+			auto now = steady_clock::now();
+			auto elapsed = now - t_log_update;
+			if (elapsed >= delay)
+				onLogUpdate();
+			else if (!timer_log_update.isActive())
+				timer_log_update.start(duration_cast<milliseconds>(delay - elapsed));
 		}
 		if (num_processed > max_num_iterations) {
 			QString msg = QString("Max num iterations reached: %1").arg(max_num_iterations);
@@ -1306,4 +1335,76 @@ void Solver::expand_positions(MapT& saved_positions, MapT& transpositions)
 		else
 			it = transpositions.erase(it);
 	}
+}
+
+void Solver::onLogUpdate()
+{
+	timer_log_update.stop();
+	t_log_update = steady_clock::now();
+	emit Message(line_to_log.text);
+	line_to_log.clear();
+}
+
+void Solver::onLogUpdateFrequencyChanged(UpdateFrequency frequency)
+{
+	frequency_log_update = frequency;
+}
+
+std::list<MoveEntry> Solver::entries(Chess::Board* board) const
+{
+	list<MoveEntry> entries;
+	if (tree.empty() || tree.front()->moves.empty())
+		return entries;
+	if (!is_branch(board, sol->opening, Line()))
+		return entries;
+
+	using namespace Chess;
+	shared_ptr<Board> temp_board(BoardFactory::create("antichess"));
+	temp_board->setFenString(temp_board->defaultFenString());
+	for (const auto& move : sol->opening)
+		temp_board->makeMove(move);
+	auto t = tree.front();
+	auto& history = board->MoveHistory();
+	for (int i = sol->opening.size(); i < history.size(); i++)
+	{
+		bool is_found = false;
+		for (auto& m : t->moves) {
+			if (temp_board->genericMove(history[i].move) == m->move()) {
+				temp_board->makeMove(history[i].move);
+				t = m;
+				is_found = true;
+				break;
+			}
+		}
+		if (!is_found)
+			return entries;
+	}
+	if (t->moves.empty())
+		return entries;
+
+	shared_ptr<set<Chess::Move>> legal_moves;
+	if (temp_board->sideToMove() != our_color) {
+		auto legal_moves_vector = temp_board->legalMoves();
+		legal_moves = make_shared<set<Chess::Move>>(legal_moves_vector.begin(), legal_moves_vector.end());
+	}
+	for (auto& m : t->moves) {
+		auto move = m->move(temp_board);
+		if (legal_moves)
+			legal_moves->erase(move);
+		QString san = temp_board->moveString(move, Board::StandardAlgebraic);
+		quint16 score = (m->score() > WIN_THRESHOLD) ? m->weight : (quint16)UNKNOWN_SCORE;
+		entries.emplace_back(EntrySource::solver, san, m->pgMove, score, 0);
+		if (!m->is_solved())
+			entries.back().info = "~";
+	}
+	if (legal_moves) {
+		for (auto& m : *legal_moves) {
+			auto pgMove = OpeningBook::moveToBits(temp_board->genericMove(m));
+			QString san = temp_board->moveString(m, Board::StandardAlgebraic);
+			entries.emplace_front(EntrySource::none, san, pgMove, (quint16)UNKNOWN_SCORE, 0);
+		}
+	}
+	entries.sort(SolutionEntry::compare);
+	MoveEntry::set_best_moves(entries);
+	return entries;
 }

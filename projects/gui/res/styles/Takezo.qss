@@ -196,6 +196,17 @@ QToolButton:checked
 }
 
 
+QToolButton::menu-button
+{
+	background-color: transparent;
+}
+
+QToolButton[popupMode="1"]
+{
+	border: none;
+}
+
+
 /*-----QDockWidget-----*/
 QDockWidget::title 
 {

@@ -86,6 +86,8 @@ MainWindow::MainWindow(ChessGame* game, SettingsDialog* settingsDlg)
 	setAttribute(Qt::WA_DeleteOnClose, true);
 	setDockNestingEnabled(true);
 
+	
+	m_settingsDlg = settingsDlg;
 	m_gameViewer = new GameViewer(Qt::Horizontal, nullptr);
 	m_gameViewer->setContentsMargins(6, 6, 6, 6);
 	m_tint = QColor(0, 0, 0, 0);
@@ -137,6 +139,7 @@ MainWindow::MainWindow(ChessGame* game, SettingsDialog* settingsDlg)
 	connect(settingsDlg, SIGNAL(engineChanged(const QString&)), m_evaluation, SLOT(engineChanged(const QString&)));
 	connect(settingsDlg, SIGNAL(engineHashChanged(int)), m_evaluation, SLOT(engineHashChanged(int)));
 	connect(settingsDlg, SIGNAL(engineNumThreadsChanged(int)), m_evaluation, SLOT(engineNumThreadsChanged(int)));
+	connect(settingsDlg, SIGNAL(boardUpdateFrequencyChanged(UpdateFrequency)), m_evaluation, SLOT(boardUpdateFrequencyChanged(UpdateFrequency)));
 
 	connect(CuteChessApplication::instance()->gameManager(), SIGNAL(finished()), this, SLOT(onGameManagerFinished()), Qt::QueuedConnection);
 
@@ -1130,13 +1133,17 @@ void MainWindow::openSolution(QModelIndex index, SolutionItem* item)
 		m_solution->activate();
 		m_solutionsModel->dataChanged(QModelIndex(), QModelIndex());
 		QSettings().setValue("solutions/last_solution", m_solution->nameToShow(true));
-		if (m_solver)
-			disconnect(m_solver.get(), nullptr, this, nullptr);
+		if (m_solver) {
+			disconnect(m_solver.get(), nullptr, this,           nullptr);
+			disconnect(m_settingsDlg,  nullptr, m_solver.get(), nullptr);
+		}
 		m_solver = std::make_shared<Solver>(m_solution);
 		connect(m_solver.get(), SIGNAL(Message(const QString&, MessageType)), this, SLOT(logMessage(const QString&, MessageType)));
 		connect(m_solver.get(), SIGNAL(updateCurrentSolution()), this, SLOT(updateCurrentSolution()));
+		connect(m_settingsDlg, SIGNAL(logUpdateFrequencyChanged(UpdateFrequency)), m_solver.get(), SLOT(onLogUpdateFrequencyChanged(UpdateFrequency)));
 	}
 	m_results->setSolution(m_solution);
+	m_results->setSolver(m_solver);
 	m_evaluation->setSolver(m_solver);
 	if (m_solutionsWidget)
 		m_solutionsWidget->setSolver(m_solver);

@@ -1,7 +1,10 @@
 #ifndef SETTINGSDIALOG_H
 #define SETTINGSDIALOG_H
 
+#include "positioninfo.h"
+
 #include <QDialog>
+
 
 namespace Ui {
 	class SettingsDialog;
@@ -32,6 +35,8 @@ signals:
 	void engineHashChanged(int hash_size);
 	void engineNumThreadsChanged(int num_threads);
 	void bookCacheChanged(int cache_size);
+	void boardUpdateFrequencyChanged(UpdateFrequency frequency);
+	void logUpdateFrequencyChanged(UpdateFrequency frequency);
 
 private:
 	void readSettings();

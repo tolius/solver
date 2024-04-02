@@ -176,8 +176,14 @@ QToolButton:checked
 }
 
 
+QToolButton::menu-button
+{
+	background-color: transparent;
+}
+
+
 /*-----QPushButton-----*/
-QPushButton
+QPushButton, QToolButton[popupMode="1"]
 {
 	background-color: qlineargradient(spread:repeat, x1:1, y1:0, x2:1, y2:1, stop:0 rgba(84, 84, 84, 255),stop:1 rgba(59, 59, 59, 255));
 	color: #ffffff;
@@ -191,7 +197,7 @@ QPushButton
 }
 
 
-QPushButton::flat
+QPushButton::flat, QToolButton[popupMode="1"]::flat
 {
 	background-color: transparent;
 	border: none;
@@ -200,7 +206,7 @@ QPushButton::flat
 }
 
 
-QPushButton::disabled
+QPushButton::disabled, QToolButton[popupMode="1"]::disabled
 {
 	background-color: #404040;
 	color: #656565;
@@ -209,7 +215,7 @@ QPushButton::disabled
 }
 
 
-QPushButton::hover
+QPushButton::hover, QToolButton[popupMode="1"]::hover
 {
 	background-color: rgba(183, 134, 32, 20%);
 	border: 1px solid #b78620;
@@ -217,7 +223,7 @@ QPushButton::hover
 }
 
 
-QPushButton::pressed
+QPushButton::pressed, QToolButton[popupMode="1"]::pressed
 {
 	background-color: qlineargradient(spread:repeat, x1:1, y1:0, x2:1, y2:1, stop:0 rgba(74, 74, 74, 255),stop:1 rgba(49, 49, 49, 255));
 	border: 1px solid #b78620;
@@ -225,12 +231,19 @@ QPushButton::pressed
 }
 
 
-QPushButton::checked
+QPushButton::checked, QToolButton[popupMode="1"]::checked
 {
 	background-color: qlineargradient(spread:repeat, x1:1, y1:0, x2:1, y2:1, stop:0 rgba(74, 74, 74, 255),stop:1 rgba(49, 49, 49, 255));
 	border: 1px solid #222;
 
 }
+
+
+QToolButton[popupMode="1"]
+{
+	padding: 3px;
+}
+
 
 
 /*-----QLineEdit-----*/

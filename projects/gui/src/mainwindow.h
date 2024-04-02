@@ -148,6 +148,7 @@ class MainWindow : public QMainWindow
 
 		GameTabBar* m_tabBar;
 
+		SettingsDialog* m_settingsDlg;
 		GameViewer* m_gameViewer;
 		MoveList* m_moveList;
 		Evaluation* m_evaluation;

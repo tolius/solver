@@ -229,7 +229,7 @@ QTabBar::tab:!selected:hover
 
 
 /*-----QPushButton-----*/
-QPushButton 
+QPushButton, QToolButton[popupMode="1"]
 {
 	background-color: qlineargradient(spread:pad, x1:1, y1:0, x2:1, y2:1, stop:0 rgba(82, 82, 82, 255),stop:0.995192 rgba(75, 75, 75, 255));
 	color: #000;
@@ -241,21 +241,21 @@ QPushButton
 }
 
 
-QPushButton:hover
+QPushButton:hover, QToolButton[popupMode="1"]:hover
 {
 	background-color: #8b8b8b;
 	
 }
 
 
-QPushButton:pressed
+QPushButton:pressed, QToolButton[popupMode="1"]:pressed
 {
 	background-color: #7c7c7c;
 
 }
 
 
-QPushButton:checked
+QPushButton:checked, QToolButton[popupMode="1"]:checked
 {
 	background-color: #7c7c7c;
 
@@ -293,6 +293,12 @@ QToolButton:checked
 {
 	background-color: #7c7c7c;
 
+}
+
+
+QToolButton::menu-button
+{
+	background-color: transparent;
 }
 
 

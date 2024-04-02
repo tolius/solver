@@ -37,7 +37,7 @@ QPlainTextEdit {
 	border-width: 1px;
 	color: #a9b7c6;
 }
-QPushButton{
+QPushButton, QToolButton[popupMode="1"]{
 	border-style: solid;
 	border-top-color: transparent;
 	border-right-color: transparent;
@@ -49,7 +49,7 @@ QPushButton{
 	padding: 2px;
 	background-color: #1e1d23;
 }
-QPushButton::default{
+QPushButton::default, QToolButton[popupMode="1"]::default{
 	border-style: inset;
 	border-top-color: transparent;
 	border-right-color: transparent;
@@ -84,7 +84,11 @@ QToolButton:hover{
 	padding-bottom: 1px;
 	background-color: #1e1d23;
 }
-QPushButton:hover{
+QToolButton::menu-button
+{
+	background-color: transparent;
+}
+QPushButton:hover, QToolButton[popupMode="1"]:hover{
 	border-style: solid;
 	border-top-color: transparent;
 	border-right-color: transparent;
@@ -96,7 +100,7 @@ QPushButton:hover{
 	padding-bottom: 2px;
 	background-color: #1e1d23;
 }
-QPushButton:pressed{
+QPushButton:pressed, QToolButton[popupMode="1"]:pressed{
 	border-style: solid;
 	border-top-color: transparent;
 	border-right-color: transparent;
@@ -108,7 +112,7 @@ QPushButton:pressed{
 	padding-bottom: 1px;
 	background-color: #1e1d23;
 }
-QPushButton:disabled{
+QPushButton:disabled, QToolButton[popupMode="1"]:disabled{
 	border-style: solid;
 	border-top-color: transparent;
 	border-right-color: transparent;

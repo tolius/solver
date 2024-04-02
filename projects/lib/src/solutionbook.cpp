@@ -150,6 +150,15 @@ QString SolutionEntry::getNodes() const
 	return QString::fromStdWString(ss.str());
 }
 
+bool SolutionEntry::compare(const SolutionEntry& a, const SolutionEntry& b)
+{
+	if (a.score() < b.score())
+		return true;
+	if (a.score() > b.score())
+		return false;
+	return a.nodes() > b.nodes();
+}
+
 
 SolutionBook::SolutionBook(AccessMode mode)
 	: PolyglotBook(mode)

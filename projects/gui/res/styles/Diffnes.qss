@@ -190,8 +190,14 @@ QToolButton:checked
 }
 
 
+QToolButton::menu-button
+{
+	background-color: transparent;
+}
+
+
 /*-----QPushButton-----*/
-QPushButton
+QPushButton, QToolButton[popupMode="1"]
 {
 	background-color: #4891b4;
 	color: #fff;
@@ -202,7 +208,7 @@ QPushButton
 }
 
 
-QPushButton::flat
+QPushButton::flat, QToolButton[popupMode="1"]::flat
 {
 	background-color: transparent;
 	border: none;
@@ -211,7 +217,7 @@ QPushButton::flat
 }
 
 
-QPushButton::disabled
+QPushButton::disabled, QToolButton[popupMode="1"]::disabled
 {
 	background-color: #606060;
 	color: #959595;
@@ -220,7 +226,7 @@ QPushButton::disabled
 }
 
 
-QPushButton::hover
+QPushButton::hover, QToolButton[popupMode="1"]::hover
 {
 	background-color: #54aad3;
 	border: 1px solid #46a2da;
@@ -228,7 +234,7 @@ QPushButton::hover
 }
 
 
-QPushButton::pressed
+QPushButton::pressed, QToolButton[popupMode="1"]::pressed
 {
 	background-color: #2385b4;
 	border: 1px solid #46a2da;
@@ -236,11 +242,17 @@ QPushButton::pressed
 }
 
 
-QPushButton::checked
+QPushButton::checked, QToolButton[popupMode="1"]::checked
 {
 	background-color: #bd5355;
 	border: 1px solid #bd5355;
 
+}
+
+
+QToolButton[popupMode="1"]
+{
+	padding: 3px;
 }
 
 

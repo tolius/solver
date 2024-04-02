@@ -156,6 +156,38 @@ SettingsDialog::SettingsDialog(QWidget* parent)
 			emit bookCacheChanged(static_cast<int>(val * 1024));
 		}
 	);
+
+	auto set_label = [](QLabel* label, int val)
+	{
+		auto frequency = value_to_frequency(val);
+		label->setText( (frequency == UpdateFrequency::never)        ? "   Never    "
+		              : (frequency == UpdateFrequency::infrequently) ? "Infrequently"
+		              : (frequency == UpdateFrequency::frequently)   ? " Frequently "
+		              : (frequency == UpdateFrequency::always)       ? "   Always   "
+		                                                             : "  Standard  ");
+	};
+	int board_update = s.value("board_update", (int)UpdateFrequency::standard).toInt();
+	ui->m_slider_BoardUpdate->setValue(board_update);
+	set_label(ui->m_label_BoardUpdate, board_update);
+	connect(ui->m_slider_BoardUpdate, &QSlider::valueChanged, this,
+	        [&](int val)
+	        {
+		        QSettings().setValue("solver/board_update", val);
+		        set_label(ui->m_label_BoardUpdate, val);
+		        emit boardUpdateFrequencyChanged(value_to_frequency(val));
+	        }
+	);
+
+	int log_update = s.value("log_update", (int)UpdateFrequency::standard).toInt();
+	ui->m_slider_LogUpdate->setValue(log_update);
+	set_label(ui->m_label_LogUpdate, log_update);
+	connect(ui->m_slider_LogUpdate, &QSlider::valueChanged, this,
+	        [&](int val)
+	        {
+		        QSettings().setValue("solver/log_update", val);
+		        set_label(ui->m_label_LogUpdate, val);
+		        emit logUpdateFrequencyChanged(value_to_frequency(val));
+	        });
 	s.endGroup();
 
 	/// UI
@@ -275,13 +307,13 @@ void SettingsDialog::readSettings()
 	s.endGroup();
 }
 
-QString bkg_color_style(const QColor& bkg)
-{
-	return QString("background-color: rgba(%1, %2, %3, %4);").arg(bkg.red()).arg(bkg.green()).arg(bkg.blue()).arg(bkg.alpha());
-}
 
 void SettingsDialog::onTintChanged(int value)
 {
+	auto bkg_color_style = [](const QColor& bkg)
+	{
+		return QString("background-color: rgba(%1, %2, %3, %4);").arg(bkg.red()).arg(bkg.green()).arg(bkg.blue()).arg(bkg.alpha());
+	};
 	if (value < 0)
 		value = ui->m_slider_WinLossHighlighting->value();
 	else
