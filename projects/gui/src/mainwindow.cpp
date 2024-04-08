@@ -1139,6 +1139,7 @@ void MainWindow::openSolution(QModelIndex index, SolutionItem* item)
 		}
 		m_solver = std::make_shared<Solver>(m_solution);
 		connect(m_solver.get(), SIGNAL(Message(const QString&, MessageType)), this, SLOT(logMessage(const QString&, MessageType)));
+		connect(m_solver.get(), SIGNAL(clearLog()), this, SLOT(clearLog()));
 		connect(m_solver.get(), SIGNAL(updateCurrentSolution()), this, SLOT(updateCurrentSolution()));
 		connect(m_settingsDlg, SIGNAL(logUpdateFrequencyChanged(UpdateFrequency)), m_solver.get(), SLOT(onLogUpdateFrequencyChanged(UpdateFrequency)));
 	}
@@ -1282,4 +1283,9 @@ void MainWindow::logMessage(const QString& message, MessageType type)
 	else
 		cursor.insertHtml(QString("<span>%1</span>").arg(msg)); // cursor.insertText(msg);
 	m_log->verticalScrollBar()->setValue(m_log->verticalScrollBar()->maximum());
+}
+
+void MainWindow::clearLog()
+{
+	m_log->clear();
 }

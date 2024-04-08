@@ -125,8 +125,7 @@ QString Results::positionChanged()
 			if (solution_entries.empty()) {
 				missing_entries.clear();
 				solution_entries = solution->nextPositionEntries(board, &missing_entries);
-				if (!solution_entries.empty())
-					solution_entries.splice(solution_entries.begin(), missing_entries);
+				solution_entries.splice(solution_entries.begin(), missing_entries);
 			}
 			else {
 				solution_entries.splice(solution_entries.end(), missing_entries);
@@ -164,8 +163,12 @@ QString Results::positionChanged()
 		QString score = (all_unknown || (entry.source == EntrySource::positions && entry.info == "only move"))
 		    ? ""
 		    : entry.getScore(entry.source == EntrySource::book || entry.source == EntrySource::solver);
-		if (entry.info.isEmpty() && entry.source == EntrySource::book && entry.score() != UNKNOWN_SCORE && entry.nodes()) 
-			entry.info = entry.getNodes();
+		if (entry.info.isEmpty() && entry.score() != UNKNOWN_SCORE) {
+			if (entry.source == EntrySource::book && entry.nodes())
+				entry.info = entry.getNodes();
+			else if (entry.source == EntrySource::positions && (entry.score() < MATE_VALUE - MANUAL_VALUE - 1 || entry.score() > WIN_THRESHOLD))
+				entry.info = "eval";
+		}
 		auto label_score = new QLabel(score, ui->widget_Solution);
 		if (entry.is_best)
 		{

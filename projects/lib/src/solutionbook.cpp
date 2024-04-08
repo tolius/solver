@@ -114,27 +114,33 @@ QString SolutionEntry::score2Text(qint16 score)
 		return (score < 0 ? "#-" : "#") + QString::number(MATE_VALUE - abs_score);
 	if (abs_score >= MATE_VALUE - MANUAL_VALUE - 1 && abs_score <= WIN_THRESHOLD)  // -1 for nextEntries()
 		return score < 0 ? "**" : "*";
+	if (score == FAKE_DRAW_SCORE)
+		return "Draw?";
+	//if (score > FAKE_MATE_VALUE)
+	//	return QString("#%1").arg(MATE_VALUE - score);
+	if (score > MATE_THRESHOLD)
+		return QString("#%1?").arg(FAKE_MATE_VALUE - score);
+	//if (score < -FAKE_MATE_VALUE)
+	//	return QString("#-%1").arg(MATE_VALUE + score);
+	if (score < -MATE_THRESHOLD)
+		return QString("#-%1?").arg(FAKE_MATE_VALUE + score);
 	if (abs_score < 15200)
 		return (score > 0 ? "+" : "") + QString::number(float(score) / 100.f, 'f', 1);
 	if (abs_score == 15265 || abs_score == 15266)
 		return (score < 0) ? " -EG" : " EG";
 	if (15200 <= abs_score && abs_score < 15300)
-		return (score > 0) ? QString(" E.%1").arg(score - 15200, 2, 10, (QChar)'0') : QString(" -E.%1").arg(-score - 15200, 2, 10, (QChar)'0');
-	return (score > 0) ? QString("E%1").arg(score / 100.f - 152, 5, 'f', 2) : QString("-E%1").arg(-score / 100.f - 152, 4, 'f', 2);
+		return (score > 0) ? QString( " E.%1").arg( score - 15200, 2, 10, (QChar)'0')
+		                   : QString(" -E.%1").arg(-score - 15200, 2, 10, (QChar)'0');
+	return (score > 0) ? QString( "E%1").arg( static_cast<float>(score) / 100 - 152, 5, 'f', 2)
+	                   : QString("-E%1").arg(-static_cast<float>(score) / 100 - 152, 4, 'f', 2);
 }
 
 QString SolutionEntry::getScore(bool is_book, qint16 add_plies) const
 {
 	qint16 s = score(add_plies);
 	QString str_score = s == UNKNOWN_SCORE ? "?"
-	    : !is_book                         ? score2Text(s)
-	    : s == 0                           ? "Draw"
-	    : s == FAKE_DRAW_SCORE             ? "Draw?"
-	    : s > FAKE_MATE_VALUE              ? QString("#%1").arg(MATE_VALUE - s)
-	    : s > MATE_THRESHOLD               ? QString("#%1?").arg(FAKE_MATE_VALUE - s)
-	    : s < -FAKE_MATE_VALUE             ? QString("#-%1").arg(MATE_VALUE + s)
-	    : s < -MATE_THRESHOLD              ? QString("#-%1").arg(FAKE_MATE_VALUE + s)
-	                                       : score2Text(s); // QString("%1").arg(float(s) / 100, 0, 'f', 2);
+	    : is_book && s == 0                ? "Draw"
+	                                       : score2Text(s);
 	return str_score;
 }
 

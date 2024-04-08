@@ -632,7 +632,7 @@ QString Solution::positionInfo(std::shared_ptr<Chess::Board> board)
 		QString alt_san = alt_entry->san(board);
 		info = QString("%1<b>%2 %3</b>")
 		           .arg(info)
-		           .arg((info.isEmpty() || san == alt_san) ? "" : QString(" &rarr;&nbsp;%1").arg(alt_san))
+		           .arg(san == alt_san ? "" : QString(" &rarr;&nbsp;%1").arg(alt_san))
 		           .arg(alt_entry->is_overridden() ? "Overridden" : "Alt");
 	}
 	if (!esol_entries.empty()) {

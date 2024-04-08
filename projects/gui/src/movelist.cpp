@@ -77,6 +77,7 @@ MoveList::MoveList(QWidget* parent)
 	connect(m_selectionTimer, SIGNAL(timeout()), this, SLOT(selectChosenMove()));
 
 	ui->m_moveList->document()->setIndentWidth(18);
+	ui->splitter->setSizes({0, 100});
 
 	QTextCharFormat format(ui->m_moveList->currentCharFormat());
 	m_defaultTextFormat.setForeground(format.foreground());

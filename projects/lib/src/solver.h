@@ -142,6 +142,7 @@ public:
 
 signals:
 	void Message(const QString& message, MessageType type = MessageType::std);
+	void clearLog();
 	void evaluatePosition();
 	void updateCurrentSolution();
 	void solvingStatusChanged();

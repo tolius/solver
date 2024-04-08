@@ -109,7 +109,7 @@ Solver::Solver(std::shared_ptr<Solution> solution)
 	gui_update_delay = 2; // s
 	to_log = true;
 	to_update_max_only_when_finish = to_copy_solution;
-	to_print_all_max = to_copy_solution;
+	to_print_all_max = true; // = to_copy_solution;
 
 	
 	num_processed = 0;
@@ -293,6 +293,8 @@ void Solver::start(Chess::Board* new_pos, std::function<void(QString)> message)
 		}
 		if (!san_moves.empty())
 			sol_name = QString("%1 %2").arg(sol_name).arg(san_moves.join(' '));
+		if (QSettings().value("solutions/clear_log_when_Auto_started", true).toBool())
+			emit clearLog();
 		emit Message(QString("Starting to solve %1").arg(sol_name));
 		tree_state = SolverState(false);
 		vector<pMove> tree_to_solve;
@@ -731,7 +733,7 @@ void Solver::evaluate_position(SolverMove& move, SolverState& info, pMove& best_
 								.arg(best_move->scoreText())
 								.arg(cached_move->scoreText())
 								.arg(get_move_stack(board)),
-			             MessageType::info);
+			             MessageType::std);
 			best_move = cached_move;
 		}
 	}
@@ -943,13 +945,15 @@ void Solver::update_max_move(int16_t score, QString move_sequence)
 	if (!move_sequence.isEmpty())
 		move_sequence = " " + move_sequence;
 	if (mate_in <= WIN_THRESHOLD)
-		emit Message(QString("MAX #%1: %2%3").arg(new_num_moves).arg(move_stack).arg(move_sequence), MessageType::info);
+		emit Message(QString("MAX #%1: %2%3").arg(new_num_moves).arg(move_stack).arg(move_sequence), new_num_moves > max_num_moves ? MessageType::info : MessageType::std);
 	else
 		emit Message(QString("..WRONG mate_in=%1: %2 %3").arg(mate_in).arg(move_stack).arg(move_sequence), MessageType::warning);
 }
 
 bool Solver::is_stop_move(const SolverMove& best_move, const SolverState& info) const
 {
+	if (best_move.is_overridden())
+		return false;
 	if (best_move.score() > score_hard_limit)
 		return true;
 	if (best_move.score() <= s.score_limit)
@@ -1350,12 +1354,12 @@ void Solver::onLogUpdateFrequencyChanged(UpdateFrequency frequency)
 	frequency_log_update = frequency;
 }
 
-std::list<MoveEntry> Solver::entries(Chess::Board* board) const
+std::list<MoveEntry> Solver::entries(Chess::Board* pos) const
 {
 	list<MoveEntry> entries;
 	if (tree.empty() || tree.front()->moves.empty())
 		return entries;
-	if (!is_branch(board, sol->opening, Line()))
+	if (!is_branch(pos, sol->opening, Line()))
 		return entries;
 
 	using namespace Chess;
@@ -1364,7 +1368,7 @@ std::list<MoveEntry> Solver::entries(Chess::Board* board) const
 	for (const auto& move : sol->opening)
 		temp_board->makeMove(move);
 	auto t = tree.front();
-	auto& history = board->MoveHistory();
+	auto& history = pos->MoveHistory();
 	for (int i = sol->opening.size(); i < history.size(); i++)
 	{
 		bool is_found = false;
@@ -1387,15 +1391,51 @@ std::list<MoveEntry> Solver::entries(Chess::Board* board) const
 		auto legal_moves_vector = temp_board->legalMoves();
 		legal_moves = make_shared<set<Chess::Move>>(legal_moves_vector.begin(), legal_moves_vector.end());
 	}
-	for (auto& m : t->moves) {
+	bool skip_transp = (board->MoveHistory().size() <= sol->opening.size()) || is_branch(temp_board, board);
+	for (auto& m : t->moves)
+	{
 		auto move = m->move(temp_board);
 		if (legal_moves)
 			legal_moves->erase(move);
 		QString san = temp_board->moveString(move, Board::StandardAlgebraic);
-		quint16 score = (m->score() > WIN_THRESHOLD) ? m->weight : (quint16)UNKNOWN_SCORE;
-		entries.emplace_back(EntrySource::solver, san, m->pgMove, score, 0);
-		if (!m->is_solved())
-			entries.back().info = "~";
+		entries.emplace_back(EntrySource::solver, san, m->pgMove, m->weight, 0);
+		if (m->is_solved())
+			continue;
+		if (m->score() < MATE_VALUE - MANUAL_VALUE - 1 || m->score() > WIN_THRESHOLD)
+			entries.back().info = "~"; // if not overridden
+
+		// Find transpositions
+		if (skip_transp)
+			continue;
+		qint16 score_i = UNKNOWN_SCORE;
+		temp_board->makeMove(move);
+		if (temp_board->sideToMove() == our_color)
+		{
+			auto cached_move = get_existing(temp_board);
+			if (cached_move)
+				score_i = cached_move->score();
+		}
+		else
+		{
+			for (auto& opp_move : temp_board->legalMoves())
+			{
+				temp_board->makeMove(opp_move);
+				auto cached_move = get_existing(temp_board);
+				temp_board->undoMove();
+				if (!cached_move) {
+					score_i = UNKNOWN_SCORE;
+					break;
+				}
+				if (score_i == UNKNOWN_SCORE || cached_move->score() < score_i)
+					score_i = cached_move->score();
+			}
+		}
+		temp_board->undoMove();
+		if (score_i != UNKNOWN_SCORE) {
+			qint16 score_i_1 = (score_i >= MATE_THRESHOLD) ? (score_i - 1) : score_i;
+			entries.back().weight = reinterpret_cast<const quint16&>(score_i_1);
+			entries.back().info = "tr";
+		}
 	}
 	if (legal_moves) {
 		for (auto& m : *legal_moves) {

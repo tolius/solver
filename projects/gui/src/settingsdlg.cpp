@@ -209,6 +209,12 @@ SettingsDialog::SettingsDialog(QWidget* parent)
 		}
 	);
 
+	connect(ui->m_clearLogWhenAutoStarted, &QCheckBox::toggled, this, 
+		[=](bool checked) {
+			QSettings().setValue("solutions/clear_log_when_Auto_started", checked);
+		}
+	);
+
 	connect(ui->m_openLastSolution, &QCheckBox::toggled,
 		this, [=](bool checked) {
 			QSettings().setValue("solutions/open_last_solution", checked);
@@ -293,16 +299,14 @@ void SettingsDialog::readSettings()
 	QSettings s;
 
 	s.beginGroup("ui");
-	ui->m_highlightLegalMovesCheck->setChecked(
-		s.value("highlight_legal_moves", true).toBool());
-	ui->m_showMoveArrowsCheck->setChecked(
-		s.value("show_move_arrows", true).toBool());
+	ui->m_highlightLegalMovesCheck->setChecked(s.value("highlight_legal_moves", true).toBool());
+	ui->m_showMoveArrowsCheck->setChecked(s.value("show_move_arrows", true).toBool());
 	ui->m_moveAnimationSpin->setValue(s.value("move_animation_duration", 300).toInt());
-	ui->m_showWatkinsForOpponent->setChecked(
-		s.value("show_Watkins_for_opponent", true).toBool());
+	ui->m_showWatkinsForOpponent->setChecked(s.value("show_Watkins_for_opponent", true).toBool());
 	s.endGroup();
 
 	s.beginGroup("solutions");
+	ui->m_clearLogWhenAutoStarted->setChecked(s.value("clear_log_when_Auto_started", true).toBool());
 	ui->m_openLastSolution->setChecked(s.value("open_last_solution", true).toBool());
 	s.endGroup();
 }

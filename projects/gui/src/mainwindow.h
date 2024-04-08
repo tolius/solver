@@ -107,6 +107,7 @@ class MainWindow : public QMainWindow
 		void updateCurrentSolution();
 		void setTint(QColor tint, bool to_color_move_buttons);
 	    void logMessage(const QString& msg, MessageType type);
+	    void clearLog();
 
 	private:
 		struct TabData

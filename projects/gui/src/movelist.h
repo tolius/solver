@@ -98,7 +98,7 @@ signals:
 
 protected:
 	// Reimplemented from QWidget
-	virtual bool eventFilter(QObject* obj, QEvent* event);
+	bool eventFilter(QObject* obj, QEvent* event) override;
 
 private slots:
 	void onMoveMade(const Chess::GenericMove& move, const QString& sanString, const QString& comment);
