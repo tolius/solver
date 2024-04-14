@@ -173,6 +173,7 @@ private:
 	int64_t ram_budget;
 
 	friend class Solver;
+	bool is_solver_upper_level;
 
 public:
 	static const QString DATA;

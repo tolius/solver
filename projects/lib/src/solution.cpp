@@ -113,7 +113,7 @@ Solution::Solution(std::shared_ptr<SolutionData> data, const QString& basename, 
 			info_win_in++; // show #WinIn before the last move of the opening is made, not after
 	}
 	side = opening.size() % 2 == 0 ? Chess::Side::White : Chess::Side::Black;
-
+	is_solver_upper_level = true;
 }
 
 void Solution::initFilenames()
@@ -206,8 +206,8 @@ void Solution::activate(bool send_msg)
 	ram_budget = static_cast<quint64>(QSettings().value("solver/book_cache", 1.0).toDouble() * 1024 * 1024 * 1024);
 	loadBook(false);
 
-	// Read positions book, alts_upper, solution_upper
-	for (FileType type : { FileType_positions_upper, FileType_positions_lower, FileType_alts_upper, FileType_solution_upper })
+	// Read alts, positions, and solution books
+	for (FileType type : { FileType_alts_upper, FileType_alts_lower, FileType_positions_upper, FileType_positions_lower, FileType_solution_upper, FileType_solution_lower })
 	{
 		QString path_pos = path(type);
 		QFileInfo fi_pos(path_pos);
@@ -1192,8 +1192,7 @@ std::vector<SolutionEntry> Solution::eSolutionEntries(Chess::Board* board)
 			if (board->isLegalMove(m)) {
 				++it;
 			}
-			else
-			{
+			else {
 				emit Message(QString("Error: wrong move %1 (%2) from Watkins's solution, ZS=0x%3")
 				                 .arg(it->san(board))
 				                 .arg(it->pgMove)
@@ -1203,10 +1202,11 @@ std::vector<SolutionEntry> Solution::eSolutionEntries(Chess::Board* board)
 			}
 		}
 		if (board->sideToMove() == side) {
+			auto type = is_solver_upper_level ? FileType_solution_upper : FileType_solution_lower;
 			if (!entries.empty())
-				addToBook(temp_board->key(), entries.front(), FileType_solution_upper);
-			else if (fileExists(FileType_solution_upper) || fileExists(FileType_solution_upper, FileSubtype::New))
-				addToBook(temp_board->key(), SolutionEntry(0, ESOLUTION_VALUE, 0), FileType_solution_upper);
+				addToBook(temp_board->key(), entries.front(), type);
+			else if (fileExists(type) || fileExists(type, FileSubtype::New))
+				addToBook(temp_board->key(), SolutionEntry(0, ESOLUTION_VALUE, 0), type);
 		}
 		else {
 			cache[board->key()] = entries;

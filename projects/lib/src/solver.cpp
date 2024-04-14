@@ -59,25 +59,15 @@ Solver::Solver(std::shared_ptr<Solution> solution)
 {
 	sol = solution;
 	to_copy_solution = false;
-	only_upper_level = true;
 	is_final_assembly = false; // !only_upper_level && !branch
 	limit_win = 30;
-	s.score_limit = only_upper_level ? (MATE_VALUE - limit_win) : (MATE_VALUE - 0);
+	set_level(true);
 	min_winning_sequence = 1;
 	check_depth_limit = !to_copy_solution;
 	s.dont_lose_winning_sequence = !to_copy_solution && !is_final_assembly;
 	s.to_reensure_winning_sequence = !to_copy_solution && !is_final_assembly;
 	to_fix_engine_v0 = !true;
 	force_cached_transpositions = true;
-	score_hard_limit = only_upper_level ? (MATE_VALUE - 7) : (MATE_VALUE - 0);
-	if (only_upper_level) {
-		s.std_engine_time = 190;
-		s.add_engine_time = 150;
-	}
-	else {
-		s.std_engine_time = 120;
-		s.add_engine_time = 90;
-	}
 	s.add_engine_time_to_ensure_winning_sequence = 5 * s.add_engine_time;
 	s.min_score = -500;
 	s.score_to_add_time = 1100;
@@ -93,7 +83,6 @@ Solver::Solver(std::shared_ptr<Solution> solution)
 	s.multiPV_2_stop_time = int(s.std_engine_time * 0.10f);
 	s.multiPV_stop_time = int(s.std_engine_time * 0.50f); // 20
 	s.multiPV_stop_score = MATE_VALUE - 8;
-	evaluate_egtb = !only_upper_level && !to_copy_solution;
 	endgame5_score_limit = MATE_VALUE - limit_win; // -20  // MATE_VALUE - 0 --> to evaluate all known 5-men endgames
 	to_recheck_endgames = false;
 	rechecked_good_endgames = 0;
@@ -189,19 +178,46 @@ void Solver::init()
 	our_color = board->sideToMove();
 }
 
+void Solver::set_level(bool upper_level)
+{
+	only_upper_level = upper_level;
+	sol->is_solver_upper_level = only_upper_level;
+	s.score_limit = only_upper_level ? (MATE_VALUE - limit_win) : (MATE_VALUE - 0);
+	score_hard_limit = only_upper_level ? (MATE_VALUE - 7) : (MATE_VALUE - 0);
+	if (only_upper_level)
+	{
+		s.std_engine_time = 190;
+		s.add_engine_time = 150;
+	}
+	else
+	{
+		s.std_engine_time = 120;
+		s.add_engine_time = 90;
+	}
+	evaluate_egtb = !only_upper_level && !to_copy_solution;
+}
+
 void Solver::start(Chess::Board* new_pos, std::function<void(QString)> message)
 {
 	if (status != Status::idle) {
 		message("It's already been started.");
 		return;
 	}
-	
-	if (new_pos && !isCurrentBranch(new_pos))
-	{
+
+	if (new_pos && !isCurrentBranch(new_pos)) {
 		message("You cannot start from a position that does not belong to the solution you have selected.\n\n"
-			    "Either set a position that belongs to the current solution branch, or set a starting position on the chessboard.");
+		        "Either set a position that belongs to the current solution branch, or set a starting position on the chessboard.");
 		return;
 	}
+
+	std::shared_ptr<Chess::Board> start_pos(new_pos ? new_pos->copy() : nullptr);
+	start(start_pos, message, true);
+}
+
+void Solver::start(pBoard start_pos, std::function<void(QString)> message, bool upper_level)
+{
+	if (only_upper_level != upper_level)
+		set_level(upper_level);
 
 	status = Status::solving;
 	emit solvingStatusChanged();
@@ -284,8 +300,8 @@ void Solver::start(Chess::Board* new_pos, std::function<void(QString)> message)
 
 		for (const auto& move : sol->branch)
 			add_move(move);
-		if (new_pos) {
-			auto& moves = new_pos->MoveHistory();
+		if (start_pos) {
+			auto& moves = start_pos->MoveHistory();
 			for (int i = sol->opening.size() + sol->branch.size(); i < moves.size(); i++)
 				add_move(moves[i].move);
 			if (moves.size() > sol->opening.size() + sol->branch.size())
@@ -295,7 +311,7 @@ void Solver::start(Chess::Board* new_pos, std::function<void(QString)> message)
 			sol_name = QString("%1 %2").arg(sol_name).arg(san_moves.join(' '));
 		if (QSettings().value("solutions/clear_log_when_Auto_started", true).toBool())
 			emit clearLog();
-		emit Message(QString("Starting to solve %1").arg(sol_name));
+		emit Message(QString("Starting to solve %1 at the %2 level").arg(sol_name).arg(only_upper_level ? "UPPER" : "LOWER"), MessageType::info);
 		tree_state = SolverState(false);
 		vector<pMove> tree_to_solve;
 		t->clearData();
@@ -326,7 +342,7 @@ void Solver::start(Chess::Board* new_pos, std::function<void(QString)> message)
 	}
 	timer_log_update.stop();
 	line_to_log.clear();
-	emit Message(QString("Finishing solving %1").arg(sol_name), MessageType::info);
+	emit Message(QString("Finishing solving %1 at the %2 level").arg(sol_name).arg(only_upper_level ? "UPPER" : "LOWER"), MessageType::info);
 	if (status != Status::solving) {
 		emit solvingStatusChanged();
 		return;
@@ -344,9 +360,26 @@ void Solver::start(Chess::Board* new_pos, std::function<void(QString)> message)
 
 	create_book(t, num_opening_moves);
 	sol->mergeAllFiles();
-	status = Status::idle;
-	init();
-	emit solvingStatusChanged();
+
+	auto stop_solving = [this]()
+	{
+		status = Status::idle;
+		init();
+		emit solvingStatusChanged();
+	};
+
+	if (!only_upper_level) {
+		stop_solving();
+		return;
+	}
+	if (num_new_moves) {
+		stop_solving();
+		emit Message("You can re-run it to proceed solving at the lower level. "
+			"However, it makes sense to first improve and verify the generated solution "
+			"and only then continue at the lower level.");
+		return;
+	}
+	start(start_pos, message, false);
 }
 
 void Solver::stop()
@@ -354,12 +387,12 @@ void Solver::stop()
 	status = Status::idle;
 }
 
-bool Solver::save(pBoard pos, Chess::Move move, std::shared_ptr<SolutionEntry> data, bool is_only_move, Solution::FileType type)
+bool Solver::save(pBoard pos, Chess::Move move, std::shared_ptr<SolutionEntry> data, bool is_only_move, bool is_multi_pos)
 {
 	if (!pos)
 		return false;
 	bool is_waiting = (status == Status::waitingEval) && (pos->key() == board->key());
-	if (is_waiting && type == Solution::FileType_positions_upper)
+	if (is_waiting && !is_multi_pos)
 	{
 		process(pos, move, data, is_only_move);
 		return true;
@@ -371,15 +404,13 @@ bool Solver::save(pBoard pos, Chess::Move move, std::shared_ptr<SolutionEntry> d
 		|| !isCurrentBranch(pos))
 		return false;
 
+	auto type = is_multi_pos ? (only_upper_level ? Solution::FileType_multi_upper : Solution::FileType_multi_lower)
+	                         : (only_upper_level ? Solution::FileType_positions_upper : Solution::FileType_positions_lower);
 	sol->addToBook(pos, *data, type);
-	if (is_waiting && type == Solution::FileType_alts_upper) {
-		eval_result = { data, move, is_only_move };
-		return true;
-	}
 	return false;
 }
 
-void Solver::save_override(Chess::Board* pos, std::shared_ptr<SolutionEntry> data)
+void Solver::saveOverride(Chess::Board* pos, std::shared_ptr<SolutionEntry> data)
 {
 	if (!pos || !isCurrentBranch(pos))
 		return;
@@ -407,7 +438,8 @@ void Solver::save_override(Chess::Board* pos, std::shared_ptr<SolutionEntry> dat
 	if (is_waiting)
 		eval_result = { data, move, false };
 
-	sol->addToBook(prev_key, *data, Solution::FileType_alts_upper);
+	auto type = only_upper_level ? Solution::FileType_alts_upper : Solution::FileType_alts_lower;
+	sol->addToBook(prev_key, *data, type);
 }
 
 void Solver::process(pBoard pos, Chess::Move move, std::shared_ptr<SolutionEntry> data, bool is_only_move)
@@ -842,7 +874,8 @@ Solver::pMove Solver::get_engine_move(SolverMove& move, SolverState& info, bool 
 	    || old_best_move_depth >= s.max_depth
 	    || best_move->time() == 0; // best_move.time() == 0 if the other moves are obviously losing, so skipped
 								   //!! TODO: it should use the prev. score in this case, save it as move+1, not only return it?
-	if (!is_score_ok && best_move)
+	bool re_ensure = (!is_score_ok && best_move);
+	if (re_ensure)
 		emit Message(QString("...Re-ensure winning %1: %2->%3: %4 < %5: %6")
 		                 .arg(best_move->san(board))
 		                 .arg(move.scoreText())
@@ -862,6 +895,8 @@ Solver::pMove Solver::get_engine_move(SolverMove& move, SolverState& info, bool 
 	auto old_best_move = best_move;
 
 	/// Run engine.
+	if (!re_ensure)
+		num_new_moves++;
 	solver_session->is_endgame = false;
 	solver_session->is_super_boost = is_super_boost;
 	solver_session->move_score = move.isNull() ? MoveEvaluation::NULL_SCORE : move.score();
@@ -989,17 +1024,27 @@ Solver::pMove Solver::get_solution_move() const
 
 Solver::pMove Solver::get_esolution_move() const
 {
-	auto entry = sol->bookEntry(board, Solution::FileType_solution_upper);
-	if (!entry)
-		return nullptr;
+	auto esol1 = only_upper_level ? Solution::FileType_solution_upper : Solution::FileType_solution_lower;
+	auto esol2 = only_upper_level ? Solution::FileType_solution_lower : Solution::FileType_solution_upper;
+	auto entry = sol->bookEntry(board, esol1);
+	if (!entry) {
+		entry = sol->bookEntry(board, esol2);
+		if (!entry)
+			return nullptr;
+	}
 	return make_shared<SolverMove>(entry);
 }
 
 Solver::pMove Solver::get_alt_move() const
 {
-	auto entry = sol->bookEntry(board, Solution::FileType_alts_upper);
-	if (!entry)
-		return nullptr;
+	auto alts1 = only_upper_level ? Solution::FileType_alts_upper : Solution::FileType_alts_lower;
+	auto alts2 = only_upper_level ? Solution::FileType_alts_lower : Solution::FileType_alts_upper;
+	auto entry = sol->bookEntry(board, alts1);
+	if (!entry) {
+		entry = sol->bookEntry(board, alts2);
+		if (!entry)
+			return nullptr;
+	}
 	return make_shared<SolverMove>(entry);
 }
 
@@ -1010,10 +1055,18 @@ Solver::pMove Solver::get_saved() const
 		auto& bytes = it->second;
 		return SolverMove::fromBytes(bytes);
 	}
-	auto entry = sol->bookEntry(board, Solution::FileType_alts_upper);
+	auto alts1 = only_upper_level ? Solution::FileType_alts_upper : Solution::FileType_alts_lower;
+	auto alts2 = only_upper_level ? Solution::FileType_alts_lower : Solution::FileType_alts_upper;
+	auto entry = sol->bookEntry(board, alts1);
+	if (!entry)
+		entry = sol->bookEntry(board, alts2);
 	if (entry && entry->is_overridden())
 		return make_shared<SolverMove>(entry);
-	entry = sol->bookEntry(board, Solution::FileType_positions_upper);
+	auto pos1 = only_upper_level ? Solution::FileType_positions_upper : Solution::FileType_positions_lower;
+	auto pos2 = only_upper_level ? Solution::FileType_positions_lower : Solution::FileType_positions_upper;
+	entry = sol->bookEntry(board, pos1);
+	if (!entry)
+		entry = sol->bookEntry(board, pos2);
 	if (!entry)
 		return nullptr;
 	return make_shared<SolverMove>(entry);
@@ -1106,12 +1159,12 @@ void Solver::save_data(pcMove move, bool to_save)
 {
 	new_positions[board->key()] = move->toBytes();
 	if (to_save)
-		sol->addToBook(board, move->toBytes(), Solution::FileType_positions_upper);
+		sol->addToBook(board, move->toBytes(), only_upper_level ? Solution::FileType_positions_upper : Solution::FileType_positions_lower);
 }
 
 void Solver::save_alt(pcMove move)
 {
-	sol->addToBook(board, move->toBytes(), Solution::FileType_alts_upper);
+	sol->addToBook(board, move->toBytes(), only_upper_level ? Solution::FileType_alts_upper : Solution::FileType_positions_lower);
 }
 
 Chess::Side Solver::sideToWin() const
@@ -1141,10 +1194,8 @@ void Solver::create_book(pMove tree_front, int num_opening_moves)
 	positions.clear();
 	prepared_transpositions.clear();
 	all_entries.clear();
-	MapT saved_positions;
-	MapT transpositions;
 	num_processed = 0;
-	auto [num_nodes, score] = prepare_moves(tree_front, saved_positions, transpositions);
+	auto [num_nodes, score, saved_positions, transpositions] = prepare_moves(tree_front);
 	bool is_their_turn = (board->sideToMove() != our_color);
 	qint16 tree_score = UNKNOWN_SCORE;
 	correct_score(tree_score, score, is_their_turn, tree_front);
@@ -1176,7 +1227,7 @@ void Solver::create_book(pMove tree_front, int num_opening_moves)
 			return true;
 		}
 	);
-	auto path_book = sol->path(Solution::FileType_book_upper);
+	auto path_book = sol->path(only_upper_level ? Solution::FileType_book_upper : Solution::FileType_book);
 	auto path_bak = Solution::ext_to_bak(path_book);
 	ofstream book(path_bak.toStdString(), ios::binary | ios::out | ios::trunc);
 	for (auto& entry : all_entries)
@@ -1203,7 +1254,13 @@ void Solver::create_book(pMove tree_front, int num_opening_moves)
 	emit updateCurrentSolution();
 }
 
-std::tuple<quint32, qint16> Solver::prepare_moves(pMove& move, MapT& saved_positions, MapT& transpositions)
+void update(MapT& elements, const MapT& new_elements)
+{
+	for (const auto& elem : new_elements)
+		elements[elem.first] = elem.second;
+}
+
+std::tuple<quint32, qint16, MapT, MapT> Solver::prepare_moves(pMove& move)
 {
 	// trans           - transpositions from the processing procedure
 	// positions       - all positions from the processing procedure
@@ -1211,6 +1268,8 @@ std::tuple<quint32, qint16> Solver::prepare_moves(pMove& move, MapT& saved_posit
 	// saved_positions - positions saved in this branch because they will be used as transpositions in the next branches
 	// transpositions  - transpositions used in this branch
 
+	MapT saved_positions;
+	MapT transpositions;
 	bool is_their_turn = (board->sideToMove() != our_color);
 	assert(is_their_turn || move->moves.size() <= 1);
 	quint32 num_new_nodes = 0;
@@ -1239,18 +1298,14 @@ std::tuple<quint32, qint16> Solver::prepare_moves(pMove& move, MapT& saved_posit
 		for (auto& m : move->moves)
 		{
 			board->makeMove(m->move(board));
-			MapT new_transpositions;
-			MapT new_saved_positions;
-			auto [sub_num_nodes, sub_score] = prepare_moves(m, new_saved_positions, new_transpositions);
+			auto [sub_num_nodes, sub_score, new_saved_positions, new_transpositions] = prepare_moves(m);
 			num_new_nodes += sub_num_nodes;
 			correct_score(score, sub_score, is_their_turn, m);
 			if (!is_their_turn)
 				expand_positions(new_saved_positions, new_transpositions);
 			board->undoMove();
-			new_saved_positions.merge(saved_positions);
-			new_saved_positions.swap(saved_positions);
-			new_transpositions.merge(transpositions);
-			new_transpositions.swap(transpositions);
+			update(saved_positions, new_saved_positions);
+			update(transpositions, new_transpositions);
 			if (is_their_turn)
 				continue;
 			// ONLY if not is_their_turn:
@@ -1273,7 +1328,7 @@ std::tuple<quint32, qint16> Solver::prepare_moves(pMove& move, MapT& saved_posit
 				emit Message(QString("Prepared %1").arg(num_processed));
 		}
 	}
-	return { num_new_nodes, score };
+	return { num_new_nodes, score, saved_positions, transpositions };
 }
 
 void Solver::correct_score(qint16& score, qint16 sub_score, bool is_their_turn, pMove& m)
@@ -1310,17 +1365,10 @@ void Solver::expand_positions(MapT& saved_positions, MapT& transpositions)
 	/// Merge all saved positions (depth=1)
 	MapT to_add;
 	for (auto& d : saved_positions)
-	{
-		d.second->sub_saved_positions.merge(to_add);
-		d.second->sub_saved_positions.swap(to_add);
-	}
-	to_add.merge(saved_positions);
-	to_add.swap(saved_positions);
+		update(to_add, d.second->sub_saved_positions);
+	update(saved_positions, to_add);
 	for (auto& d : transpositions)
-	{
-		d.second->sub_saved_positions.merge(saved_positions);
-		d.second->sub_saved_positions.swap(saved_positions);
-	}
+		update(saved_positions, d.second->sub_saved_positions);
 
 	/// Merge all transpositions (depth=1)
 	to_add.clear();
@@ -1328,8 +1376,7 @@ void Solver::expand_positions(MapT& saved_positions, MapT& transpositions)
 		for (auto& [sub_key, sub_t] : d.second->sub_trans_positions)
 			if (saved_positions.find(sub_key) == saved_positions.end())
 				to_add[sub_key] = sub_t;
-	to_add.merge(transpositions);
-	to_add.swap(transpositions);
+	update(transpositions, to_add);
 
 	/// Clear transpositions (after all sub-items have been expanded)
 	for (auto it = transpositions.begin(); it != transpositions.end();)

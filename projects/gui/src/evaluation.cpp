@@ -526,7 +526,7 @@ void Evaluation::onSaveClicked()
 		return;
 	t_last_T1_change = now;
 	auto [data, move] = currData();
-	bool is_action = solver->save(board_, move, data, is_only_move, Solution::FileType_positions_upper);
+	bool is_action = solver->save(board_, move, data, is_only_move, false);
 	if (is_action || move.isNull() || !board_ || curr_key != board_->key())
 		return;
 	std::shared_ptr<Chess::Board> ref_board(board_->copy());
@@ -565,7 +565,7 @@ void Evaluation::positionChanged()
 		std::shared_ptr<SolutionEntry> data;
 		if (prev_key == board_->key())
 			data = std::get<0>(currData());
-		solver->save_override(game->board(), data);
+		solver->saveOverride(game->board(), data);
 		ui->btn_Override->setChecked(false);
 	}
 	Chess::Board* new_board = (solver_status != SolverStatus::Manual && solver) ? solver->positionToSolve().get() : game->board();
@@ -744,7 +744,7 @@ void Evaluation::startEngine()
 								: solver->settings().multiPV_2_num;
 			if (to_save_multi) {
 				auto [data, move] = currData();
-				solver->save(board_, move, data, is_only_move, Solution::FileType_multi_upper);
+				solver->save(board_, move, data, is_only_move, true);
 			}
 		}
 	}
