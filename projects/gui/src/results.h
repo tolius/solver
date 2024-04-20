@@ -1,6 +1,7 @@
 #ifndef RESULTS_H
 #define RESULTS_H
 
+#include "positioninfo.h"
 #include "movenumbertoken.h"
 #include "movetoken.h"
 #include "movecommenttoken.h"
@@ -52,6 +53,8 @@ signals:
 
 private slots:
 	void onMoveMade(const Chess::GenericMove& move, const QString& sanString, const QString& comment);
+private:
+	void onDataSourceChanged(EntrySource source);
 
 private:
 	Ui::ResultsWidget* ui;
@@ -59,6 +62,7 @@ private:
 
 	std::shared_ptr<Solution> solution;
 	std::shared_ptr<Solver> solver;
+	EntrySource data_source;
 	ChessGame* game;
 };
 

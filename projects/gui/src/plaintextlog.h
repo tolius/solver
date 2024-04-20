@@ -23,6 +23,10 @@
 
 class QContextMenuEvent;
 class QAction;
+namespace Chess
+{
+	class Board;
+}
 
 /*!
  * \brief Widget that is used to display log messages in plain text.
@@ -39,6 +43,9 @@ class PlainTextLog : public QPlainTextEdit
 		 * given \a parent.
 		 */
 		PlainTextLog(const QString& text, QWidget* parent = nullptr);
+
+	signals:
+	    void applyMoves(std::shared_ptr<Chess::Board> board);
 
 	public slots:
 		/*! Save the log to file \a filename. */

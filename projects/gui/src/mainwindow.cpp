@@ -404,6 +404,7 @@ void MainWindow::createDockWindows()
 			m_log->moveCursor(QTextCursor::End);
 		}
 	);
+	connect(m_log, SIGNAL(applyMoves(std::shared_ptr<Chess::Board>)), m_evaluation, SLOT(onSyncPositions(std::shared_ptr<Chess::Board>)));
 
 	createSolutionsModel();
 

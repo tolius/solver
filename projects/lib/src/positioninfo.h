@@ -125,7 +125,8 @@ QString get_san_sequence(int ply, const QStringList& moves);
 
 QString line_to_string(const Line& line, std::shared_ptr<Chess::Board> start_pos = nullptr, QChar separator = SEP_MOVES, bool add_move_numbers = false);
 std::tuple<QString, std::shared_ptr<Chess::Board>> compose_string(const Line& line, QChar separator = SEP_MOVES, bool add_move_numbers = false);
-std::tuple<Line, bool> parse_line(const QString& line, const QString& opening = "", std::shared_ptr<Chess::Board> start_pos = nullptr, bool undo_moves = true);
+std::tuple<Line, bool> parse_line(const QString& line, const QString& opening = "", std::shared_ptr<Chess::Board> start_pos = nullptr, bool undo_moves = true, bool ignore_incorrect_data = false);
+std::tuple<Line, std::shared_ptr<Chess::Board>> parse_line(const QString& line, bool ignore_incorrect_data);
 
 int get_max_depth(int score, size_t num_pieces);
 std::tuple<std::shared_ptr<Position>, std::shared_ptr<StateInfo>> boardToPosition(std::shared_ptr<Chess::Board> board);

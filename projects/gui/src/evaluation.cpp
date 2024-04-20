@@ -41,8 +41,15 @@ using namespace std::chrono;
 constexpr static quint64 NODES_PER_S = 1'500'000;
 constexpr static int NO_PROGRESS_TIME = 12; // [s]
 constexpr static int EG_WIN_THRESHOLD = 15200;
-constexpr static int START_DEPTH = 8;
+constexpr static int START_DEPTH = 10;
 constexpr static uint8_t UNKNOWN_ENGINE_VERSION = 0xFE;
+
+QString score_to_text(int score)
+{
+	if (score == MoveEvaluation::NULL_SCORE)
+		return "NULL";
+	return SolutionEntry::score2Text(static_cast<qint16>(score));
+}
 
 EngineSession::EngineSession()
 {
@@ -58,6 +65,60 @@ void EngineSession::reset()
 	prev_multi_mode = 0;
 	was_multi = false;
 	to_repeat = false;
+}
+
+EvalUpdate::EvalUpdate()
+{
+	clear();
+	depth = 0;
+	t_update.push_back(steady_clock::now());
+}
+
+void EvalUpdate::clear()
+{
+	depth = DEPTH_RESET;
+	score = MoveEvaluation::NULL_SCORE;
+	nps = 0;
+	tb_hits = 0;
+	time_ms = 0;
+	best_move = "";
+	move_sequence = "";
+	labels.clear();
+	progress = 0;
+}
+
+void EvalUpdate::update_labels(std::vector<std::array<QLabel*, 3>>& move_labels)
+{
+	for (auto& [i, d] : labels)
+	{
+		move_labels[i][0]->setText(QString::number(d.depth) + ':');
+		move_labels[i][1]->setText(score_to_text(d.score));
+		move_labels[i][2]->setText(d.san);
+	}
+	labels.clear();
+}
+
+bool EvalUpdate::is_reset() const
+{
+	return depth == DEPTH_RESET;
+}
+
+std::chrono::milliseconds EvalUpdate::interval() const
+{
+	if (t_update.size() < WINDOW)
+		return 0ms;
+	auto now = steady_clock::now();
+	auto elapsed_big = now - t_update.front();
+	auto elapsed_small = now - t_update.back();
+	auto interval = (4s - elapsed_big) / 10 - elapsed_small;
+	return interval < 0s ? 0ms : duration_cast<milliseconds>(interval);
+}
+
+void EvalUpdate::set_updated()
+{
+	if (t_update.size() >= WINDOW)
+		t_update.pop_front();
+	t_update.push_back(steady_clock::now());
 }
 
 Evaluation::Evaluation(GameViewer* game_viewer, QWidget* parent)
@@ -83,6 +144,8 @@ Evaluation::Evaluation(GameViewer* game_viewer, QWidget* parent)
 	connect(&timer_engine, SIGNAL(timeout()), this, SLOT(onTimerEngine()));
 	timer_sync.setSingleShot(true);
 	connect(&timer_sync, SIGNAL(timeout()), this, SLOT(onSyncPositions()));
+	timer_eval.setSingleShot(true);
+	connect(&timer_eval, SIGNAL(timeout()), this, SLOT(onUpdateEval()));
 	int board_update = QSettings().value("solver/board_update", (int)UpdateFrequency::standard).toInt();
 	frequency_sync = value_to_frequency(board_update);
 
@@ -166,7 +229,7 @@ void Evaluation::updateBoard(Chess::Board* board)
 		return;
 	}
 	ui->btn_Save->setEnabled(false);
-	ui->btn_Save->setText("Save move");
+	//ui->btn_Save->setText("Save move");
 	ui->btn_Override->setChecked(false);
 	board_.reset(board->copy());
 	updateSync();
@@ -282,8 +345,8 @@ void Evaluation::clearEvalLabels()
 	ui->label_Mate->clear();
 	ui->label_BestMove->clear();
 	ui->label_EngineMoves->clear();
-	ui->label_Speed->setText("0 kn/s");
-	ui->label_EGTB->setText("0 n/s");
+	ui->label_Speed->setText("   0 kn/s");
+	ui->label_EGTB->setText("   0 n/s");
 	ui->btn_Save->setText("Save move");
 	ui->progressBar->setValue(0);
 }
@@ -427,7 +490,7 @@ void Evaluation::onEngineReady()
 			int num = str_num.toInt(&ok);
 			if (ok) {
 				engine_version = 
-				      (240226 <= num && num <= 240331) ? 3
+				      (240226 <= num && num <= 240430) ? 3
 				    : (num == 230811)                  ? 2
 				    : (num == 230803)                  ? 1
 				    : (230409 <= num && num <= 230415) ? 1
@@ -808,14 +871,18 @@ void Evaluation::startEngine()
 		if (enabled)
 			enabled = solver->whatToSolve() ? solver->whatToSolve()->alt_step == NO_ALT_STEPS : solver->isCurrentBranch(board_);
 		ui->btn_Save->setEnabled(enabled);
-		ui->btn_Save->setText("Save move");
+		//ui->btn_Save->setText("Save move");
 	}
 	num_pieces = board_->numPieces();
 	engine->setOption("MultiPV", session.multi_pv);
 	quint64 num_nodes = (solver && session.is_auto) ? solver->settings().max_search_time / 2 * NODES_PER_S : 0;
 	engine->go(board_.get(), num_nodes, mate);
 	if (!to_repeat) {
-		clearEvalLabels();
+		std::lock_guard<std::mutex> lock(eval_data.mtx);
+		eval_data.clear();
+		if (timer_eval.isActive())
+			timer_eval.stop();
+		timer_eval.start(500ms);
 		updateStartStop();
 	}
 }
@@ -871,20 +938,6 @@ void Evaluation::reportWinStatus(WinStatus status)
 	}
 }
 
-QString score_to_text(int score)
-{
-	if (score == MoveEvaluation::NULL_SCORE)
-		return "NULL";
-	return SolutionEntry::score2Text(static_cast<qint16>(score));
-}
-
-void eval_to_string(std::array<QLabel*, 3>& labels, const MoveEvaluation& eval, const QString& san)
-{
-	labels[0]->setText(QString::number(eval.depth()) + ':');
-	labels[1]->setText(score_to_text(eval.score()));
-	labels[2]->setText(san);
-}
-
 QStringList Evaluation::process_moves(const MoveEvaluation& eval)
 {
 	QStringList san_moves;
@@ -931,54 +984,83 @@ void Evaluation::onEngineEval(const MoveEvaluation& eval)
 	auto san_moves = process_moves(eval);
 	QString eval_best_move = san_moves.empty() ? "" : san_moves.takeFirst();
 	processEngineOutput(eval, eval_best_move);
-	if (pv == 1)
+	
+	std::lock_guard<std::mutex> lock(eval_data.mtx);
+	bool eval_data_reset = eval_data.is_reset();
+	if (pv == 1 && eval_data.depth <= eval.depth())
 	{
-		int eval_depth = eval.depth();
-		int eval_score = eval.score();
-		int eval_time = eval.time();
-		quint64 eval_nps = eval.nps();
-		last_eval_depth = eval_depth;
-		int interval = (int)std::max((decltype(milliseconds().count()))0, 200 - duration_cast<milliseconds>(steady_clock::now() - t_last_eval_update).count());
-		auto update = [=]()
-		{
-			if (last_eval_depth > eval_depth && san_moves.empty())
-				return; // outdated
-			t_last_eval_update = steady_clock::now();
-			ui->label_Depth->setText(tr("%1:").arg(eval_depth));
-			ui->label_Mate->setText(score_to_text(eval_score));
-			if (san_moves.size() > 1) {
-				ui->label_BestMove->setText(eval_best_move);
-				ui->btn_Save->setText("Save " + eval_best_move);
-				QString move_sequence = get_san_sequence(board_->plyCount() + 3, san_moves);
-				ui->label_EngineMoves->setText(move_sequence);
-			}
-			int time_ms = eval_time;
-			ui->label_Speed->setText(tr("%L1 kn/s").arg(eval_nps / 1000));
-			if (time_ms == 0) {
-				ui->label_EGTB->setText("0 n/s");
-			}
-			else {
-				int64_t speed_egtb = static_cast<int64_t>(eval.tbHits()) * 1000 / time_ms;
-				ui->label_EGTB->setText(tr("%L1 n/s").arg(speed_egtb));
-			}
-		};
-		QTimer::singleShot(interval, this, update);
+		eval_data.depth = eval.depth();
+		eval_data.score = eval.score();
+		eval_data.time_ms = eval.time();
+		eval_data.nps = eval.nps();
+		eval_data.tb_hits = eval.tbHits();
+		if (san_moves.size() > 1) {
+			eval_data.best_move = eval_best_move;
+			eval_data.move_sequence = get_san_sequence(board_->plyCount() + 3, san_moves);
+		}
 	}
 	if (pv - 1 < move_labels.size())
 	{
-		if (session.multi_mode == 0 && pv == 1 && move_labels[0][2]->text() != eval_best_move) {
-			auto move_san = move_labels[0][2]->text();
-			for (int i = 1;  i < move_labels.size(); i++)
+		if (session.multi_mode == 0 && pv == 1)
+		{
+			auto it = eval_data.labels.find(0);
+			if (it == eval_data.labels.end() && move_labels[0][2]->text() != eval_best_move)
 			{
-				if (move_labels[i][2]->text() == move_san) {
-					move_labels[i][0]->setText(move_labels[0][0]->text());
-					move_labels[i][1]->setText(move_labels[0][1]->text());
-					break;
+				for (int i = 1;  i < move_labels.size(); i++)
+				{
+					if (move_labels[i][2]->text() == move_labels[0][2]->text()) {
+						move_labels[i][0]->setText(move_labels[0][0]->text());
+						move_labels[i][1]->setText(move_labels[0][1]->text());
+						break;
+					}
 				}
 			}
 		}
-		eval_to_string(move_labels[pv - 1], eval, eval_best_move);
+		eval_data.labels[pv - 1] = { eval.depth(), eval.score(), eval_best_move };
+		if (timer_eval.isActive()) {
+			if (eval_data_reset) {
+				timer_eval.stop();
+				timer_eval.start(eval_data.interval());
+			}
+		}
+		else {
+			timer_eval.start(eval_data.interval());
+		}
 	}
+}
+
+void Evaluation::onUpdateEval()
+{
+	std::lock_guard<std::mutex> lock(eval_data.mtx);
+	timer_eval.stop();
+	eval_data.set_updated();
+	if (eval_data.is_reset()) {
+		clearEvalLabels();
+		return;
+	}
+	if (eval_data.best_move.isEmpty())
+		return;
+	ui->label_Depth->setText(tr("%1:").arg(eval_data.depth));
+	ui->label_Mate->setText(score_to_text(eval_data.score));
+	if (!eval_data.best_move.isEmpty())
+	{
+		ui->label_BestMove->setText(eval_data.best_move);
+		ui->btn_Save->setText("Save " + eval_data.best_move);
+		ui->label_EngineMoves->setText(eval_data.move_sequence);
+	}
+	ui->label_Speed->setText(tr("%L1 kn/s").arg(eval_data.nps / 1000, 4, 10, QChar(' ')));
+	if (eval_data.time_ms == 0)
+	{
+		ui->label_EGTB->setText("   0 n/s");
+	}
+	else
+	{
+		int64_t speed_egtb = static_cast<int64_t>(eval_data.tb_hits) * 1000 / eval_data.time_ms;
+		ui->label_EGTB->setText(tr("%L1 n/s").arg(speed_egtb, 4, 10, QChar(' ')));
+	}
+
+	eval_data.update_labels(move_labels);
+	ui->progressBar->setValue(eval_data.progress);
 }
 
 void Evaluation::processEngineOutput(const MoveEvaluation& eval, const QString& str_move)
@@ -1044,7 +1126,7 @@ void Evaluation::processEngineOutput(const MoveEvaluation& eval, const QString& 
 	if (session.is_auto && no_progress && pv == 1 && is_only_move && solver && best_score < s->score_limit
 	    && (move_score == NULL_SCORE || abs(move_score) < s->score_limit - 1))
 	{
-		ui->progressBar->setValue(100);
+		updateProgress(100);
 		stopEngine();
 		return;
 	}
@@ -1082,7 +1164,7 @@ void Evaluation::checkProgress(quint64 nodes, bool no_progress, int depth)
 		is_score_good = (move_score == NULL_SCORE || abs(move_score) <= 20'000 || abs_score > abs(move_score));
 		if (session.is_auto && no_progress && is_score_good && depth > depth_limit)
 		{
-			ui->progressBar->setValue(100);
+			updateProgress(100);
 			if (solver_status != SolverStatus::Manual) {
 				stopEngine();
 				return;
@@ -1125,11 +1207,11 @@ void Evaluation::checkProgress(quint64 nodes, bool no_progress, int depth)
 	int depth_progress = std::max(1, depth - START_DEPTH) * max_val / std::max(1, depth_to_stop - START_DEPTH);
 	int time_progress = ti * max_val / s.std_engine_time / session.multi_pv;
 	int progress_value = std::max(1, std::min(max_val, std::max(depth_progress, time_progress)));
-	if (progress_value > ui->progressBar->value())
-		ui->progressBar->setValue(progress_value);
+	if (progress_value > eval_data.progress)
+		updateProgress(progress_value);
 	if (no_progress && (ti > s.std_engine_time || depth >= s.max_depth) && (session.is_auto || session.multi_pv == 1))
 	{
-		ui->progressBar->setValue(100);
+		updateProgress(100);
 		if (session.is_auto)
 		{
 			if (!is_score_ok) {
@@ -1181,6 +1263,14 @@ void Evaluation::checkProgress(quint64 nodes, bool no_progress, int depth)
 	}
 }
 
+void Evaluation::updateProgress(int val)
+{
+	std::lock_guard<std::mutex> lock(eval_data.mtx);
+	eval_data.progress = val;
+	if (!timer_eval.isActive())
+		timer_eval.start(eval_data.interval());
+}
+
 void Evaluation::onEngineStopped()
 {
 	//auto eval = engine->evaluation();
@@ -1206,7 +1296,7 @@ void Evaluation::onEngineFinished()
 		timer_engine.stop();
 		session.reset();
 		if (solver_status != SolverStatus::Manual && solver) {
-			if (to_keep_solving /*|| ui->progressBar->value() == 100*/) {
+			if (to_keep_solving) {
 				auto [data, move] = currData();
 				solver->process(board_, move, data, is_only_move);
 			}

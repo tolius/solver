@@ -289,7 +289,7 @@ std::tuple<QString, std::shared_ptr<Chess::Board>> compose_string(const Line& li
 	return { san_moves.join(separator), board };
 }
 
-std::tuple<Line, bool> parse_line(const QString& line, const QString& opening, std::shared_ptr<Chess::Board> start_pos, bool undo_moves)
+std::tuple<Line, bool> parse_line(const QString& line, const QString& opening, std::shared_ptr<Chess::Board> start_pos, bool undo_moves, bool ignore_incorrect_data)
 {
 	using namespace Chess;
 	Line moves;
@@ -321,7 +321,8 @@ std::tuple<Line, bool> parse_line(const QString& line, const QString& opening, s
 		auto move = board->moveFromString(san);
 		if (move.isNull())
 		{
-			moves.clear();
+			if (!ignore_incorrect_data)
+				moves.clear();
 			break;
 		}
 		moves.push_back(move);
@@ -347,6 +348,15 @@ std::tuple<Line, bool> parse_line(const QString& line, const QString& opening, s
 			board->undoMove();
 	}
 	return { moves, is_from_start_pos };
+}
+
+std::tuple<Line, std::shared_ptr<Chess::Board>> parse_line(const QString& line, bool ignore_incorrect_data)
+{
+	using namespace Chess;
+	std::shared_ptr<Board> board(BoardFactory::create("antichess"));
+	board->setFenString(board->defaultFenString());
+	auto [moves, _] = parse_line(line, "", board, false, ignore_incorrect_data);
+	return { moves, board };
 }
 
 int get_max_depth(int score, size_t numPieces)

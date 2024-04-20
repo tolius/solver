@@ -24,6 +24,7 @@
 Results::Results(QWidget* parent)
 	: QWidget(parent)
 	, ui(new Ui::ResultsWidget)
+	, data_source(EntrySource::none)
 	, game(nullptr)
 {
 	ui->setupUi(this);
@@ -33,6 +34,12 @@ Results::Results(QWidget* parent)
 	//ui->scrollArea->setWidget(ui->widget_Solution);
 	ui->label_Info->setVisible(false);
 	ui->widget_ResultInfo->setVisible(false);
+	ui->btn_SourceAuto->setChecked(true);
+
+	connect(ui->btn_SourceAuto, &QToolButton::toggled, this, [this]()   { onDataSourceChanged(EntrySource::none);      });
+	connect(ui->btn_SourceSolver, &QToolButton::toggled, this, [this]() { onDataSourceChanged(EntrySource::solver);    });
+	connect(ui->btn_SourceBook, &QToolButton::toggled, this, [this]()   { onDataSourceChanged(EntrySource::book);      });
+	connect(ui->btn_SourceEval, &QToolButton::toggled, this, [this]()   { onDataSourceChanged(EntrySource::positions); });
 }
 
 void Results::setSolution(std::shared_ptr<Solution> solution)
@@ -54,11 +61,8 @@ void Results::setGame(ChessGame* game)
 	if (this->game)
 		this->game->disconnect(this);
 	this->game = game;
-
-	if (game != nullptr)
-	{
+	if (game)
 		connect(game, SIGNAL(moveMade(Chess::GenericMove, QString, QString)), this, SLOT(onMoveMade(Chess::GenericMove, QString, QString)));
-	}
 }
 
 void Results::onMoveMade(const Chess::GenericMove& move, const QString& sanString, const QString& comment)
@@ -79,6 +83,21 @@ void Results::onMoveMade(const Chess::GenericMove& move, const QString& sanStrin
 	}
 }
 
+void Results::onDataSourceChanged(EntrySource source)
+{
+	auto btn = source == EntrySource::solver ? ui->btn_SourceSolver
+	    : source == EntrySource::book        ? ui->btn_SourceBook
+	    : source == EntrySource::positions   ? ui->btn_SourceEval
+	                                         : ui->btn_SourceAuto;
+	if (btn->isChecked())
+		return;
+	data_source = source;
+	btn->blockSignals(true);
+	btn->setChecked(true);
+	btn->blockSignals(false);
+	positionChanged();
+}
+
 QString Results::positionChanged()
 {
 	QString best_score;
@@ -95,14 +114,15 @@ QString Results::positionChanged()
 		return best_score;
 	// Find entries in the book
 	std::list<MoveEntry> solution_entries;
-	if (solver)
+	if ((data_source == EntrySource::none || data_source == EntrySource::solver) && solver)
 		solution_entries = solver->entries(board);
-	if (solution_entries.empty())
+	if (solution_entries.empty() && data_source != EntrySource::solver)
 	{
 		if (board->sideToMove() == solution->winSide())
 		{
-			solution_entries = solution->entries(board);
-			if (solution_entries.empty())
+			if (data_source == EntrySource::none || data_source == EntrySource::book)
+				solution_entries = solution->entries(board);
+			if ((data_source == EntrySource::none || data_source == EntrySource::positions) && solution_entries.empty())
 			{
 				solution_entries = solution->positionEntries(board);
 				if (solution_entries.empty())
@@ -121,8 +141,9 @@ QString Results::positionChanged()
 		else
 		{
 			std::list<MoveEntry> missing_entries;
-			solution_entries = solution->nextEntries(board, &missing_entries);
-			if (solution_entries.empty()) {
+			if (data_source == EntrySource::none || data_source == EntrySource::book)
+				solution_entries = solution->nextEntries(board, &missing_entries);
+			if ((data_source == EntrySource::none || data_source == EntrySource::positions) && solution_entries.empty()) {
 				missing_entries.clear();
 				solution_entries = solution->nextPositionEntries(board, &missing_entries);
 				solution_entries.splice(solution_entries.begin(), missing_entries);

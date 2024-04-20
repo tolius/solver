@@ -17,6 +17,8 @@
 */
 
 #include "plaintextlog.h"
+#include "positioninfo.h"
+
 #include <QContextMenuEvent>
 #include <QMenu>
 #include <QFile>
@@ -24,6 +26,7 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QTextStream>
+#include <QTextBlock>
 
 PlainTextLog::PlainTextLog(QWidget* parent)
 	: QPlainTextEdit(parent)
@@ -42,9 +45,45 @@ PlainTextLog::PlainTextLog(const QString& text, QWidget* parent)
 void PlainTextLog::contextMenuEvent(QContextMenuEvent* event)
 {
 	QMenu* menu = createStandardContextMenu();
+	QAction* applyLogMoves = menu->addAction(tr("Apply Moves"), this, 
+		[this]() {
+			auto text = textCursor().block().text();
+		    if (text.isEmpty())
+			    return;
+		    static const QString tag = "[Variant \"Antichess\"]";
+		    int i1 = text.indexOf(tag);
+			if (i1 < 0) {
+				QMessageBox::information(this, "Log", QString("The currently selected line \"%1\" does not contain any moves. Please select a line that contains moves.").arg(text));
+				return;
+			}
+		    int i2 = text.length() - 1;
+			auto check_line_end = [&](QChar ch)
+			{
+				int i = text.indexOf(ch, i1);
+				if (i >= 0 && i < i2)
+					i2 = i;
+			};
+		    check_line_end('#');
+		    check_line_end('+');
+		    check_line_end('-');
+			text = text.midRef(i1 + tag.length(), i2 - i1).trimmed().toString();
+		    auto [line, board] = parse_line(text, true);
+		    emit applyMoves(board);
+		}
+	);
+	connect(menu, &QMenu::aboutToShow, this,
+		[this, applyLogMoves]() {
+			auto text = textCursor().block().text();
+			applyLogMoves->setEnabled(!text.isEmpty() && text.indexOf("[Variant \"Antichess\"]") >= 0);
+		}
+	);
 
 	menu->addSeparator();
-	QAction* lineWrap = menu->addAction(tr("Line wrap"), this, [this]() { setLineWrapMode(lineWrapMode() == NoWrap ? WidgetWidth : NoWrap); });
+	QAction* lineWrap = menu->addAction(tr("Line Wrap"), this, 
+		[this]() {
+			setLineWrapMode(lineWrapMode() == NoWrap ? WidgetWidth : NoWrap);
+		}
+	);
 	lineWrap->setCheckable(true);
 	lineWrap->setChecked(lineWrapMode() == WidgetWidth);
 	menu->addSeparator();
@@ -52,15 +91,16 @@ void PlainTextLog::contextMenuEvent(QContextMenuEvent* event)
 	menu->addAction(tr("Clear Log"), this, SLOT(clear()));
 
 	auto saveAct = menu->addAction(tr("Save Log to File..."));
-	connect(saveAct, &QAction::triggered, this, [=]()
-	{
-		auto dlg = new QFileDialog(this, tr("Save Log"), QString(),
-			tr("Text Files (*.txt);;All Files (*.*)"));
-		connect(dlg, &QFileDialog::fileSelected, this, &PlainTextLog::saveLogToFile);
-		dlg->setAttribute(Qt::WA_DeleteOnClose);
-		dlg->setAcceptMode(QFileDialog::AcceptSave);
-		dlg->open();
-	});
+	connect(saveAct, &QAction::triggered, this, 
+		[=]() {
+			auto dlg = new QFileDialog(this, tr("Save Log"), QString(),
+				tr("Text Files (*.txt);;All Files (*.*)"));
+			connect(dlg, &QFileDialog::fileSelected, this, &PlainTextLog::saveLogToFile);
+			dlg->setAttribute(Qt::WA_DeleteOnClose);
+			dlg->setAcceptMode(QFileDialog::AcceptSave);
+			dlg->open();
+		}
+	);
 
 	menu->exec(event->globalPos());
 	delete menu;

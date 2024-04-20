@@ -29,6 +29,7 @@
 #include <tuple>
 #include <memory>
 #include <functional>
+#include <mutex>
 
 class PgnGame;
 class ChessGame;
@@ -66,6 +67,40 @@ struct EngineSession
 	EngineSession();
 
 	void reset();
+};
+
+struct EvalUpdate
+{
+	EvalUpdate();
+
+	void clear();
+	void update_labels(std::vector<std::array<QLabel*, 3>>& move_labels);
+	bool is_reset() const;
+	std::chrono::milliseconds interval() const;
+	void set_updated();
+
+	int depth;
+	int score;
+	quint64 nps;
+	quint64 tb_hits;
+	int time_ms;
+	QString best_move;
+	QString move_sequence;
+	int progress;
+
+	struct LabelData
+	{
+		int depth;
+		int score;
+		QString san;
+	};
+	std::map<int, LabelData> labels;
+
+	std::list<std::chrono::steady_clock::time_point> t_update;
+	std::mutex mtx;
+
+	static constexpr size_t WINDOW = 20;
+	static constexpr int DEPTH_RESET = 1;
 };
 
 class Evaluation : public QWidget
@@ -127,6 +162,7 @@ private slots:
 	void onEvaluatePosition();
 	void onSolvingStatusChanged();
 	void onSyncPositions(std::shared_ptr<Chess::Board> ref_board = nullptr);
+	void onUpdateEval();
 private:
 	void onEngineToggled(bool flag);
 
@@ -146,6 +182,7 @@ private:
 	void processEngineOutput(const MoveEvaluation& eval, const QString& best_move);
 	void updateBadMove(const QString& san);
 	void checkProgress(quint64 nodes, bool no_progress, int depth);
+	void updateProgress(int val);
 
 private:
 	Ui::EvaluationWidget* ui;
@@ -182,8 +219,6 @@ private:
 	bool is_only_move;
 	bool is_super_boost;
 	QString best_move;
-	std::chrono::steady_clock::time_point t_last_eval_update;
-	int last_eval_depth;
 	bool is_position_update;
 	bool is_restart;
 	bool to_keep_solving;
@@ -196,6 +231,8 @@ private:
 	QTimer timer_sync;
 	UpdateFrequency frequency_sync;
 	std::chrono::steady_clock::time_point t_last_sync;
+	QTimer timer_eval;
+	EvalUpdate eval_data;
 };
 
 #endif // EVALUATION_H
