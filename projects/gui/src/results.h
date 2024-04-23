@@ -24,11 +24,12 @@ namespace Chess
 }
 class PgnGame;
 class ChessGame;
-class QTimer;
-class FlowLayout;
 class Solution;
 class Solver;
+class FlowLayout;
 class QHBoxLayout;
+class QPushButton;
+class QTimer;
 
 namespace Ui {
 	class ResultsWidget;
@@ -47,6 +48,7 @@ public:
 
 public slots:
 	QString positionChanged();
+	void nextMoveClicked();
 
 signals:
 	void addComment(int ply, const QString& score);
@@ -64,6 +66,7 @@ private:
 	std::shared_ptr<Solver> solver;
 	EntrySource data_source;
 	ChessGame* game;
+	QPushButton* def_button;
 };
 
 #endif // RESULTS_H

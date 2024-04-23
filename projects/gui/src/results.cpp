@@ -26,6 +26,7 @@ Results::Results(QWidget* parent)
 	, ui(new Ui::ResultsWidget)
 	, data_source(EntrySource::none)
 	, game(nullptr)
+	, def_button(nullptr)
 {
 	ui->setupUi(this);
 
@@ -100,6 +101,7 @@ void Results::onDataSourceChanged(EntrySource source)
 
 QString Results::positionChanged()
 {
+	def_button = nullptr;
 	QString best_score;
 	// Clear move info
 	while (QLayoutItem* item = m_flowLayout->takeAt(0))
@@ -233,6 +235,7 @@ QString Results::positionChanged()
 
 	// Connect buttons
 	auto it = solution_entries.cbegin();
+	bool is_first = true;
 	for (int i = 0; i < buttons.size(); i++)
 	{
 		if (!buttons[i])
@@ -250,9 +253,21 @@ QString Results::positionChanged()
 					((HumanPlayer*)player)->onHumanMove(move, side);
 				});
 		}
+		if (is_first)
+		{
+			if (player->isHuman() && buttons[i]->isEnabled())
+				def_button = buttons[i];
+			is_first = false;
+		}
 		++it;
 	}
 
 	// Return best score
 	return best_score;
+}
+
+void Results::nextMoveClicked()
+{
+	if (def_button)
+		def_button->click();
 }

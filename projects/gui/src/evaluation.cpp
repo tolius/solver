@@ -71,12 +71,13 @@ EvalUpdate::EvalUpdate()
 {
 	clear();
 	depth = 0;
+	reset = false;
 	t_update.push_back(steady_clock::now());
 }
 
 void EvalUpdate::clear()
 {
-	depth = DEPTH_RESET;
+	depth = 1;
 	score = MoveEvaluation::NULL_SCORE;
 	nps = 0;
 	tb_hits = 0;
@@ -85,6 +86,7 @@ void EvalUpdate::clear()
 	move_sequence = "";
 	labels.clear();
 	progress = 0;
+	reset = true;
 }
 
 void EvalUpdate::update_labels(std::vector<std::array<QLabel*, 3>>& move_labels)
@@ -96,11 +98,6 @@ void EvalUpdate::update_labels(std::vector<std::array<QLabel*, 3>>& move_labels)
 		move_labels[i][2]->setText(d.san);
 	}
 	labels.clear();
-}
-
-bool EvalUpdate::is_reset() const
-{
-	return depth == DEPTH_RESET;
 }
 
 std::chrono::milliseconds EvalUpdate::interval() const
@@ -175,21 +172,36 @@ Evaluation::Evaluation(GameViewer* game_viewer, QWidget* parent)
 	ui->btn_Start->setEnabled(false);
 	ui->btn_Stop->setEnabled(false);
 	ui->btn_Auto->setEnabled(false);
-	ui->btn_AutoFromHere->setEnabled(false);
 	ui->btn_Manual->setEnabled(false);
 	ui->btn_Auto->setChecked(false);
-	ui->btn_AutoFromHere->setChecked(false);
 	ui->btn_Manual->setChecked(true);
 	ui->btn_Save->setEnabled(false);
 	ui->btn_Override->setEnabled(false);
 	ui->btn_Override->setChecked(false);
 	ui->btn_Sync->setEnabled(false);
 
-	sync_action = new QAction("Auto sync", this);
-	sync_action->setCheckable(true);
-	sync_action->setChecked(true);
+	auto autoMenu = new QMenu;
+	action_auto = new QAction("Auto (default)", this);
+	action_auto->setToolTip(ui->btn_Auto->toolTip());
+	action_auto_from_here = new QAction("Auto from here", this);
+	action_auto_from_here->setEnabled(false);
+	action_auto_from_here->setToolTip("Start solving the current position by automatically moving from position to position");
+	action_replicate_Watkins = new QAction("Replicate Watkins solution", this);
+	action_replicate_Watkins->setToolTip("Copy moves from the existing Watkins solution one to one");
+	action_replicate_Watkins_EG = new QAction("Replicate Watkins with endgames", this);
+	action_replicate_Watkins_EG->setToolTip("Copy moves from the existing Watkins solution and add all endgames");
+	autoMenu->addAction(action_auto);
+	autoMenu->addAction(action_auto_from_here);
+	autoMenu->addAction(action_replicate_Watkins);
+	autoMenu->addAction(action_replicate_Watkins_EG);
+	autoMenu->setToolTipsVisible(true);
+	ui->btn_Auto->setMenu(autoMenu);
+
 	auto syncMenu = new QMenu;
-	syncMenu->addAction(sync_action);
+	action_sync = new QAction("Auto sync", this);
+	action_sync->setCheckable(true);
+	action_sync->setChecked(true);
+	syncMenu->addAction(action_sync);
 	ui->btn_Sync->setMenu(syncMenu);
 
 	std::array<QToolButton*, 8> buttons = { ui->btn_MultiPV_Auto, ui->btn_MultiPV_1, ui->btn_MultiPV_2,  ui->btn_MultiPV_3,
@@ -207,15 +219,18 @@ Evaluation::Evaluation(GameViewer* game_viewer, QWidget* parent)
 	fontSizeChanged(font_size);
 	connect(CuteChessApplication::instance(), SIGNAL(fontSizeChanged(int)), this, SLOT(fontSizeChanged(int)));
 
-	connect(ui->btn_Auto, &QPushButton::toggled, this, [&](bool flag) { this->setMode(flag ? SolverStatus::Auto : SolverStatus::Manual); });
-	connect(ui->btn_AutoFromHere, &QPushButton::toggled, this, [&](bool flag) { this->setMode(flag ? SolverStatus::AutoFromHere : SolverStatus::Manual); });
-	connect(ui->btn_Manual, &QPushButton::toggled, this, [&](bool flag) { this->setMode(flag ? SolverStatus::Manual : SolverStatus::Auto); });
+	connect(ui->btn_Auto, &QPushButton::toggled, this, [this](bool flag) { setMode(flag ? SolverStatus::Auto : SolverStatus::Manual); });
+	connect(ui->btn_Manual, &QPushButton::toggled, this, [this](bool flag) { setMode(flag ? SolverStatus::Manual : SolverStatus::Auto); });
 	connect(ui->btn_Save, SIGNAL(clicked()), this, SLOT(onSaveClicked()));
 	connect(ui->btn_Override, SIGNAL(toggled(bool)), this, SLOT(onOverrideToggled(bool)));
 	connect(ui->btn_Start, &QPushButton::clicked, this, [this]() { onEngineToggled(true); });
 	connect(ui->btn_Stop, &QPushButton::clicked, this, [this]() { onEngineToggled(false); });
 	connect(ui->btn_Sync, &QToolButton::clicked, this, [this]() { onSyncPositions(board_); });
-	connect(sync_action, SIGNAL(toggled(bool)), this, SLOT(onSyncToggled(bool)));
+	connect(action_sync, SIGNAL(toggled(bool)), this, SLOT(onSyncToggled(bool)));
+	connect(action_auto, SIGNAL(triggered()), this, SLOT(onAutoTriggered()));
+	connect(action_auto_from_here, &QAction::triggered, this, [this]() { setMode(SolverStatus::AutoFromHere); });
+	connect(action_replicate_Watkins, SIGNAL(triggered()), this, SLOT(onReplicateWatkinsTriggered()));
+	connect(action_replicate_Watkins_EG, SIGNAL(triggered()), this, SLOT(onReplicateWatkinsEGTriggered()));
 
 	setEngine();
 }
@@ -266,32 +281,38 @@ void Evaluation::updateOverride()
 
 void Evaluation::setMode(SolverStatus new_status)
 {
-	auto update_ui = [&]() {
-		ui->btn_Auto->blockSignals(true);
-		ui->btn_AutoFromHere->blockSignals(true);
-		ui->btn_Manual->blockSignals(true);
-		ui->btn_Auto->setChecked(new_status == SolverStatus::Auto);
-		ui->btn_AutoFromHere->setChecked(new_status == SolverStatus::AutoFromHere);
-		ui->btn_Manual->setChecked(new_status == SolverStatus::Manual);
-		ui->btn_Auto->blockSignals(false);
-		ui->btn_AutoFromHere->blockSignals(false);
-		ui->btn_Manual->blockSignals(false);
-		bool is_auto_enabled = solver && engine && new_status == SolverStatus::Manual && engine->isReady() && engine->state() != ChessPlayer::State::Thinking;
-		ui->btn_Auto->setEnabled(is_auto_enabled);
-		ui->btn_AutoFromHere->setEnabled(is_auto_enabled && game && game->board() && game->board()->sideToMove() == solver->sideToWin() && solver->isCurrentBranch(game->board()));
-		ui->btn_Manual->setEnabled(solver && engine && new_status != SolverStatus::Manual && engine->isReady());
-		updateStartStop();
-		ui->widget_NumBestMoves->setVisible(engine && new_status == SolverStatus::Manual && engine->isReady());
-		ui->label_LoadingEngine->setVisible(!engine || !engine->isReady());
-		//if (ui->btn_Auto->isChecked() || ui->btn_AutoFromHere->isChecked())
-		//	ui->btn_MultiPV_Auto->setChecked(true);
-	};
-
+	auto mode = new_status == SolverStatus::CopyWatkins ? SolverMode::Copy_Watkins
+	    : new_status == SolverStatus::CopyWatkinsEG     ? SolverMode::Copy_Watkins_EG
+	                                                    : SolverMode::Standard;
 	if (!solver)
 		new_status = SolverStatus::Manual;
 	bool is_changed = (new_status != solver_status);
 	solver_status = new_status;
-	update_ui();
+	
+	// Update UI
+	ui->btn_Auto->blockSignals(true);
+	action_auto_from_here->blockSignals(true);
+	ui->btn_Manual->blockSignals(true);
+	ui->btn_Auto->setChecked(new_status != SolverStatus::Manual);
+	ui->btn_Manual->setChecked(new_status == SolverStatus::Manual);
+	ui->btn_Auto->blockSignals(false);
+	action_auto_from_here->blockSignals(false);
+	ui->btn_Manual->blockSignals(false);
+	bool is_auto_enabled = solver 
+		                && engine 
+		                && new_status == SolverStatus::Manual 
+		                && engine->isReady() 
+		                && engine->state() != ChessPlayer::State::Thinking;
+	ui->btn_Auto->setEnabled(is_auto_enabled);
+	action_auto_from_here->setEnabled(is_auto_enabled && game && game->board() && game->board()->sideToMove() == solver->sideToWin()
+	                                  && solver->isCurrentBranch(game->board()));
+	ui->btn_Manual->setEnabled(solver && engine && new_status != SolverStatus::Manual && engine->isReady());
+	updateStartStop();
+	ui->widget_NumBestMoves->setVisible(engine && new_status == SolverStatus::Manual && engine->isReady());
+	ui->label_LoadingEngine->setVisible(!engine || !engine->isReady());
+	// if (ui->btn_Auto->isChecked() || ui->btn_AutoFromHere->isChecked())
+	//	ui->btn_MultiPV_Auto->setChecked(true);
+
 	if (solver && is_changed)
 	{
 		if (solver_status == SolverStatus::Manual) {
@@ -301,7 +322,8 @@ void Evaluation::setMode(SolverStatus new_status)
 		else if (engine)
 		{
 			auto pos = (solver_status == SolverStatus::AutoFromHere && game) ? game->board() : nullptr;
-			solver->start(pos, [this](const QString& text) { QMessageBox::warning(this, QApplication::applicationName(), text); });
+			auto warn = [this](const QString& text) { QMessageBox::warning(this, QApplication::applicationName(), text); };
+			solver->start(pos, warn, mode);
 		}
 	}
 	
@@ -317,7 +339,7 @@ void Evaluation::updateStartStop()
 	ui->btn_Stop->setEnabled(is_ok && engine->state() == ChessPlayer::State::Thinking);
 	bool is_auto_enabled = solver && is_ok && solver_status == SolverStatus::Manual && engine->state() != ChessPlayer::State::Thinking;
 	ui->btn_Auto->setEnabled(is_auto_enabled);
-	ui->btn_AutoFromHere->setEnabled(is_auto_enabled && game && game->board() && game->board()->sideToMove() == solver->sideToWin() && solver->isCurrentBranch(game->board()));
+	action_auto_from_here->setEnabled(is_auto_enabled && game && game->board() && game->board()->sideToMove() == solver->sideToWin() && solver->isCurrentBranch(game->board()));
 }
 
 void Evaluation::clearEvals()
@@ -655,7 +677,7 @@ void Evaluation::positionChanged()
 	ui->widget_SolutionInfo->setVisible(false);
 	updateBoard(new_board); // updateSync() is called here
 	updateOverride();
-	ui->btn_AutoFromHere->setEnabled(ui->btn_Auto->isEnabled() && solver && game->board() && game->board()->sideToMove() == solver->sideToWin() && solver->isCurrentBranch(game->board()));
+	action_auto_from_here->setEnabled(ui->btn_Auto->isEnabled() && solver && game->board() && game->board()->sideToMove() == solver->sideToWin() && solver->isCurrentBranch(game->board()));
 	if (!board_)
 		return;
 	engine->write(tr("position fen %1").arg(board_->fenString()));
@@ -707,6 +729,27 @@ void Evaluation::engineNumThreadsChanged(int num_threads)
 		stopEngine();
 	}
 	engine->setOption("Threads", QSettings().value("engine/threads", 2).toInt());
+}
+
+void Evaluation::onAutoTriggered()
+{
+	if (!ui->btn_Auto->isEnabled() || ui->btn_Auto->isChecked() || action_auto_from_here->isChecked())
+		return;
+	this->setMode(SolverStatus::Auto);
+}
+
+void Evaluation::onReplicateWatkinsTriggered()
+{
+	if (!ui->btn_Auto->isEnabled() || ui->btn_Auto->isChecked() || action_auto_from_here->isChecked())
+		return;
+	this->setMode(SolverStatus::CopyWatkins);
+}
+
+void Evaluation::onReplicateWatkinsEGTriggered()
+{
+	if (!ui->btn_Auto->isEnabled() || ui->btn_Auto->isChecked() || action_auto_from_here->isChecked())
+		return;
+	this->setMode(SolverStatus::CopyWatkinsEG);
 }
 
 void Evaluation::onSyncToggled(bool flag)
@@ -986,7 +1029,6 @@ void Evaluation::onEngineEval(const MoveEvaluation& eval)
 	processEngineOutput(eval, eval_best_move);
 	
 	std::lock_guard<std::mutex> lock(eval_data.mtx);
-	bool eval_data_reset = eval_data.is_reset();
 	if (pv == 1 && eval_data.depth <= eval.depth())
 	{
 		eval_data.depth = eval.depth();
@@ -1018,7 +1060,7 @@ void Evaluation::onEngineEval(const MoveEvaluation& eval)
 		}
 		eval_data.labels[pv - 1] = { eval.depth(), eval.score(), eval_best_move };
 		if (timer_eval.isActive()) {
-			if (eval_data_reset) {
+			if (eval_data.reset) {
 				timer_eval.stop();
 				timer_eval.start(eval_data.interval());
 			}
@@ -1034,8 +1076,9 @@ void Evaluation::onUpdateEval()
 	std::lock_guard<std::mutex> lock(eval_data.mtx);
 	timer_eval.stop();
 	eval_data.set_updated();
-	if (eval_data.is_reset()) {
+	if (eval_data.reset) {
 		clearEvalLabels();
+		eval_data.reset = false;
 		return;
 	}
 	if (eval_data.best_move.isEmpty())
@@ -1355,7 +1398,7 @@ void Evaluation::onEvaluatePosition()
 		auto solver_board = solver->positionToSolve();
 		if (solver_board && game->board() && game->board()->key() != solver_board->key())
 		{
-			if (frequency_sync != UpdateFrequency::never && sync_action->isChecked())
+			if (frequency_sync != UpdateFrequency::never && action_sync->isChecked())
 			{
 				auto delay = (frequency_sync == UpdateFrequency::always) ? 500ms
 				    : (frequency_sync == UpdateFrequency::frequently)    ? 1s

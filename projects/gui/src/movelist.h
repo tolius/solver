@@ -94,6 +94,7 @@ signals:
 
 	void gotoFirstMoveClicked();
 	void gotoPreviousMoveClicked(int num);
+	void gotoNextMoveClicked();
 	void gotoCurrentMoveClicked();
 
 protected:

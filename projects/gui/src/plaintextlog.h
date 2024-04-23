@@ -52,8 +52,12 @@ class PlainTextLog : public QPlainTextEdit
 		void saveLogToFile(const QString& fileName);
 
 	protected:
+	    void sendMoves();
+
+	protected:
 		// Inherited from QPlainTextEdit
-		virtual void contextMenuEvent(QContextMenuEvent* event);
+	    virtual void contextMenuEvent(QContextMenuEvent* event) override;
+	    virtual void mouseDoubleClickEvent(QMouseEvent* e) override;
 
 };
 

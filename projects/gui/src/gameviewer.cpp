@@ -27,12 +27,14 @@
 #include "titlewidget.h"
 #include "solution.h"
 #include "board/board.h"
+#include "positioninfo.h"
 
 #include <QHBoxLayout>
 #include <QVBoxLayout>
 #include <QToolButton>
 #include <QSlider>
 #include <QLabel>
+#include <QLineEdit>
 #include <QMessageBox>
 #include <QSettings>
 
@@ -61,39 +63,34 @@ GameViewer::GameViewer(Qt::Orientation orientation,
 	m_viewFirstMoveBtn->setMinimumSize(32, 32);
 	m_viewFirstMoveBtn->setToolTip(tr("Skip to the beginning"));
 	m_viewFirstMoveBtn->setIcon(QIcon(":/icons/toolbutton/first_16x16"));
-	connect(m_viewFirstMoveBtn, SIGNAL(clicked()),
-		this, SLOT(viewFirstMoveClicked()));
+	connect(m_viewFirstMoveBtn, SIGNAL(clicked()), this, SLOT(viewFirstMoveClicked()));
 
 	m_viewPreviousMoveBtn->setEnabled(false);
 	m_viewPreviousMoveBtn->setAutoRaise(true);
 	m_viewPreviousMoveBtn->setMinimumSize(32, 32);
 	m_viewPreviousMoveBtn->setToolTip(tr("Previous move"));
 	m_viewPreviousMoveBtn->setIcon(QIcon(":/icons/toolbutton/previous_16x16"));
-	connect(m_viewPreviousMoveBtn, SIGNAL(clicked()),
-		this, SLOT(viewPreviousMoveClicked()));
+	connect(m_viewPreviousMoveBtn, SIGNAL(clicked()), this, SLOT(viewPreviousMoveClicked()));
 
 	m_viewNextMoveBtn->setEnabled(false);
 	m_viewNextMoveBtn->setAutoRaise(true);
 	m_viewNextMoveBtn->setMinimumSize(32, 32);
 	m_viewNextMoveBtn->setToolTip(tr("Next move"));
 	m_viewNextMoveBtn->setIcon(QIcon(":/icons/toolbutton/next_16x16"));
-	connect(m_viewNextMoveBtn, SIGNAL(clicked()),
-		this, SLOT(viewNextMoveClicked()));
+	connect(m_viewNextMoveBtn, SIGNAL(clicked()), this, SIGNAL(gotoNextMoveClicked())); // SLOT(viewNextMoveClicked()));
 
 	m_viewLastMoveBtn->setEnabled(false);
 	m_viewLastMoveBtn->setAutoRaise(true);
 	m_viewLastMoveBtn->setMinimumSize(32, 32);
-	m_viewLastMoveBtn->setToolTip(tr("Skip to the end"));
+	m_viewLastMoveBtn->setToolTip(tr("Go to the current position"));
 	m_viewLastMoveBtn->setIcon(QIcon(":/icons/toolbutton/last_16x16"));
-	connect(m_viewLastMoveBtn, SIGNAL(clicked()),
-		this, SLOT(viewLastMoveClicked()));
+	connect(m_viewLastMoveBtn, SIGNAL(clicked()), this, SIGNAL(gotoCurrentMoveClicked())); // SLOT(viewLastMoveClicked()));
 
 	m_moveNumberSlider->setEnabled(false);
 	#ifdef Q_OS_WIN
 	m_moveNumberSlider->setMinimumHeight(18);
 	#endif
-	connect(m_moveNumberSlider, SIGNAL(valueChanged(int)),
-		this, SLOT(viewPositionClicked(int)));
+	connect(m_moveNumberSlider, SIGNAL(valueChanged(int)), this, SLOT(viewPositionClicked(int)));
 
 	QHBoxLayout* controls = new QHBoxLayout();
 	controls->setContentsMargins(0, 0, 0, 0);
@@ -107,17 +104,23 @@ GameViewer::GameViewer(Qt::Orientation orientation,
 	layout->setContentsMargins(0, 0, 0, 0);
 
 	QHBoxLayout* clockLayout = new QHBoxLayout();
-	auto labelTitle = new QLabel();
-	labelTitle->setText("<h3>Title here</h3>");
-	labelTitle->setTextFormat(Qt::RichText);
-	labelTitle->setAlignment(Qt::AlignHCenter);
-	titleWidget = new TitleWidget(this);
-	clockLayout->addWidget(titleWidget);
+	//auto labelTitle = new QLabel();
+	//labelTitle->setText("<h3>Title here</h3>");
+	//labelTitle->setTextFormat(Qt::RichText);
+	//labelTitle->setAlignment(Qt::AlignHCenter);
+	m_titleWidget = new TitleWidget(this);
+	clockLayout->addWidget(m_titleWidget);
 
 	clockLayout->insertSpacing(1, 20);
 	layout->addLayout(clockLayout);
 
 	layout->addWidget(m_boardView);
+
+	m_currLine = new QLineEdit(this);
+	m_currLine->setReadOnly(true);
+	m_currLine->setEnabled(false);
+	m_currLine->setStyleSheet("background-color: transparent; border: none;");
+	layout->addWidget(m_currLine);
 
 	if (orientation == Qt::Horizontal)
 	{
@@ -138,7 +141,13 @@ GameViewer::GameViewer(Qt::Orientation orientation,
 
 TitleWidget* GameViewer::titleBar() const
 {
-	return titleWidget;
+	return m_titleWidget;
+}
+
+void GameViewer::updateCurrentLine()
+{
+	QString curr_line = get_move_stack(m_game->board(), false, 499);
+	m_currLine->setText(curr_line);
 }
 
 void GameViewer::autoFlip()
@@ -199,8 +208,8 @@ void GameViewer::setGame(const PgnGame* pgn)
 
 	m_viewFirstMoveBtn->setEnabled(false);
 	m_viewPreviousMoveBtn->setEnabled(false);
-	m_viewNextMoveBtn->setEnabled(!m_moves.isEmpty());
-	m_viewLastMoveBtn->setEnabled(!m_moves.isEmpty());
+	m_viewNextMoveBtn->setEnabled(true);//!m_moves.isEmpty());
+	m_viewLastMoveBtn->setEnabled(true);//!m_moves.isEmpty());
 
 	m_moveNumberSlider->setEnabled(!m_moves.isEmpty());
 	m_moveNumberSlider->setMaximum(m_moves.count());
@@ -251,6 +260,7 @@ void GameViewer::undoMoves(int num)
 		m_game->pgn()->undoMove();
 	}
 	m_moveNumberSlider->setMaximum(m_moves.count());
+	updateCurrentLine();
 }
 
 void GameViewer::viewFirstMoveClicked()
@@ -312,8 +322,8 @@ void GameViewer::viewNextMove()
 
 	if (m_moveIndex >= m_moves.count())
 	{
-		m_viewNextMoveBtn->setEnabled(false);
-		m_viewLastMoveBtn->setEnabled(false);
+		//m_viewNextMoveBtn->setEnabled(false);
+		//m_viewLastMoveBtn->setEnabled(false);
 
 //		if (!m_game.isNull() && !m_game->isFinished() && m_game->playerToMove()->isHuman())
 //			m_boardView->setEnabled(true);
@@ -422,6 +432,8 @@ void GameViewer::onFenChanged(const QString& fen)
 void GameViewer::onMoveMade(const Chess::GenericMove& move)
 {
 	m_moves.append(move);
+
+	updateCurrentLine();
 
 	m_moveNumberSlider->setEnabled(true);
 	m_moveNumberSlider->setMaximum(m_moves.count());

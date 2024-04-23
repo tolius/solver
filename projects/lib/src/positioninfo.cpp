@@ -202,6 +202,11 @@ QString SolverMove::scoreText() const
 
 QString get_move_stack(std::shared_ptr<Chess::Board> game_board, bool add_fen, int move_limit)
 {
+	return get_move_stack(game_board.get(), add_fen, move_limit);
+}
+
+QString get_move_stack(Chess::Board* game_board, bool add_fen, int move_limit)
+{
 	using namespace Chess;
 	QStringList moves;
 	auto move_data = game_board->MoveHistory();

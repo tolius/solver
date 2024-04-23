@@ -75,7 +75,6 @@ struct EvalUpdate
 
 	void clear();
 	void update_labels(std::vector<std::array<QLabel*, 3>>& move_labels);
-	bool is_reset() const;
 	std::chrono::milliseconds interval() const;
 	void set_updated();
 
@@ -87,6 +86,7 @@ struct EvalUpdate
 	QString best_move;
 	QString move_sequence;
 	int progress;
+	bool reset;
 
 	struct LabelData
 	{
@@ -100,7 +100,6 @@ struct EvalUpdate
 	std::mutex mtx;
 
 	static constexpr size_t WINDOW = 20;
-	static constexpr int DEPTH_RESET = 1;
 };
 
 class Evaluation : public QWidget
@@ -127,7 +126,9 @@ private:
 	{
 		Manual,
 		Auto,
-		AutoFromHere
+		AutoFromHere,
+		CopyWatkins,
+		CopyWatkinsEG
 	};
 
 public slots:
@@ -157,6 +158,9 @@ private slots:
 	void onTimerEngine();
 	void onSaveClicked();
 	void onOverrideToggled(bool flag);
+	void onAutoTriggered();
+	void onReplicateWatkinsTriggered();
+	void onReplicateWatkinsEGTriggered();
 	void onSyncToggled(bool flag);
 	void onMultiPVClicked(int multiPV);
 	void onEvaluatePosition();
@@ -190,7 +194,11 @@ private:
 	GameViewer* game_viewer;
 	std::vector<std::array<QLabel*, 3>> move_labels;
 	std::map<int, QToolButton*> multiPV_buttons;
-	QAction* sync_action;
+	QAction* action_sync;
+	QAction* action_auto;
+	QAction* action_auto_from_here;
+	QAction* action_replicate_Watkins;
+	QAction* action_replicate_Watkins_EG;
 	//QThread solver_thread;
 
 	SolverStatus solver_status;

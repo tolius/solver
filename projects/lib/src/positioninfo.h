@@ -121,6 +121,7 @@ using Line = std::list<Chess::Move>;
 using EntryRow = std::array<char, 16>;
 
 QString get_move_stack(std::shared_ptr<Chess::Board> game_board, bool add_fen = false, int move_limit = 999);
+QString get_move_stack(Chess::Board* game_board, bool add_fen = false, int move_limit = 999);
 QString get_san_sequence(int ply, const QStringList& moves);
 
 QString line_to_string(const Line& line, std::shared_ptr<Chess::Board> start_pos = nullptr, QChar separator = SEP_MOVES, bool add_move_numbers = false);

@@ -110,6 +110,7 @@ MoveList::MoveList(QWidget* parent)
 	connect(ui->btn_GoStart, &QPushButton::clicked, this, [&]() { emit gotoFirstMoveClicked(); });
 	connect(ui->btn_GoBack1, &QPushButton::clicked, this, [&]() { emit gotoPreviousMoveClicked(1); });
 	connect(ui->btn_GoBack2, &QPushButton::clicked, this, [&]() { emit gotoPreviousMoveClicked(2); });
+	connect(ui->btn_GoNext, &QPushButton::clicked, this, [&]() { emit gotoNextMoveClicked(); });
 	connect(ui->btn_GoCurrent, &QPushButton::clicked, this, [&]() { emit gotoCurrentMoveClicked(); });
 }
 
@@ -411,6 +412,7 @@ void MoveList::updateButtons()
 	ui->btn_GoStart->setEnabled(m_moveCount);
 	ui->btn_GoBack1->setEnabled(m_moveCount);
 	ui->btn_GoBack2->setEnabled(m_moveCount);
+	ui->btn_GoNext->setEnabled(m_moveCount);
 	ui->btn_GoCurrent->setEnabled(m_moveCount);
 }
 

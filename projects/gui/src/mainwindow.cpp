@@ -105,6 +105,7 @@ MainWindow::MainWindow(ChessGame* game, SettingsDialog* settingsDlg)
 	QWidget* mainWidget = new QWidget(this);
 	mainWidget->setLayout(mainLayout);
 	setCentralWidget(mainWidget);
+	mainWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
 	createActions();
 	createMenus();
@@ -121,7 +122,9 @@ MainWindow::MainWindow(ChessGame* game, SettingsDialog* settingsDlg)
 	connect(m_moveList, SIGNAL(gotoPreviousMoveClicked(int)), m_gameViewer, SLOT(gotoPreviousMove(int)));
 
 	//connect(m_moveList, SIGNAL(moveSelected(Chess::Move)), m_evaluation, SLOT(positionChanged(quint64)));
+	connect(m_moveList, SIGNAL(gotoNextMoveClicked()), m_results, SLOT(nextMoveClicked()));
 	connect(m_moveList, SIGNAL(gotoCurrentMoveClicked()), m_evaluation, SLOT(gotoCurrentMove()));
+
 	connect(m_evaluation, SIGNAL(tintChanged(QColor, bool)), this, SLOT(setTint(QColor, bool)));
 	connect(m_evaluation, SIGNAL(reportGoodMoves(const std::set<QString>&)), m_moveList, SLOT(goodMovesReported(const std::set<QString>&)));
 	connect(m_evaluation, SIGNAL(reportBadMove(const QString&)), m_moveList, SLOT(badMoveReported(const QString&)));
@@ -135,6 +138,8 @@ MainWindow::MainWindow(ChessGame* game, SettingsDialog* settingsDlg)
 	connect(m_gameViewer, SIGNAL(moveSelected(int)), m_moveList, SLOT(selectMove(int)));
 	connect(m_gameViewer, SIGNAL(moveSelected(int)), m_evaluation, SLOT(positionChanged()));
 	connect(m_gameViewer, SIGNAL(moveSelected(int)), m_results, SLOT(positionChanged()));
+	connect(m_gameViewer, SIGNAL(gotoNextMoveClicked()), m_results, SLOT(nextMoveClicked()));
+	connect(m_gameViewer, SIGNAL(gotoCurrentMoveClicked()), m_evaluation, SLOT(gotoCurrentMove()));
 
 	connect(settingsDlg, SIGNAL(engineChanged(const QString&)), m_evaluation, SLOT(engineChanged(const QString&)));
 	connect(settingsDlg, SIGNAL(engineHashChanged(int)), m_evaluation, SLOT(engineHashChanged(int)));
@@ -385,7 +390,7 @@ void MainWindow::createSolutionsModel()
 
 void MainWindow::createDockWindows()
 {
-	this->setTabPosition(Qt::AllDockWidgetAreas, QTabWidget::North );
+	this->setTabPosition(Qt::AllDockWidgetAreas, QTabWidget::North);
 	//this->setDockOptions(QMainWindow::AnimatedDocks | QMainWindow::VerticalTabs);
 
 	// Log
@@ -393,7 +398,7 @@ void MainWindow::createDockWindows()
 	logDock->setObjectName("Log");
 	m_log = new PlainTextLog(logDock);
 	logDock->setWidget(m_log);
-	logDock->close();
+	//logDock->close();
 	addDockWidget(Qt::BottomDockWidgetArea, logDock);
 	connect(m_evaluation, SIGNAL(Message(const QString&, MessageType)), this, SLOT(logMessage(const QString&, MessageType)));
 	connect(m_evaluation, &Evaluation::ShortMessage, m_log, 
@@ -412,10 +417,10 @@ void MainWindow::createDockWindows()
 	auto solutionsDock = new QDockWidget(tr("Solutions"), this);
 	solutionsDock->setObjectName("SolutionsDock");
 	m_solutionsWidget = new SolutionsWidget(m_solutionsModel, this, m_gameViewer);
-	m_solutionsWidget->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+	m_solutionsWidget->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
 	solutionsDock->setWidget(m_solutionsWidget);
 	solutionsDock->setContentsMargins(0, 0, 9, 0);
-	addDockWidget(Qt::RightDockWidgetArea, solutionsDock);
+	addDockWidget(Qt::LeftDockWidgetArea, solutionsDock);
 	if (m_solver)
 		m_solutionsWidget->setSolver(m_solver);
 	connect(m_solutionsWidget, SIGNAL(solutionSelected(QModelIndex)), this, SLOT(selectSolution(QModelIndex)));
@@ -426,15 +431,15 @@ void MainWindow::createDockWindows()
 	// EvaluationWidget
 	auto evaluationDock = new QDockWidget(tr("Evaluation"), this);
 	evaluationDock->setObjectName("EvaluationDock");
-	m_evaluation->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+	m_evaluation->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
 	evaluationDock->setWidget(m_evaluation);
 	evaluationDock->setContentsMargins(0, 0, 9, 0);
-	addDockWidget(Qt::RightDockWidgetArea, evaluationDock);
+	addDockWidget(Qt::LeftDockWidgetArea, evaluationDock);
 
 	// ResultsWidget
 	auto resultsDock = new QDockWidget(tr("Results"), this);
 	resultsDock->setObjectName("ResultsDock");
-	m_results->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+	m_results->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
 	resultsDock->setWidget(m_results);
 	resultsDock->setContentsMargins(0, 0, 9, 0);
 	addDockWidget(Qt::RightDockWidgetArea, resultsDock);
@@ -442,17 +447,17 @@ void MainWindow::createDockWindows()
 	// Move list
 	QDockWidget* moveListDock = new QDockWidget(tr("Moves"), this);
 	moveListDock->setObjectName("MoveListDock");
-	m_moveList->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
+	m_moveList->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
 	moveListDock->setWidget(m_moveList);
 	//moveListDock->widget()->layout()->setContentsMargins(0, 0, 6, 0);
 	moveListDock->setContentsMargins(0, 0, 9, 0);
 	addDockWidget(Qt::RightDockWidgetArea, moveListDock);
 
-	tabifyDockWidget(evaluationDock, solutionsDock);
-	tabifyDockWidget(evaluationDock, resultsDock);
+	tabifyDockWidget(solutionsDock, evaluationDock);
 	solutionsDock->raise();
-	splitDockWidget(solutionsDock, evaluationDock, Qt::Vertical);
-	//splitDockWidget(whiteEvalDock, blackEvalDock, Qt::Vertical);
+	tabifyDockWidget(moveListDock, resultsDock);
+	moveListDock->raise();
+	//splitDockWidget(solutionsDock, evaluationDock, Qt::Vertical);
 
 	//??
 	//show();

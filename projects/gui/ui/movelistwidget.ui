@@ -80,6 +80,22 @@
       </widget>
      </item>
      <item row="0" column="3">
+      <widget class="QPushButton" name="btn_GoNext">
+       <property name="enabled">
+        <bool>false</bool>
+       </property>
+       <property name="toolTip">
+        <string>Next move</string>
+       </property>
+       <property name="text">
+        <string/>
+       </property>
+       <property name="icon">
+        <iconset theme=":/icons/toolbutton/next_16x16"/>
+       </property>
+      </widget>
+     </item>
+     <item row="0" column="4">
       <widget class="QPushButton" name="btn_GoCurrent">
        <property name="enabled">
         <bool>true</bool>

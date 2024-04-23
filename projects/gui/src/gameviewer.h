@@ -30,6 +30,7 @@
 
 class QToolButton;
 class QSlider;
+class QLineEdit;
 class ChessGame;
 class PgnGame;
 class BoardScene;
@@ -60,6 +61,8 @@ class GameViewer : public QWidget
 
 	signals:
 		void moveSelected(int moveNumber);
+		void gotoCurrentMoveClicked();
+		void gotoNextMoveClicked();
 
 	public slots: //!! workaround
 		void gotoFirstMove();
@@ -82,12 +85,14 @@ class GameViewer : public QWidget
 		void viewPosition(int index);
 		void autoFlip();
 		void undoMoves(int num); //!! workaround
+	    void updateCurrentLine();
 
 	private:
 		BoardScene* m_boardScene;
 		BoardView* m_boardView;
 		QSlider* m_moveNumberSlider;
-		TitleWidget* titleWidget;
+		TitleWidget* m_titleWidget;
+	    QLineEdit* m_currLine;
 
 		QToolButton* m_viewFirstMoveBtn;
 		QToolButton* m_viewPreviousMoveBtn;

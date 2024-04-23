@@ -86,6 +86,11 @@ struct LIB_EXPORT SolverEvalResult
 	bool is_only_move;
 };
 
+enum class SolverMode
+{
+	Standard, Copy_Watkins, Copy_Watkins_EG
+};
+
 
 struct Transposition;
 using MapT = std::map<uint64_t, std::shared_ptr<Transposition>>;
@@ -134,7 +139,7 @@ public:
 	bool isSolving() const;
 	std::list<MoveEntry> entries(Chess::Board* board) const;
 
-	void start(Chess::Board* new_pos, std::function<void(QString)> message);
+	void start(Chess::Board* new_pos, std::function<void(QString)> message, SolverMode mode);
 	void stop();
 	bool save(pBoard pos, Chess::Move move, std::shared_ptr<SolutionEntry> data, bool is_only_move, bool is_multi_pos);
 	void saveOverride(Chess::Board* pos, std::shared_ptr<SolutionEntry> data);
@@ -153,8 +158,9 @@ public slots:
 
 protected:
 	void init();
+	void set_mode(SolverMode mode);
 	void set_level(bool upper_level);
-	void start(pBoard start_pos, std::function<void(QString)> message, bool upper_level = true);
+	void start(pBoard start_pos, std::function<void(QString)> message, SolverMode mode, bool upper_level = true);
 	void process_move(std::vector<pMove>& tree, SolverState& info);
 	void analyse_position(SolverMove& move, SolverState& info);
 	void find_solution(SolverMove& move, SolverState& info, pMove& best_move);
@@ -176,6 +182,8 @@ protected:
 	std::tuple<quint32, qint16, MapT, MapT> prepare_moves(pMove& move);
 	void correct_score(qint16& score, qint16 sub_score, bool is_their_turn, pMove& m);
 	void expand_positions(MapT& saved_positions, MapT& transpositions);
+	void emit_message(const QString& message, MessageType type = MessageType::std, bool force = false);
+	std::chrono::seconds log_update_time();
 
 protected:
 	std::shared_ptr<Solution> sol;
@@ -197,6 +205,7 @@ protected:
 	QTimer timer_log_update;
 	UpdateFrequency frequency_log_update;
 	std::chrono::steady_clock::time_point t_log_update;
+	std::chrono::steady_clock::time_point t_gui_update;
 	LineToLog line_to_log;
 
 private:
@@ -214,7 +223,7 @@ private:
 	int max_alt_steps;
 	int solver_stop_score;
 	int min_depth;
-	bool evaluate_egtb;
+	bool evaluate_endgames;
 	qint16 endgame5_score_limit;
 	bool to_recheck_endgames;
 	int rechecked_good_endgames;
@@ -230,8 +239,6 @@ private:
 	bool to_copy_only_moves;
 	bool to_save_only_moves;
 	bool to_save_endgames;
-	int gui_update_delay;
-	bool to_log;
 	bool to_update_max_only_when_finish;
 	bool to_print_all_max;
 	// Positions

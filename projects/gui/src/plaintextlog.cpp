@@ -42,35 +42,46 @@ PlainTextLog::PlainTextLog(const QString& text, QWidget* parent)
 	setLineWrapMode(NoWrap);
 }
 
+void PlainTextLog::mouseDoubleClickEvent(QMouseEvent* e)
+{
+	sendMoves();
+}
+
+void PlainTextLog::sendMoves()
+{
+	auto text = textCursor().block().text();
+	if (text.isEmpty())
+		return;
+	static const QString tag = "[Variant \"Antichess\"]";
+	int i1 = text.indexOf(tag);
+	if (i1 < 0)
+	{
+		QMessageBox::information(
+		    this, "Log",
+		    QString("The currently selected line \"%1\" does not contain any moves. "
+				"Please select a line that contains moves to set the corresponding position on the board.").arg(text));
+		return;
+	}
+	int i2 = text.length() - 1;
+	auto check_line_end = [&](QChar ch)
+	{
+		int i = text.indexOf(ch, i1);
+		if (i >= 0 && i < i2)
+			i2 = i;
+	};
+	check_line_end('#');
+	check_line_end('+');
+	check_line_end('-');
+	text = text.midRef(i1 + tag.length(), i2 - i1).trimmed().toString();
+	auto [line, board] = parse_line(text, true);
+	emit applyMoves(board);
+}
+
 void PlainTextLog::contextMenuEvent(QContextMenuEvent* event)
 {
 	QMenu* menu = createStandardContextMenu();
-	QAction* applyLogMoves = menu->addAction(tr("Apply Moves"), this, 
-		[this]() {
-			auto text = textCursor().block().text();
-		    if (text.isEmpty())
-			    return;
-		    static const QString tag = "[Variant \"Antichess\"]";
-		    int i1 = text.indexOf(tag);
-			if (i1 < 0) {
-				QMessageBox::information(this, "Log", QString("The currently selected line \"%1\" does not contain any moves. Please select a line that contains moves.").arg(text));
-				return;
-			}
-		    int i2 = text.length() - 1;
-			auto check_line_end = [&](QChar ch)
-			{
-				int i = text.indexOf(ch, i1);
-				if (i >= 0 && i < i2)
-					i2 = i;
-			};
-		    check_line_end('#');
-		    check_line_end('+');
-		    check_line_end('-');
-			text = text.midRef(i1 + tag.length(), i2 - i1).trimmed().toString();
-		    auto [line, board] = parse_line(text, true);
-		    emit applyMoves(board);
-		}
-	);
+	QAction* applyLogMoves = menu->addAction(tr("Apply Moves (double click)"), this, &PlainTextLog::sendMoves);
+
 	connect(menu, &QMenu::aboutToShow, this,
 		[this, applyLogMoves]() {
 			auto text = textCursor().block().text();
