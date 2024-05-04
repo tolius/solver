@@ -189,7 +189,7 @@ Evaluation::Evaluation(GameViewer* game_viewer, QWidget* parent)
 	action_replicate_Watkins = new QAction("Replicate Watkins solution", this);
 	action_replicate_Watkins->setToolTip("Copy moves from the existing Watkins solution one to one");
 	action_replicate_Watkins_EG = new QAction("Replicate Watkins with endgames", this);
-	action_replicate_Watkins_EG->setToolTip("Copy moves from the existing Watkins solution and add all endgames");
+	action_replicate_Watkins_EG->setToolTip("Copy moves from the existing Watkins solution and add all endgames / overridden moves");
 	autoMenu->addAction(action_auto);
 	autoMenu->addAction(action_auto_from_here);
 	autoMenu->addAction(action_replicate_Watkins);
@@ -201,6 +201,7 @@ Evaluation::Evaluation(GameViewer* game_viewer, QWidget* parent)
 	action_sync = new QAction("Auto sync", this);
 	action_sync->setCheckable(true);
 	action_sync->setChecked(true);
+	action_sync->setToolTip("Automatically synchronise the evaluated position with the chessboard periodically");
 	syncMenu->addAction(action_sync);
 	ui->btn_Sync->setMenu(syncMenu);
 
@@ -389,6 +390,9 @@ void Evaluation::setSolver(std::shared_ptr<Solver> solver)
 	ui->label_SolutionInfo->setText("");
 	ui->widget_SolutionInfo->setVisible(false);
 	//ui->widget_Solution->setVisible(solution && !solution->isEmpty());
+	bool enable_Watkins = solver && solver->solution() && solver->solution()->hasWatkinsSolution();
+	action_replicate_Watkins->setEnabled(enable_Watkins);
+	action_replicate_Watkins_EG->setEnabled(enable_Watkins);
 	setMode(SolverStatus::Manual);
 }
 
@@ -756,6 +760,8 @@ void Evaluation::onSyncToggled(bool flag)
 {
 	if (flag)
 		onSyncPositions(board_);
+	else
+		timer_sync.stop();
 }
 
 void Evaluation::onSyncPositions(std::shared_ptr<Chess::Board> ref_board)
@@ -1079,7 +1085,6 @@ void Evaluation::onUpdateEval()
 	if (eval_data.reset) {
 		clearEvalLabels();
 		eval_data.reset = false;
-		return;
 	}
 	if (eval_data.best_move.isEmpty())
 		return;

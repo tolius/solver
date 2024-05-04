@@ -110,8 +110,8 @@ public:
 	std::list<MoveEntry> nextEntries(Chess::Board* board, std::list<MoveEntry>* missing_entries = nullptr) const;
 	std::list<MoveEntry> positionEntries(Chess::Board* board, bool use_esolution = true);
 	std::list<MoveEntry> nextPositionEntries(Chess::Board* board, std::list<MoveEntry>* missing_entries = nullptr);
-	std::shared_ptr<SolutionEntry> bookEntry(std::shared_ptr<Chess::Board> board, FileType type) const;
-	std::shared_ptr<SolutionEntry> bookEntry(Chess::Board* board, FileType type) const;
+	std::shared_ptr<SolutionEntry> bookEntry(std::shared_ptr<Chess::Board> board, FileType type, bool check_cache = true) const;
+	std::shared_ptr<SolutionEntry> bookEntry(Chess::Board* board, FileType type, bool check_cache = true) const;
 	QString positionInfo(std::shared_ptr<Chess::Board> board);
 	QString eSolutionInfo(Chess::Board* board);
 	QString info() const;
@@ -122,6 +122,7 @@ public:
 	QString nodes() const;
 	const QString& subTag() const;
 	bool exists() const;
+	bool hasWatkinsSolution() const;
 	std::shared_ptr<SolutionData> mainData() const;
 
 	void initFilenames();
@@ -134,8 +135,8 @@ public:
 	void addToBook(std::shared_ptr<Chess::Board> board, const SolutionEntry& entry, FileType type);
 	void addToBook(quint64 key, const SolutionEntry& entry, FileType type);
 	void addToBook(std::shared_ptr<Chess::Board> board, uint64_t data, FileType type);
-	std::vector<SolutionEntry> eSolutionEntries(std::shared_ptr<Chess::Board> board);
-	std::vector<SolutionEntry> eSolutionEntries(Chess::Board* board);
+	std::vector<SolutionEntry> eSolutionEntries(std::shared_ptr<Chess::Board> board, bool use_cache = true);
+	std::vector<SolutionEntry> eSolutionEntries(Chess::Board* board, bool use_cache = true);
 
 signals:
 	void Message(const QString&, MessageType type = MessageType::std);

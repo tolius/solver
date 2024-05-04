@@ -184,6 +184,7 @@ protected:
 	void expand_positions(MapT& saved_positions, MapT& transpositions);
 	void emit_message(const QString& message, MessageType type = MessageType::std, bool force = false);
 	std::chrono::seconds log_update_time();
+	void update_gui(bool force = false);
 
 protected:
 	std::shared_ptr<Solution> sol;
@@ -210,6 +211,7 @@ protected:
 
 private:
 	bool to_copy_solution;
+	bool to_allow_override_when_copying;
 	bool only_upper_level;
 	bool is_final_assembly;
 	qint16 limit_win;
@@ -233,7 +235,6 @@ private:
 	size_t max_num_iterations;
 	bool is_solver_Watkins;
 	bool use_book_to_select_alts;
-	bool use_extended_solution_first;
 	bool to_save_extended_solution;
 	bool to_save_null_in_extended_solution;
 	bool to_copy_only_moves;

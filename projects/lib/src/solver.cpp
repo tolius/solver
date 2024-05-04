@@ -20,6 +20,10 @@ using namespace std::chrono;
 
 constexpr static qint16 FORCED_MOVE = MATE_VALUE - 255;
 constexpr static qint16 ABOVE_EG = 20000;
+constexpr static qint16 DRAW_EG = 0; // = FAKE_DRAW_SCORE
+
+constexpr static auto UPDATE_PERIOD = 70ms;
+constexpr static auto MAX_SLEEP_TIME = 50ms;
 
 
 SolverState::SolverState(bool to_force_solver, int8_t alt_steps, int16_t score_to_beat)
@@ -83,7 +87,7 @@ Solver::Solver(std::shared_ptr<Solution> solution)
 	to_recheck_endgames = false;
 	rechecked_good_endgames = 0;
 	is_solver_Watkins = true;
-	use_extended_solution_first = true;
+	//use_extended_solution_first = true;
 	to_save_extended_solution = true;
 	to_copy_only_moves = true;
 	to_save_only_moves = false;
@@ -146,6 +150,7 @@ void Solver::init()
 void Solver::set_mode(SolverMode mode)
 {
 	to_copy_solution = (mode == SolverMode::Copy_Watkins || mode == SolverMode::Copy_Watkins_EG);
+	to_allow_override_when_copying = (mode == SolverMode::Copy_Watkins_EG);
 
 	check_depth_limit = !to_copy_solution;
 	s.dont_lose_winning_sequence = !to_copy_solution && !is_final_assembly;
@@ -169,6 +174,8 @@ void Solver::set_level(bool upper_level)
 	score_hard_limit = only_upper_level ? (MATE_VALUE - 7) : (MATE_VALUE - 0);
 	s.std_engine_time = 190;
 	s.add_engine_time = 150;
+	if (!to_copy_solution)
+		evaluate_endgames = !upper_level;
 }
 
 std::shared_ptr<Solution> Solver::solution() const
@@ -209,13 +216,23 @@ void Solver::start(Chess::Board* new_pos, std::function<void(QString)> message, 
 		return;
 	}
 
-	if ((mode == SolverMode::Copy_Watkins || mode == SolverMode::Copy_Watkins_EG) && (sol->Watkins.isEmpty() || sol->WatkinsStartingPly < 0)) {
-		message("Failed to start because no Watkins solution file is specified or the Watkins solution file does not contain data for the current opening.\n\n"
-		        "Please check the solution settings or re-run it in Auto mode.");
-		return;
+	if (mode == SolverMode::Copy_Watkins || mode == SolverMode::Copy_Watkins_EG) {
+		if (sol->Watkins.isEmpty() || sol->WatkinsStartingPly < 0) {
+			message("Failed to start because no Watkins solution file is specified or the Watkins solution file does not contain data for the current opening.\n\n"
+					"Please check the solution settings or re-run it in Auto mode.");
+			return;
+		}
+		auto path_pos = sol->path(Solution::FileType_positions_upper);
+		QFileInfo fi(path_pos);
+		if (fi.size() > 2000)
+		{
+			message("Failed to start because the solution already contains engine-computed data.\n\n"
+			        "Please create a new empty solution to replicate the Watkins solution.");
+			return;
+		}
 	}
 
-	std::shared_ptr<Chess::Board> start_pos(new_pos ? new_pos->copy() : nullptr);
+	shared_ptr<Chess::Board> start_pos(new_pos ? new_pos->copy() : nullptr);
 	start(start_pos, message, mode, true);
 }
 
@@ -309,12 +326,31 @@ void Solver::start(pBoard start_pos, std::function<void(QString)> message, Solve
 
 		for (const auto& move : sol->branch)
 			add_move(move);
-		if (start_pos) {
+		if (start_pos)
+		{
+			// Set initial moves
 			auto& moves = start_pos->MoveHistory();
 			for (int i = sol->opening.size() + sol->branch.size(); i < moves.size(); i++)
 				add_move(moves[i].move);
 			if (moves.size() > sol->opening.size() + sol->branch.size())
 				num_line_plies = static_cast<int>(moves.size() - sol->opening.size() - sol->branch.size());
+			// Check whether it's lower level
+			if (!to_copy_solution && upper_level)
+			{
+				shared_ptr<Chess::Board> pos(start_pos->copy());
+				for (int i = pos->MoveHistory().size() - 1; i >= sol->opening.size() + sol->branch.size(); i--)
+				{
+					if (pos->sideToMove() != our_color)
+						continue;
+					if (sol->bookEntry(pos, Solution::FileType_positions_lower) || sol->bookEntry(pos, Solution::FileType_alts_lower)) {
+						set_level(false); // evaluate_endgames will also be updates
+						break;
+					}
+					if (sol->bookEntry(pos, Solution::FileType_positions_upper) || sol->bookEntry(pos, Solution::FileType_alts_upper))
+						break;
+					pos->undoMove();
+				}
+			}
 		}
 		if (!san_moves.empty())
 			sol_name = QString("%1 %2").arg(sol_name).arg(san_moves.join(' '));
@@ -630,17 +666,18 @@ void Solver::analyse_position(SolverMove& move, SolverState& info)
 			QString msg = QString("Max num iterations reached: %1").arg(max_num_iterations);
 			throw runtime_error(msg.toStdString());
 		}
+		update_gui();
 	}
 }
 
 void Solver::find_solution(SolverMove& move, SolverState& info, pMove& best_move)
 {
 	shared_ptr<SolverMove> solver_move = is_solver_path ? get_solution_move() : nullptr;
-	if (!use_extended_solution_first && !solver_move && is_solver_path) {
-		solver_move = get_esolution_move();
-		if (solver_move && solver_move->isNull())
-			solver_move = nullptr;
-	}
+	//if (!use_extended_solution_first && !solver_move && is_solver_path) {
+	//	solver_move = get_esolution_move();
+	//	if (solver_move && solver_move->isNull())
+	//		solver_move = nullptr;
+	//}
 	shared_ptr<Position> position;
 	shared_ptr<StateInfo> state;
 	size_t num_pieces = board->numPieces();
@@ -680,7 +717,13 @@ void Solver::find_solution(SolverMove& move, SolverState& info, pMove& best_move
 			}
 			if (endgame_moves.empty()) {
 				QString msg = QString("No ENDGAME moves: %1").arg(get_move_stack(board));
-				throw runtime_error(msg.toStdString());
+				if (to_copy_solution) {
+					emit_message(msg, MessageType::warning);
+					endgame_moves.emplace_back(Chess::Move(), board, DRAW_EG, egtb_version());
+				}
+				else {
+					throw runtime_error(msg.toStdString());
+				}
 			}
 			// From multiple best moves, select already existing one
 			if (endgame_moves.size() == 1) {
@@ -713,7 +756,7 @@ void Solver::find_solution(SolverMove& move, SolverState& info, pMove& best_move
 			//	self.positions.save_endgame(board, best_move, zbytes)
 			update_max_move(best_move->score());
 			num_evaluated_endgames++;
-			if (best_move->score() < MATE_VALUE - 267)
+			if (!to_copy_solution && best_move->score() < MATE_VALUE - 267)
 				emit_message(QString(".....EGTB score %1: %2").arg(best_move->score()).arg(get_move_stack(board)), MessageType::warning);
 		}
 		else
@@ -736,7 +779,7 @@ void Solver::find_solution(SolverMove& move, SolverState& info, pMove& best_move
 	if ((is_endgame && !evaluate_endgames
 			&& (num_pieces <= 4 || (num_pieces == 5 && !to_copy_solution && best_move->score() > endgame5_score_limit)))
 		|| (info.is_alt() && info.alt_steps >= max_alt_steps))
-		move.set_score(best_move->score() - 1);
+		move.set_score((is_endgame && to_copy_solution && best_move->score() == DRAW_EG) ? DRAW_EG : best_move->score() - 1);
 	else
 		move.moves.push_back(best_move);
 }
@@ -745,9 +788,15 @@ void Solver::evaluate_position(SolverMove& move, SolverState& info, pMove& best_
 {
 	auto only_move = get_only_move(move, info);
 	if (to_copy_solution) {
-		assert(only_move || solver_move);
+		assert(only_move || solver_move || to_allow_override_when_copying);
+		if (to_allow_override_when_copying) {
+			best_move = get_alt_move();
+			if (best_move)
+				return;
+		}
 		best_move = only_move ? only_move : solver_move;
-		return;
+		if (best_move || !to_allow_override_when_copying)
+			return;
 	}
 	
 	if (only_move)
@@ -858,7 +907,7 @@ Solver::pMove Solver::get_only_move(SolverMove& move, SolverState& info)
 
 Solver::pMove Solver::get_engine_move(SolverMove& move, SolverState& info, bool is_super_boost)
 {
-	assert(!to_copy_solution);
+	assert(!to_copy_solution || to_allow_override_when_copying);
 	constexpr static qint16 REAL_MATE = MATE_VALUE - 90;
 
 	/// Check cache.
@@ -927,7 +976,7 @@ Solver::pMove Solver::get_engine_move(SolverMove& move, SolverState& info, bool 
 			break;
 		if (status != Status::waitingEval)
 			throw stopProcessing();
-		if (sleep_time < 50ms)
+		if (sleep_time < MAX_SLEEP_TIME)
 			sleep_time += 5ms;
 		this_thread::sleep_for(sleep_time);
 	}
@@ -1024,7 +1073,7 @@ Solver::pMove Solver::get_existing(pBoard board) const
 
 Solver::pMove Solver::get_solution_move() const
 {
-	auto entries = sol->eSolutionEntries(board);
+	auto entries = sol->eSolutionEntries(board, !to_copy_solution);
 	if (entries.empty())
 		return nullptr;
 	return make_shared<SolverMove>(entries.front());
@@ -1034,9 +1083,9 @@ Solver::pMove Solver::get_esolution_move() const
 {
 	auto esol1 = only_upper_level ? Solution::FileType_solution_upper : Solution::FileType_solution_lower;
 	auto esol2 = only_upper_level ? Solution::FileType_solution_lower : Solution::FileType_solution_upper;
-	auto entry = sol->bookEntry(board, esol1);
+	auto entry = sol->bookEntry(board, esol1, !to_copy_solution);
 	if (!entry) {
-		entry = sol->bookEntry(board, esol2);
+		entry = sol->bookEntry(board, esol2, !to_copy_solution);
 		if (!entry)
 			return nullptr;
 	}
@@ -1515,8 +1564,13 @@ std::chrono::seconds Solver::log_update_time()
 void Solver::emit_message(const QString& message, MessageType type, bool force)
 {
 	emit Message(message, type);
+	update_gui(force);
+}
+
+void Solver::update_gui(bool force)
+{
 	auto now = steady_clock::now();
-	if (!force && (frequency_log_update == UpdateFrequency::never || now - t_gui_update < 1s))
+	if (!force && (frequency_log_update == UpdateFrequency::never || now - t_gui_update < UPDATE_PERIOD))
 		return;
 	t_gui_update = now;
 	qApp->processEvents();

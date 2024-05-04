@@ -85,14 +85,14 @@ class GameViewer : public QWidget
 		void viewPosition(int index);
 		void autoFlip();
 		void undoMoves(int num); //!! workaround
-	    void updateCurrentLine();
+		void updateCurrentLine();
 
 	private:
 		BoardScene* m_boardScene;
 		BoardView* m_boardView;
 		QSlider* m_moveNumberSlider;
 		TitleWidget* m_titleWidget;
-	    QLineEdit* m_currLine;
+		QLineEdit* m_currLine;
 
 		QToolButton* m_viewFirstMoveBtn;
 		QToolButton* m_viewPreviousMoveBtn;

@@ -18,7 +18,7 @@ using namespace std;
 namespace
 {
 	static set<string> special_endgames;
-    static uint32_t EGTB_VERSION;
+    static uint32_t EGTB_VERSION = 0;
 }
 
 constexpr static uint8_t SOLVED_MOVE = 0xFD;
@@ -425,7 +425,7 @@ std::tuple<std::list<SolverMove>, uint8_t> get_endgame_moves(std::shared_ptr<Che
 		return { moves, DTZ_NONE };
 	if (apply_50move_rule && tb_dtz >= DTZ_MAX || abs(tb_val) >= DRAW)
 		return { moves, tb_dtz };
-	auto depth_time = [](uint32_t dtz_value) { return (dtz_value << 16) & EGTB_VERSION; };
+	auto depth_time = [](uint32_t dtz_value) { return (dtz_value << 16) | EGTB_VERSION; };
 	auto our_color = board->sideToMove();
 	uint8_t dtz = 100 - board->plyCount();
 	auto legal_moves = board->legalMoves();
@@ -502,6 +502,11 @@ bool init_EGTB()
 	}
 
 	return true;
+}
+
+quint32 egtb_version()
+{
+	return EGTB_VERSION;
 }
 
 bool is_endgame_available(std::shared_ptr<const Position> pos)

@@ -570,12 +570,12 @@ std::list<MoveEntry> Solution::nextPositionEntries(Chess::Board* board, std::lis
 	return next_entries;
 }
 
-std::shared_ptr<SolutionEntry> Solution::bookEntry(std::shared_ptr<Chess::Board> board, FileType type) const
+std::shared_ptr<SolutionEntry> Solution::bookEntry(std::shared_ptr<Chess::Board> board, FileType type, bool check_cache) const
 {
-	return bookEntry(board.get(), type);
+	return bookEntry(board.get(), type, check_cache);
 }
 
-std::shared_ptr<SolutionEntry> Solution::bookEntry(Chess::Board* board, FileType type) const
+std::shared_ptr<SolutionEntry> Solution::bookEntry(Chess::Board* board, FileType type, bool check_cache) const
 {
 	if (!board)
 		return nullptr;
@@ -584,7 +584,7 @@ std::shared_ptr<SolutionEntry> Solution::bookEntry(Chess::Board* board, FileType
 	list<SolutionEntry> book_entries;
 	if (books[type])
 		book_entries = books[type]->bookEntries(board->key());
-	if (type < data_new.size()) {
+	if (check_cache && type < data_new.size()) {
 		auto it_new = data_new[type].find(board->key());
 		if (it_new != data_new[type].end()) {
 			for (auto it = book_entries.begin(); it != book_entries.end(); ++it) {
@@ -706,7 +706,7 @@ QString Solution::info() const
 		info = (version == 0)              ? "unknown"
 		    : (version < SOLUTION_VERSION) ? QString("old_v%1").arg(version)
 		                                   : QString("new_v%1").arg(version);
-	if (!Watkins.isEmpty() && WatkinsStartingPly >= 0)
+	if (hasWatkinsSolution())
 		info += " W";
 	if (fileExists(FileType_positions_upper) || fileExists(FileType_positions_lower))
 		info += " D";
@@ -783,6 +783,11 @@ const QString& Solution::subTag() const
 bool Solution::exists() const
 {
 	return true;
+}
+
+bool Solution::hasWatkinsSolution() const
+{
+	return !Watkins.isEmpty() && WatkinsStartingPly >= 0;
 }
 
 bool Solution::remove(std::function<bool(const QString&)> are_you_sure, std::function<void(const QString&)> message)
@@ -1069,12 +1074,12 @@ void Solution::addToBook(const EntryRow& row, FileType type) const
 	file.write(row.data(), row.size());
 }
 
-std::vector<SolutionEntry> Solution::eSolutionEntries(std::shared_ptr<Chess::Board> board)
+std::vector<SolutionEntry> Solution::eSolutionEntries(std::shared_ptr<Chess::Board> board, bool use_cache)
 {
-	return eSolutionEntries(board.get());
+	return eSolutionEntries(board.get(), use_cache);
 }
 
-std::vector<SolutionEntry> Solution::eSolutionEntries(Chess::Board* board)
+std::vector<SolutionEntry> Solution::eSolutionEntries(Chess::Board* board, bool use_cache)
 {
 	static map<quint64, vector<SolutionEntry>> cache; // TODO: set max size for the cache
 
@@ -1083,9 +1088,9 @@ std::vector<SolutionEntry> Solution::eSolutionEntries(Chess::Board* board)
 		return entries;
 	if (board->sideToMove() == side)
 	{
-		auto entry = bookEntry(board, FileType_solution_upper);
+		auto entry = bookEntry(board, FileType_solution_upper, use_cache);
 		if (!entry)
-			entry = bookEntry(board, FileType_solution_lower);
+			entry = bookEntry(board, FileType_solution_lower, use_cache);
 		if (entry) {
 			if (entry->pgMove)
 				entries.push_back(*entry);
@@ -1097,18 +1102,20 @@ std::vector<SolutionEntry> Solution::eSolutionEntries(Chess::Board* board)
 		if (!QSettings().value("ui/show_Watkins_for_opponent", true).toBool())
 			return entries;
 
-		auto it_cache = cache.find(board->key());
-		if (it_cache != cache.end())
-			return it_cache->second;
+		if (use_cache) {
+			auto it_cache = cache.find(board->key());
+			if (it_cache != cache.end())
+				return it_cache->second;
+		}
 	}
 
-	if (Watkins.isEmpty() || WatkinsStartingPly < 0)
+	if (!hasWatkinsSolution())
 		return entries;
-	if (board->MoveHistory().size() < WatkinsStartingPly)
-		return entries;
+
 	try
 	{
 		using namespace Chess;
+		shared_ptr<vector<uint16_t>> opening_moves;
 		if (!WatkinsSolution.is_open())
 		{
 			emit Message(QString("Opening Watkins solution file \"%1\"...").arg(Watkins));
@@ -1116,7 +1123,6 @@ std::vector<SolutionEntry> Solution::eSolutionEntries(Chess::Board* board)
 			filepath /= "Watkins";
 			filepath /= Watkins.toStdString();
 			bool is_ok = WatkinsSolution.open_tree(filepath);
-			shared_ptr<vector<uint16_t>> opening_moves;
 			if (is_ok)
 			{
 				opening_moves = WatkinsSolution.opening_moves();
@@ -1161,6 +1167,32 @@ std::vector<SolutionEntry> Solution::eSolutionEntries(Chess::Board* board)
 			}
 		}
 
+		int num_moves = board->MoveHistory().size();
+		if (num_moves < WatkinsStartingPly)
+		{
+			if (num_moves < WatkinsOpening.size())
+			{
+				if (!opening_moves)
+					opening_moves = WatkinsSolution.opening_moves();
+				if (opening_moves && num_moves < opening_moves->size())
+				{
+					for (int i = 0; i < num_moves; i++) {
+						if (board->MoveHistory()[i].move != WatkinsOpening[i])
+							return entries;
+					}
+					auto root_entries = WatkinsSolution.get_solution(vector<move_t>(), true /*temp_board->sideToMove() == side*/);
+					if (!root_entries.empty()) {
+						uint32_t num_nodes = (WatkinsStartingPly - num_moves) / 2;
+						for (auto& e : root_entries)
+							num_nodes += e.nodes();
+						uint16_t pgMove =  opening_moves->at(num_moves);
+						entries.emplace_back(pgMove, ESOLUTION_VALUE, num_nodes);
+					}
+				}
+			}
+			return entries;
+		}
+
 		shared_ptr<Board> temp_board(BoardFactory::create("antichess"));
 		temp_board->setFenString(temp_board->defaultFenString());
 		assert(board->MoveHistory().size() >= WatkinsStartingPly);
@@ -1171,7 +1203,7 @@ std::vector<SolutionEntry> Solution::eSolutionEntries(Chess::Board* board)
 			temp_board->makeMove(m);
 		}
 
-		std::vector<move_t> moves;
+		vector<move_t> moves;
 		for (int i = WatkinsStartingPly; i < board->MoveHistory().size(); i++)
 		{
 			auto& m = board->MoveHistory()[i].move;
@@ -1208,7 +1240,7 @@ std::vector<SolutionEntry> Solution::eSolutionEntries(Chess::Board* board)
 			else if (fileExists(type) || fileExists(type, FileSubtype::New))
 				addToBook(temp_board->key(), SolutionEntry(0, ESOLUTION_VALUE, 0), type);
 		}
-		else {
+		else if (use_cache) {
 			cache[board->key()] = entries;
 		}
 	}

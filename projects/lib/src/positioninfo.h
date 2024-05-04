@@ -133,6 +133,7 @@ int get_max_depth(int score, size_t num_pieces);
 std::tuple<std::shared_ptr<Position>, std::shared_ptr<StateInfo>> boardToPosition(std::shared_ptr<Chess::Board> board);
 std::tuple<std::list<SolverMove>, uint8_t> get_endgame_moves(std::shared_ptr<Chess::Board> board, std::shared_ptr<Position> position = nullptr, bool apply_50move_rule = true);
 bool init_EGTB();
+quint32 egtb_version();
 bool is_endgame_available(std::shared_ptr<const Position> pos);
 bool is_branch(std::shared_ptr<Chess::Board> main_pos, std::shared_ptr<Chess::Board> branch);
 bool is_branch(Chess::Board* pos, const Line& opening, const Line& branch);
