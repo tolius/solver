@@ -224,8 +224,7 @@ void Solver::start(Chess::Board* new_pos, std::function<void(QString)> message, 
 		}
 		auto path_pos = sol->path(Solution::FileType_positions_upper);
 		QFileInfo fi(path_pos);
-		if (fi.size() > 2000)
-		{
+		if (fi.size() > 2000) {
 			message("Failed to start because the solution already contains engine-computed data.\n\n"
 			        "Please create a new empty solution to replicate the Watkins solution.");
 			return;
@@ -788,7 +787,10 @@ void Solver::evaluate_position(SolverMove& move, SolverState& info, pMove& best_
 {
 	auto only_move = get_only_move(move, info);
 	if (to_copy_solution) {
-		assert(only_move || solver_move || to_allow_override_when_copying);
+		if (!only_move && !solver_move && !to_allow_override_when_copying) {
+			QString msg = QString("In the Watkins solution used, no continuation is found for the next position: %1").arg(get_move_stack(board));
+			throw runtime_error(msg.toStdString());
+		}
 		if (to_allow_override_when_copying) {
 			best_move = get_alt_move();
 			if (best_move)

@@ -203,6 +203,7 @@ Evaluation::Evaluation(GameViewer* game_viewer, QWidget* parent)
 	action_sync->setChecked(true);
 	action_sync->setToolTip("Automatically synchronise the evaluated position with the chessboard periodically");
 	syncMenu->addAction(action_sync);
+	syncMenu->setToolTipsVisible(true);
 	ui->btn_Sync->setMenu(syncMenu);
 
 	std::array<QToolButton*, 8> buttons = { ui->btn_MultiPV_Auto, ui->btn_MultiPV_1, ui->btn_MultiPV_2,  ui->btn_MultiPV_3,
