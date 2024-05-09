@@ -444,3 +444,8 @@ void GameViewer::onMoveMade(const Chess::GenericMove& move)
 	if (m_humanGame)
 		autoFlip();
 }
+
+std::mutex& GameViewer::mutex()
+{
+	return m_update_mutex;
+}

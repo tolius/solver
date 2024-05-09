@@ -27,6 +27,7 @@
 #include <QPointer>
 
 #include <memory>
+#include <mutex>
 
 class QToolButton;
 class QSlider;
@@ -55,6 +56,7 @@ class GameViewer : public QWidget
 		Chess::Board* board() const;
 		BoardScene* boardScene() const;
 		TitleWidget* titleBar() const;
+		std::mutex& mutex();
 
 	public slots:
 		void viewMove(int index, bool keyLeft = false);
@@ -103,6 +105,7 @@ class GameViewer : public QWidget
 		QVector<Chess::GenericMove> m_moves;
 		int m_moveIndex;
 		bool m_humanGame;
+		std::mutex m_update_mutex;
 };
 
 #endif // GAMEVIEWER_H

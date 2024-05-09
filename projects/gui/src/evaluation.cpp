@@ -186,13 +186,17 @@ Evaluation::Evaluation(GameViewer* game_viewer, QWidget* parent)
 	action_auto_from_here = new QAction("Auto from here", this);
 	action_auto_from_here->setEnabled(false);
 	action_auto_from_here->setToolTip("Start solving the current position by automatically moving from position to position");
-	action_replicate_Watkins = new QAction("Replicate Watkins solution", this);
+	action_replicate_Watkins = new QAction("Replicate Watkins solution one to one", this);
 	action_replicate_Watkins->setToolTip("Copy moves from the existing Watkins solution one to one");
-	action_replicate_Watkins_EG = new QAction("Replicate Watkins with endgames", this);
+	action_replicate_Watkins_Override = new QAction("Replicate Watkins solution and revise it", this);
+	action_replicate_Watkins_Override->setToolTip("Copy moves from the existing Watkins solution and revise it");
+	action_replicate_Watkins_EG = new QAction("Replicate Watkins solution with endgames", this);
 	action_replicate_Watkins_EG->setToolTip("Copy moves from the existing Watkins solution and add all endgames / overridden moves");
 	autoMenu->addAction(action_auto);
 	autoMenu->addAction(action_auto_from_here);
+	//autoMenu->addSeparator();
 	autoMenu->addAction(action_replicate_Watkins);
+	autoMenu->addAction(action_replicate_Watkins_Override);
 	autoMenu->addAction(action_replicate_Watkins_EG);
 	autoMenu->setToolTipsVisible(true);
 	ui->btn_Auto->setMenu(autoMenu);
@@ -233,6 +237,7 @@ Evaluation::Evaluation(GameViewer* game_viewer, QWidget* parent)
 	connect(action_auto_from_here, &QAction::triggered, this, [this]() { setMode(SolverStatus::AutoFromHere); });
 	connect(action_replicate_Watkins, SIGNAL(triggered()), this, SLOT(onReplicateWatkinsTriggered()));
 	connect(action_replicate_Watkins_EG, SIGNAL(triggered()), this, SLOT(onReplicateWatkinsEGTriggered()));
+	connect(action_replicate_Watkins_Override, SIGNAL(triggered()), this, SLOT(onReplicateWatkinsOverrideTriggered()));
 
 	setEngine();
 }
@@ -283,9 +288,10 @@ void Evaluation::updateOverride()
 
 void Evaluation::setMode(SolverStatus new_status)
 {
-	auto mode = new_status == SolverStatus::CopyWatkins ? SolverMode::Copy_Watkins
-	    : new_status == SolverStatus::CopyWatkinsEG     ? SolverMode::Copy_Watkins_EG
-	                                                    : SolverMode::Standard;
+	auto mode = new_status == SolverStatus::CopyWatkins   ? SolverMode::Copy_Watkins
+	    : new_status == SolverStatus::CopyWatkinsOverride ? SolverMode::Copy_Watkins_Override
+	    : new_status == SolverStatus::CopyWatkinsEG       ? SolverMode::Copy_Watkins_EG
+	                                                      : SolverMode::Standard;
 	if (!solver)
 		new_status = SolverStatus::Manual;
 	bool is_changed = (new_status != solver_status);
@@ -394,6 +400,7 @@ void Evaluation::setSolver(std::shared_ptr<Solver> solver)
 	bool enable_Watkins = solver && solver->solution() && solver->solution()->hasWatkinsSolution();
 	action_replicate_Watkins->setEnabled(enable_Watkins);
 	action_replicate_Watkins_EG->setEnabled(enable_Watkins);
+	action_replicate_Watkins_Override->setEnabled(enable_Watkins);
 	setMode(SolverStatus::Manual);
 }
 
@@ -750,6 +757,13 @@ void Evaluation::onReplicateWatkinsTriggered()
 	this->setMode(SolverStatus::CopyWatkins);
 }
 
+void Evaluation::onReplicateWatkinsOverrideTriggered()
+{
+	if (!ui->btn_Auto->isEnabled() || ui->btn_Auto->isChecked() || action_auto_from_here->isChecked())
+		return;
+	this->setMode(SolverStatus::CopyWatkinsOverride);
+}
+
 void Evaluation::onReplicateWatkinsEGTriggered()
 {
 	if (!ui->btn_Auto->isEnabled() || ui->btn_Auto->isChecked() || action_auto_from_here->isChecked())
@@ -779,8 +793,11 @@ void Evaluation::onSyncPositions(std::shared_ptr<Chess::Board> ref_board)
 	}
 	if (!ref_board)
 		return;
+
+	static std::mutex sync_mutex;
 	timer_sync.stop();
 	t_last_sync = steady_clock::now();
+	std::lock_guard<std::mutex> lock(sync_mutex);
 	disconnect(this->game, SIGNAL(moveMade(Chess::GenericMove, QString, QString)), this, SLOT(positionChanged()));
 	try
 	{

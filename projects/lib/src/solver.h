@@ -88,7 +88,10 @@ struct LIB_EXPORT SolverEvalResult
 
 enum class SolverMode
 {
-	Standard, Copy_Watkins, Copy_Watkins_EG
+	Standard,
+	Copy_Watkins,
+	Copy_Watkins_Override,
+	Copy_Watkins_EG
 };
 
 

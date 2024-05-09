@@ -128,6 +128,7 @@ private:
 		Auto,
 		AutoFromHere,
 		CopyWatkins,
+		CopyWatkinsOverride,
 		CopyWatkinsEG
 	};
 
@@ -160,6 +161,7 @@ private slots:
 	void onOverrideToggled(bool flag);
 	void onAutoTriggered();
 	void onReplicateWatkinsTriggered();
+	void onReplicateWatkinsOverrideTriggered();
 	void onReplicateWatkinsEGTriggered();
 	void onSyncToggled(bool flag);
 	void onMultiPVClicked(int multiPV);
@@ -198,6 +200,7 @@ private:
 	QAction* action_auto;
 	QAction* action_auto_from_here;
 	QAction* action_replicate_Watkins;
+	QAction* action_replicate_Watkins_Override;
 	QAction* action_replicate_Watkins_EG;
 	//QThread solver_thread;
 

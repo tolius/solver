@@ -149,8 +149,8 @@ void Solver::init()
 
 void Solver::set_mode(SolverMode mode)
 {
-	to_copy_solution = (mode == SolverMode::Copy_Watkins || mode == SolverMode::Copy_Watkins_EG);
-	to_allow_override_when_copying = (mode == SolverMode::Copy_Watkins_EG);
+	to_copy_solution = (mode == SolverMode::Copy_Watkins || mode == SolverMode::Copy_Watkins_Override || mode == SolverMode::Copy_Watkins_EG);
+	to_allow_override_when_copying = (mode == SolverMode::Copy_Watkins_Override || mode == SolverMode::Copy_Watkins_EG);
 
 	check_depth_limit = !to_copy_solution;
 	s.dont_lose_winning_sequence = !to_copy_solution && !is_final_assembly;
@@ -216,7 +216,7 @@ void Solver::start(Chess::Board* new_pos, std::function<void(QString)> message, 
 		return;
 	}
 
-	if (mode == SolverMode::Copy_Watkins || mode == SolverMode::Copy_Watkins_EG) {
+	if (mode == SolverMode::Copy_Watkins || mode == SolverMode::Copy_Watkins_Override || mode == SolverMode::Copy_Watkins_EG) {
 		if (sol->Watkins.isEmpty() || sol->WatkinsStartingPly < 0) {
 			message("Failed to start because no Watkins solution file is specified or the Watkins solution file does not contain data for the current opening.\n\n"
 					"Please check the solution settings or re-run it in Auto mode.");
