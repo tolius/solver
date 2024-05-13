@@ -212,7 +212,7 @@ void Solver::start(Chess::Board* new_pos, std::function<void(QString)> message, 
 
 	if (new_pos && !isCurrentBranch(new_pos)) {
 		message("You cannot start from a position that does not belong to the solution you have selected.\n\n"
-		        "Either set a position that belongs to the current solution branch, or set a starting position on the chessboard.");
+		        "Either set a position that belongs to the current solution branch, or set a starting position on the board.");
 		return;
 	}
 
@@ -773,7 +773,7 @@ void Solver::find_solution(SolverMove& move, SolverState& info, pMove& best_move
 	//assert(move.score() == UNKNOWN_SCORE || move.score() <= ABOVE_EG || move.score() <= best_move->score - 1);
 	if (move.score() != UNKNOWN_SCORE && move.score() > ABOVE_EG && move.score() > best_move->score() - 1 && move.score() != FORCED_MOVE) {
 		auto move_stack = get_move_stack(board);
-		emit_message(QString("...NOT BEST %1! %2 in %3").arg(move.score() - (best_move->score() - 1)).arg(best_move->san(board), move_stack), MessageType::info);
+		emit_message(QString("...NOT BEST %1! %2 in %3").arg(move.score() - (best_move->score() - 1)).arg(best_move->san(board)).arg(move_stack), MessageType::info);
 	}
 	if ((is_endgame && !evaluate_endgames
 			&& (num_pieces <= 4 || (num_pieces == 5 && !to_copy_solution && best_move->score() > endgame5_score_limit)))
@@ -816,13 +816,23 @@ void Solver::evaluate_position(SolverMove& move, SolverState& info, pMove& best_
 		if (cached_move && cached_move->pgMove != best_move->pgMove && cached_move->score() >= best_move->score() && cached_move->score() > FORCED_MOVE
 			&& best_move->score() != FORCED_MOVE && best_move->depth_time() != MANUAL_VALUE && !board->isRepetition(cached_move->move(board)))
 		{
-			emit_message(QString("..TRANSP %1->%2: %3->%4 %5")
-								.arg(best_move->san(board))
-								.arg(cached_move->san(board))
-								.arg(best_move->scoreText())
-								.arg(cached_move->scoreText())
-								.arg(get_move_stack(board)),
-			             MessageType::std);
+			QString msg;
+			if (best_move->score() == cached_move->score()) {
+				msg = QString("..TRANSP %1->%2 %3: %4")
+				    .arg(best_move->san(board))
+				    .arg(cached_move->san(board))
+				    .arg(best_move->scoreText())
+				    .arg(get_move_stack(board));
+			}
+			else {
+				msg = QString("..TRANSP %1->%2: %3->%4 %5")
+				          .arg(best_move->san(board))
+				          .arg(cached_move->san(board))
+				          .arg(best_move->scoreText())
+				          .arg(cached_move->scoreText())
+				          .arg(get_move_stack(board));
+			}
+			emit_message(msg, MessageType::std);
 			best_move = cached_move;
 		}
 	}

@@ -42,6 +42,11 @@ PlainTextLog::PlainTextLog(const QString& text, QWidget* parent)
 	setLineWrapMode(NoWrap);
 }
 
+void PlainTextLog::setOpening(const QString& opening)
+{
+	this->opening = QString(" %1 ").arg(opening);
+}
+
 void PlainTextLog::mouseDoubleClickEvent(QMouseEvent* e)
 {
 	sendMoves();
@@ -54,13 +59,21 @@ void PlainTextLog::sendMoves()
 		return;
 	static const QString tag = "[Variant \"Antichess\"]";
 	int i1 = text.indexOf(tag);
-	if (i1 < 0)
+	if (i1 >= 0)
 	{
-		QMessageBox::information(
-		    this, "Log",
-		    QString("The currently selected line \"%1\" does not contain any moves. "
-				"Please select a line that contains moves to set the corresponding position on the board.").arg(text));
-		return;
+		i1 += tag.length();
+	}
+	else
+	{
+		i1 = opening.isEmpty() ? -1 : text.indexOf(opening);
+		if (i1 < 0) {
+			QMessageBox::information(
+				this, "Log",
+				QString("The currently selected line \"%1\" does not contain any moves. "
+					"Please select a line that contains moves to set the corresponding position on the board.").arg(text));
+			return;
+		}
+		i1++;
 	}
 	int i2 = text.length() - 1;
 	auto check_line_end = [&](QChar ch)
@@ -72,7 +85,8 @@ void PlainTextLog::sendMoves()
 	check_line_end('#');
 	check_line_end('+');
 	check_line_end('-');
-	text = text.midRef(i1 + tag.length(), i2 - i1).trimmed().toString();
+	check_line_end(':');
+	text = text.midRef(i1, i2 - i1 + 1).trimmed().toString();
 	auto [line, board] = parse_line(text, true);
 	emit applyMoves(board);
 }

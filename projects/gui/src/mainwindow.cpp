@@ -1137,6 +1137,8 @@ void MainWindow::openSolution(QModelIndex index, SolutionItem* item)
 			qApp->processEvents();
 		}
 		m_solution->activate();
+		auto [str_opening, _] = compose_string(m_solution->openingMoves(), QChar(' '), true);
+		m_log->setOpening(str_opening);
 		m_solutionsModel->dataChanged(QModelIndex(), QModelIndex());
 		QSettings().setValue("solutions/last_solution", m_solution->nameToShow(true));
 		if (m_solver) {

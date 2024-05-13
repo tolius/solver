@@ -204,8 +204,8 @@ Evaluation::Evaluation(GameViewer* game_viewer, QWidget* parent)
 	auto syncMenu = new QMenu;
 	action_sync = new QAction("Auto sync", this);
 	action_sync->setCheckable(true);
-	action_sync->setChecked(true);
-	action_sync->setToolTip("Automatically synchronise the evaluated position with the chessboard periodically");
+	action_sync->setChecked(false);
+	action_sync->setToolTip("Automatically synchronise the evaluated position with the board periodically");
 	syncMenu->addAction(action_sync);
 	syncMenu->setToolTipsVisible(true);
 	ui->btn_Sync->setMenu(syncMenu);
@@ -838,7 +838,7 @@ void Evaluation::onSyncPositions(std::shared_ptr<Chess::Board> ref_board)
 	}
 	catch (std::exception e)
 	{
-		emit Message(tr("Failed to synchronise the chessboard: %1.").arg(e.what()), MessageType::std);
+		emit Message(tr("Failed to synchronise the board: %1.").arg(e.what()), MessageType::std);
 	}
 	connect(this->game, SIGNAL(moveMade(Chess::GenericMove, QString, QString)), this, SLOT(positionChanged()));
 	//updateSync();

@@ -20,6 +20,7 @@
 #define PLAIN_TEXT_LOG_H
 
 #include <QPlainTextEdit>
+#include <QString>
 
 class QContextMenuEvent;
 class QAction;
@@ -44,6 +45,8 @@ class PlainTextLog : public QPlainTextEdit
 		 */
 		PlainTextLog(const QString& text, QWidget* parent = nullptr);
 
+		void setOpening(const QString& opening);
+
 	signals:
 	    void applyMoves(std::shared_ptr<Chess::Board> board);
 
@@ -59,6 +62,8 @@ class PlainTextLog : public QPlainTextEdit
 	    virtual void contextMenuEvent(QContextMenuEvent* event) override;
 	    virtual void mouseDoubleClickEvent(QMouseEvent* e) override;
 
+	protected:
+	    QString opening;
 };
 
 #endif // PLAIN_TEXT_LOG_H

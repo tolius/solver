@@ -990,9 +990,13 @@ void WesternBoard::vMakeMove(const Move& move, BoardTransition* transition)
 		}
 	}
 
-	if (captureType(move) != Piece::NoPiece)
+	auto capturedPiece = captureType(move);
+	if (capturedPiece != Piece::NoPiece)
 	{
 		removeCastlingRights(target);
+		if (capturedPiece == King && m_kingSquare[side.opposite()] == target)
+			m_kingSquare[side.opposite()] = 0; // King can be captured in Antichess
+
 		isReversible = false;
 	}
 
@@ -1050,7 +1054,7 @@ void WesternBoard::vUndoMove(const Move& move)
 		m_history.pop_back();
 		return;
 	}
-	else if (move.promotion() == Piece::NoPiece && target == m_kingSquare[side])
+	else if (move.promotion() == Piece::NoPiece && target == m_kingSquare[side] && pieceAt(target).type() == King)
 	{
 		m_kingSquare[side] = source;
 	}
@@ -1075,6 +1079,7 @@ void WesternBoard::vUndoMove(const Move& move)
 		setSquare(source, pieceAt(target));
 
 	setSquare(target, md.capture);
+	//?? set m_kingSquare[side.opposite()] if a king was captured (relevant for Antichess)? Although it could just be one of the kings...
 	m_history.pop_back();
 }
 
