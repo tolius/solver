@@ -390,6 +390,11 @@ bool Solution::fileExists(FileType type, FileSubtype subtype) const
 	return fi.exists();
 }
 
+QString Solution::bookFolder() const
+{
+	return QString("%1/%2%3/").arg(folder).arg(BOOKS).arg(tag.isEmpty() ? "" : ('/' + tag));
+}
+
 bool Solution::isValid() const
 {
 	return !opening.empty();
@@ -949,15 +954,8 @@ bool Solution::mergeFiles(FileType type)
 	{
 		vector<char> data_to_save;
 		{
-			map<uint64_t, uint64_t> entries;
-			if (size_std > 0)
-			{
-				vector<char[16]> buf(size_std / 16);
-				ifstream file_std(path_std.toStdString(), ios::binary | ios::in);
-				file_std.read((char*)buf.data(), size_std);
-				std::transform(buf.begin(), buf.end(), std::inserter(entries, entries.end()),
-				               [](char* data) { return make_pair(load_bigendian(data), load_bigendian(data + 8)); });
-			} // destructing the buffer
+			map<uint64_t, uint64_t> entries = read_book(path_std.toStdString(), size_std);
+			// Update entries:
 			{
 				vector<char> buf(size_new);
 				ifstream file_new(path_new.toStdString(), ios::binary | ios::in);

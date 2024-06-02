@@ -234,6 +234,7 @@ add_library(lib STATIC
 	projects/lib/src/solution.cpp
 	projects/lib/src/solutionbook.cpp
 	projects/lib/src/solver.cpp
+	projects/lib/src/solverresults.cpp
 	projects/lib/src/positioninfo.cpp
 
 	projects/lib/components/json/src/jsonparser.cpp
@@ -296,6 +297,7 @@ add_executable(gui
 	projects/gui/src/settingsdlg.cpp
 	projects/gui/src/solutiondlg.cpp
 	projects/gui/src/importdlg.cpp
+	projects/gui/src/mergebooksdlg.cpp
 	projects/gui/src/solutionsmodel.cpp
 	projects/gui/src/solutionitem.cpp
 	projects/gui/src/main.cpp
@@ -315,6 +317,7 @@ add_executable(gui
 	projects/gui/ui/settingsdlg.ui
 	projects/gui/ui/solutiondlg.ui
 	projects/gui/ui/importdlg.ui
+	projects/gui/ui/mergebooksdlg.ui
 	projects/gui/ui/solutionswidget.ui
 	projects/gui/ui/evaluationwidget.ui
 	projects/gui/ui/movelistwidget.ui

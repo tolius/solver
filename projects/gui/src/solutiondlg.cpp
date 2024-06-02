@@ -407,7 +407,7 @@ void SolutionDialog::on_WatkinsSolutionChanged()
 
 void SolutionDialog::on_OKClicked()
 {
-	auto warninig = [&](const QString& info)
+	auto warning = [this](const QString& info)
 	{
 		QMessageBox::warning(this, QApplication::applicationName(), info);
 	};
@@ -416,14 +416,14 @@ void SolutionDialog::on_OKClicked()
 	QString t = data->tag;
 	if (t.remove(QRegExp(R"([\/\\])")).toLower() == Solution::DATA)
 	{
-		warninig(tr("The tag \"%1\" is not allowed. Please come up with another one.").arg(data->tag));
+		warning(tr("The tag \"%1\" is not allowed. Please come up with another one.").arg(data->tag));
 		return;
 	}
 	QRegExp regex(R"([^a-zA-Z0-9_\-+=,;\.!#])");
 	int i = regex.indexIn(data->tag);
 	if (i >= 0)
 	{
-		warninig(tr("The tag has an invalid character \"%1\". Please come up with another one.").arg(data->tag[i]));
+		warning(tr("The tag has an invalid character \"%1\". Please come up with another one.").arg(data->tag[i]));
 		return;
 	}
 
@@ -444,7 +444,7 @@ void SolutionDialog::on_OKClicked()
 			                   .arg(Solution::SPEC_EXT);
 		if (QFileInfo(filename).exists())
 		{
-			warninig(tr("Unable to add the \"%1\" opening because the solution file already exists.\n\n"
+			warning(tr("Unable to add the \"%1\" opening because the solution file already exists.\n\n"
 						"Either delete the existing solution first, or use a unique tag.")
 						 .arg(solution_line.replace(SEP_MOVES, QChar(' '))));
 			return;
@@ -457,7 +457,7 @@ void SolutionDialog::on_OKClicked()
 	{
 		data->branchesToSkip.clear();
 		QString str_info = tr("\n\n%1").arg(info);
-		warninig(tr("Invalid branch that does not need to be computed:\n\n%1%2").arg(branch_to_skip).arg(str_info));
+		warning(tr("Invalid branch that does not need to be computed:\n\n%1%2").arg(branch_to_skip).arg(str_info));
 	};
 	for (int i = 0; i < ui->table_BranchesToSkip->rowCount(); i++)
 	{
@@ -512,7 +512,7 @@ void SolutionDialog::on_OKClicked()
 		QFileInfo fi(dir_Watkins + "/" + file_Watkins);
 		if (!fi.exists())
 		{
-			warninig(tr("Unable to open the Watkins solution file \"%1\" in \"%2\".").arg(file_Watkins).arg(dir_Watkins));
+			warning(tr("Unable to open the Watkins solution file \"%1\" in \"%2\".").arg(file_Watkins).arg(dir_Watkins));
 			return;
 		}
 		data->Watkins = file_Watkins;

@@ -393,7 +393,7 @@ void ImportDialog::on_ImportClicked()
 	/// Check tag.
 	QString tag = ui->line_Tag->text();
 
-	auto warninig = [this](const QString& info)
+	auto warning = [this](const QString& info)
 	{
 		QMessageBox::warning(this, QApplication::applicationName(), tr("Warning: %1\n\nImport terminated.").arg(info));
 		is_importing = false;
@@ -401,14 +401,14 @@ void ImportDialog::on_ImportClicked()
 	};
 	if (tag.remove(QRegExp(R"([\/\\])")).toLower() == Solution::DATA)
 	{
-		warninig(tr("The tag \"%1\" is not allowed. Please come up with another one.").arg(tag));
+		warning(tr("The tag \"%1\" is not allowed. Please come up with another one.").arg(tag));
 		return;
 	}
 	QRegExp regex(R"([^a-zA-Z0-9_\-+=,;\.!#])");
 	int i = regex.indexIn(tag);
 	if (i >= 0)
 	{
-		warninig(tr("The tag has an invalid character \"%1\". Please come up with another one.").arg(tag[i]));
+		warning(tr("The tag has an invalid character \"%1\". Please come up with another one.").arg(tag[i]));
 		return;
 	}
 	if (!tag.isEmpty())
@@ -455,7 +455,7 @@ void ImportDialog::on_ImportClicked()
 		std::replace(filename.begin(), filename.end(), ' ', '_');
 		fs::path path_spec = dir / (filename + '.' + Solution::SPEC_EXT.toStdString());
 		if (fs::exists(path_spec)) {
-			warninig(tr("the file \"%1\" already exists.").arg(QString::fromStdString(path_spec.generic_string())));
+			warning(tr("the file \"%1\" already exists.").arg(QString::fromStdString(path_spec.generic_string())));
 			solution_files.info->setText(EXISTS);
 			return;
 		}
@@ -467,7 +467,7 @@ void ImportDialog::on_ImportClicked()
 				ss << filename << '_' << base << ending;
 				fs::path path_i = dir / ss.str();
 				if (fs::exists(path_i)) {
-					warninig(tr("the file \"%1\" already exists.").arg(path_to_QString(path_i)));
+					warning(tr("the file \"%1\" already exists.").arg(path_to_QString(path_i)));
 					solution_files.info->setText(EXISTS);
 					return;
 				}
@@ -495,7 +495,7 @@ void ImportDialog::on_ImportClicked()
 						num_wins++;
 				};
 				if (false && num_wins >= num / 2) {//!! remove false
-					warninig(tr("the file \"%1\" contains the lower-level solution. The current version of %2 can only import upper-level solutions.")
+					warning(tr("the file \"%1\" contains the lower-level solution. The current version of %2 can only import upper-level solutions.")
 					             .arg(path_to_QString(file.path)).arg(QApplication::applicationName()));
 					solution_files.info->setText(LOWER_LEVEL);
 					return;
@@ -510,7 +510,7 @@ void ImportDialog::on_ImportClicked()
 			QString source_file = path_to_QString(file.path);
 			bool is_copied = QFile::copy(source_file, dest_file);
 			if (!is_copied) {
-				warninig(tr("failed to copy the file \"%1\".").arg(source_file));
+				warning(tr("failed to copy the file \"%1\".").arg(source_file));
 				sol_files.info->setText(NOT_COPIED);
 				return false;
 			}
@@ -534,13 +534,13 @@ void ImportDialog::on_ImportClicked()
 					auto& file_txt = it_std->second;
 					ifstream file(file_txt.path);
 					if (!file.is_open()) {
-						warninig(tr("failed to open the file \"%1\".").arg(path_to_QString(it_std->second.path)));
+						warning(tr("failed to open the file \"%1\".").arg(path_to_QString(it_std->second.path)));
 						solution_files.info->setText(NOT_COPIED);
 						return;
 					}
 					auto [data, err] = read_override_file(file);
 					if (!err.isEmpty()) {
-						warninig(tr("failed to read the file \"%1\".\n\n%2").arg(path_to_QString(it_std->second.path)).arg(err));
+						warning(tr("failed to read the file \"%1\".\n\n%2").arg(path_to_QString(it_std->second.path)).arg(err));
 						solution_files.info->setText(NOT_COPIED);
 						return;
 					}

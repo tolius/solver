@@ -61,6 +61,8 @@
 #include "board/move.h"
 #include "solution.h"
 #include "solver.h"
+#include "solverresults.h"
+#include "mergebooksdlg.h"
 #include "humanplayer.h"
 #include "chessengine.h"
 #include "settingsdlg.h"
@@ -187,6 +189,9 @@ void MainWindow::createActions()
 	m_copyPgnAct = new QAction(tr("Copy PG&N"), this);
 	m_copyZsAct = new QAction(tr("Copy &ZS"), this);
 
+	m_mergeBooksAct = new QAction(tr("Merge &Books"), this);
+	m_mergeBooksAct->setEnabled((bool)m_solver);
+
 	m_flipBoardAct = new QAction(tr("&Flip Board"), this);
 	m_flipBoardAct->setShortcut(Qt::CTRL + Qt::Key_F);
 
@@ -229,6 +234,7 @@ void MainWindow::createActions()
 	connect(copyFenSequence, SIGNAL(triggered()), this, SLOT(copyFen()));
 	connect(m_copyPgnAct, SIGNAL(triggered()), this, SLOT(copyPgn()));
 	connect(m_copyZsAct, SIGNAL(triggered()), this, SLOT(copyZS()));
+	connect(m_mergeBooksAct, SIGNAL(triggered()), this, SLOT(mergeBooks()));
 	connect(m_flipBoardAct, SIGNAL(triggered()), m_gameViewer->boardScene(), SLOT(flip()));
 	connect(m_closeGameAct, &QAction::triggered, this, [=]()
 	{
@@ -283,6 +289,8 @@ void MainWindow::createMenus()
 	m_toolsMenu->addAction(m_copyPgnAct);
 	m_toolsMenu->addAction(m_copyZsAct);
 //	m_toolsMenu->addAction(m_pasteFenAct);
+	m_toolsMenu->addSeparator();
+	m_toolsMenu->addAction(m_mergeBooksAct);
 	m_toolsMenu->addSeparator();
 	m_toolsMenu->addAction(m_showSettingsAct);
 
@@ -922,6 +930,14 @@ void MainWindow::copyZS()
 		cb->setText(zs);
 }
 
+void MainWindow::mergeBooks()
+{
+	if (!m_solver)
+		return;
+	MergeBooksDialog dlg(this, m_solver);
+	auto res = dlg.exec();
+}
+
 void MainWindow::showAboutDialog()
 {
 	QString html;
@@ -1145,7 +1161,7 @@ void MainWindow::openSolution(QModelIndex index, SolutionItem* item)
 			disconnect(m_solver.get(), nullptr, this,           nullptr);
 			disconnect(m_settingsDlg,  nullptr, m_solver.get(), nullptr);
 		}
-		m_solver = std::make_shared<Solver>(m_solution);
+		m_solver = std::make_shared<SolverResults>(m_solution);
 		connect(m_solver.get(), SIGNAL(Message(const QString&, MessageType)), this, SLOT(logMessage(const QString&, MessageType)));
 		connect(m_solver.get(), SIGNAL(clearLog()), this, SLOT(clearLog()));
 		connect(m_solver.get(), SIGNAL(updateCurrentSolution()), this, SLOT(updateCurrentSolution()));
@@ -1157,6 +1173,7 @@ void MainWindow::openSolution(QModelIndex index, SolutionItem* item)
 	if (m_solutionsWidget)
 		m_solutionsWidget->setSolver(m_solver);
 	m_gameViewer->titleBar()->setSolution(m_solution);
+	m_mergeBooksAct->setEnabled((bool)m_solver);
 	initSolutionGame();
 
 	m_solutionsModel->highlight(index);

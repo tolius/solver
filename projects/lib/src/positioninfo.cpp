@@ -11,6 +11,8 @@
 
 #include <set>
 #include <stdexcept>
+#include <fstream>
+#include <filesystem>
 
 using namespace std;
 
@@ -586,4 +588,24 @@ EntryRow entry_to_bytes(quint64 key, quint16 pgMove, qint16 weight, quint32 lear
 EntryRow entry_to_bytes(quint64 key, const SolutionEntry& entry)
 {
 	return entry_to_bytes(key, entry.pgMove, entry.weight, entry.learn);
+}
+
+std::map<uint64_t, uint64_t> read_book(const std::string& filepath, qint64 filesize)
+{
+	map<uint64_t, uint64_t> entries;
+	if (filesize == 0)
+		return entries;
+	if (filesize < 0) {
+		error_code ec;
+		filesize = static_cast<qint64>(filesystem::file_size(filepath, ec));
+		if (filesize < 0 || ec)
+			return entries;
+	}
+	
+	vector<char[16]> buf(filesize / 16);
+	ifstream file_std(filepath, ios::binary | ios::in);
+	file_std.read((char*)buf.data(), filesize);
+	std::transform(buf.begin(), buf.end(), std::inserter(entries, entries.end()),
+				    [](char* data) { return make_pair(load_bigendian(data), load_bigendian(data + 8)); });
+	return entries;
 }

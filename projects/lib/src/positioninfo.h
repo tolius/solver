@@ -13,6 +13,7 @@
 #include <tuple>
 #include <string>
 #include <array>
+#include <map>
 
 constexpr static qint16 UNKNOWN_SCORE = -32768;
 constexpr static qint16 MATE_VALUE = 32767;
@@ -143,6 +144,8 @@ template<typename T>
 	void save_bigendian(T val, void* bytes);
 EntryRow entry_to_bytes(quint64 key, quint16 pgMove, qint16 weight, quint32 learn);
 EntryRow entry_to_bytes(quint64 key, const SolutionEntry& entry);
+
+std::map<uint64_t, uint64_t> read_book(const std::string& filepath, qint64 filesize = -1);
 
 
 #endif // POSITIONINFO_H

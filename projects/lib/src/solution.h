@@ -137,13 +137,14 @@ public:
 	void addToBook(std::shared_ptr<Chess::Board> board, uint64_t data, FileType type);
 	std::vector<SolutionEntry> eSolutionEntries(std::shared_ptr<Chess::Board> board, bool use_cache = true);
 	std::vector<SolutionEntry> eSolutionEntries(Chess::Board* board, bool use_cache = true);
+	QString bookFolder() const;
+	QString path(FileType type, FileSubtype subtype = FileSubtype::Std) const;
+	bool fileExists(FileType type, FileSubtype subtype = FileSubtype::Std) const;
 
 signals:
 	void Message(const QString&, MessageType type = MessageType::std);
 
 private:
-	QString path(FileType type, FileSubtype subtype = FileSubtype::Std) const;
-	bool fileExists(FileType type, FileSubtype subtype = FileSubtype::Std) const;
 	bool hasMergeErrors() const;
 	void saveBranchSettings(QSettings& s, std::shared_ptr<Chess::Board> board);
 	bool mergeFiles(FileType type);
@@ -174,6 +175,7 @@ private:
 	int64_t ram_budget;
 
 	friend class Solver;
+	friend class SolverResults;
 	bool is_solver_upper_level;
 
 public:

@@ -51,7 +51,7 @@ class ChessPlayer;
 class SolutionsModel;
 class GameTabBar;
 class Solution;
-class Solver;
+class SolverResults;
 class SettingsDialog;
 struct SolutionData;
 class SolutionItem;
@@ -97,6 +97,7 @@ class MainWindow : public QMainWindow
 		void pasteFen();
 		void copyPgn();
 		void copyZS();
+		void mergeBooks();
 		void showAboutDialog();
 		void closeAllGames();
 		void selectSolution(QModelIndex index);
@@ -106,8 +107,8 @@ class MainWindow : public QMainWindow
 		void importSolution(const std::filesystem::path&);
 		void updateCurrentSolution();
 		void setTint(QColor tint, bool to_color_move_buttons);
-	    void logMessage(const QString& msg, MessageType type);
-	    void clearLog();
+		void logMessage(const QString& msg, MessageType type);
+		void clearLog();
 
 	private:
 		struct TabData
@@ -166,6 +167,7 @@ class MainWindow : public QMainWindow
 		QAction* m_pasteFenAct;
 		QAction* m_copyPgnAct;
 		QAction* m_copyZsAct;
+		QAction* m_mergeBooksAct;
 		QAction* m_flipBoardAct;
 		QAction* m_minimizeAct;
 		QAction* m_showPreviousTabAct;
@@ -179,7 +181,7 @@ class MainWindow : public QMainWindow
 		QPointer<ChessPlayer> m_players[2];
 		QList<TabData> m_tabs;
 		std::shared_ptr<Solution> m_solution;
-		std::shared_ptr<Solver> m_solver;
+		std::shared_ptr<SolverResults> m_solver;
 		QColor m_tint;
 
 		QString m_currentFile;
