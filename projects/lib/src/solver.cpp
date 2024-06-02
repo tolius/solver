@@ -401,7 +401,7 @@ void Solver::start(pBoard start_pos, std::function<void(QString)> message, Solve
 	int num_opening_moves = (sol->opening.size() + sol->branch.size() + num_line_plies + 1) / 2;
 	emit Message(QString("Mate score %1 = %2 + %3").arg(num_opening_moves + mate_score).arg(num_opening_moves).arg(mate_score));
 	emit Message(QString("Number of transpositions: %1").arg(trans.size()));
-	emit Message(QString("Number of solver moves: %1").arg(num_moves_from_solver));
+	emit Message(QString("Number of solution moves: %1").arg(num_moves_from_solver));
 	emit Message(QString("Number of evaluated endgames: %1").arg(num_evaluated_endgames));
 
 	create_book(t, num_opening_moves);
@@ -414,7 +414,8 @@ void Solver::start(pBoard start_pos, std::function<void(QString)> message, Solve
 		emit solvingStatusChanged();
 	};
 
-	if (!only_upper_level) {
+	bool do_lower_level = QSettings().value("solutions/auto_lower_level", false).toBool();
+	if (!only_upper_level || !do_lower_level) {
 		stop_solving();
 		return;
 	}

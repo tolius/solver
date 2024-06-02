@@ -209,6 +209,12 @@ SettingsDialog::SettingsDialog(QWidget* parent)
 		}
 	);
 
+	connect(ui->m_lowerLevel, &QCheckBox::toggled, this, 
+		[=](bool checked) {
+			QSettings().setValue("solutions/auto_lower_level", checked);
+		}
+	);
+
 	connect(ui->m_clearLogWhenAutoStarted, &QCheckBox::toggled, this, 
 		[=](bool checked) {
 			QSettings().setValue("solutions/clear_log_when_Auto_started", checked);
@@ -306,6 +312,7 @@ void SettingsDialog::readSettings()
 	s.endGroup();
 
 	s.beginGroup("solutions");
+	ui->m_lowerLevel->setChecked(s.value("auto_lower_level", false).toBool());
 	ui->m_clearLogWhenAutoStarted->setChecked(s.value("clear_log_when_Auto_started", true).toBool());
 	ui->m_openLastSolution->setChecked(s.value("open_last_solution", true).toBool());
 	s.endGroup();
