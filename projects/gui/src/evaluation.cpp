@@ -344,7 +344,7 @@ void Evaluation::updateStartStop()
 	bool is_ok = engine && engine->isReady();
 	using s = ChessPlayer::State;
 	ui->btn_Start->setEnabled(is_ok && solver_status == SolverStatus::Manual && ((engine->state() == s::Observing) || (engine->state() == s::Idle)));
-	ui->btn_Stop->setEnabled(is_ok && engine->state() == ChessPlayer::State::Thinking);
+	ui->btn_Stop->setEnabled(is_ok && (engine->state() == ChessPlayer::State::Thinking || solver_status != SolverStatus::Manual));
 	bool is_auto_enabled = solver && is_ok && solver_status == SolverStatus::Manual && engine->state() != ChessPlayer::State::Thinking;
 	ui->btn_Auto->setEnabled(is_auto_enabled);
 	action_auto_from_here->setEnabled(is_auto_enabled && game && game->board() && game->board()->sideToMove() == solver->sideToWin() && solver->isCurrentBranch(game->board()));

@@ -34,7 +34,6 @@ Results::Results(QWidget* parent)
 	ui->widget_Solution->setLayout(m_flowLayout);
 	//ui->scrollArea->setWidget(ui->widget_Solution);
 	ui->label_Info->setVisible(false);
-	ui->widget_ResultInfo->setVisible(false);
 	ui->btn_SourceAuto->setChecked(true);
 
 	connect(ui->btn_SourceAuto, &QToolButton::toggled, this, [this]()   { onDataSourceChanged(EntrySource::none);      });
@@ -48,8 +47,6 @@ void Results::setSolution(std::shared_ptr<Solution> solution)
 	this->solution = solution;
 	bool is_available = solution && solution->isBookOpen();
 	ui->widget_Solution->setVisible(is_available);
-	ui->widget_ResultInfo->setVisible(false);
-	ui->widget_SolutionResult->setVisible(false);
 }
 
 void Results::setSolver(std::shared_ptr<Solver> solver)

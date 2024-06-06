@@ -51,6 +51,7 @@
 #include "movelist.h"
 #include "evaluation.h"
 #include "results.h"
+#include "release.h"
 #include "titlewidget.h"
 #include "plaintextlog.h"
 #include "solutionsmodel.h"
@@ -96,6 +97,7 @@ MainWindow::MainWindow(ChessGame* game, SettingsDialog* settingsDlg)
 	m_moveList = new MoveList(this);
 	m_evaluation = new Evaluation(m_gameViewer, this);
 	m_results = new Results(this);
+	m_release = new Release(this);
 	m_solutionsWidget = nullptr;
 
 	QVBoxLayout* mainLayout = new QVBoxLayout();
@@ -444,6 +446,14 @@ void MainWindow::createDockWindows()
 	evaluationDock->setContentsMargins(0, 0, 9, 0);
 	addDockWidget(Qt::LeftDockWidgetArea, evaluationDock);
 
+	// ReleaseWidget
+	auto releaseDock = new QDockWidget(tr("Release"), this);
+	releaseDock->setObjectName("ReleaseDock");
+	m_release->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
+	releaseDock->setWidget(m_release);
+	releaseDock->setContentsMargins(0, 0, 9, 0);
+	addDockWidget(Qt::LeftDockWidgetArea, releaseDock);
+
 	// ResultsWidget
 	auto resultsDock = new QDockWidget(tr("Results"), this);
 	resultsDock->setObjectName("ResultsDock");
@@ -462,10 +472,12 @@ void MainWindow::createDockWindows()
 	addDockWidget(Qt::RightDockWidgetArea, moveListDock);
 
 	tabifyDockWidget(solutionsDock, evaluationDock);
+	tabifyDockWidget(solutionsDock, releaseDock);
 	solutionsDock->raise();
 	tabifyDockWidget(moveListDock, resultsDock);
 	moveListDock->raise();
 	//splitDockWidget(solutionsDock, evaluationDock, Qt::Vertical);
+	releaseDock->close();
 
 	//??
 	//show();
@@ -478,6 +490,7 @@ void MainWindow::createDockWindows()
 	m_viewMenu->addAction(solutionsDock->toggleViewAction());
 	m_viewMenu->addAction(evaluationDock->toggleViewAction());
 	m_viewMenu->addAction(resultsDock->toggleViewAction());
+	m_viewMenu->addAction(releaseDock->toggleViewAction());
 	m_viewMenu->addAction(logDock->toggleViewAction());
 }
 
@@ -1120,7 +1133,7 @@ void MainWindow::addSolution(std::shared_ptr<SolutionData> data)
 	if (!solution || !solution->isValid())
 		return;
 	m_solutionsModel->addSolution(solution);
-	if (m_solver && !m_solver->isSolving())
+	if (m_solver && !m_solver->isBusy())
 		openSolution(solution);
 }
 
@@ -1172,6 +1185,7 @@ void MainWindow::openSolution(QModelIndex index, SolutionItem* item)
 	m_evaluation->setSolver(m_solver);
 	if (m_solutionsWidget)
 		m_solutionsWidget->setSolver(m_solver);
+	m_release->setSolver(m_solver);
 	m_gameViewer->titleBar()->setSolution(m_solution);
 	m_mergeBooksAct->setEnabled((bool)m_solver);
 	initSolutionGame();
@@ -1249,6 +1263,7 @@ void MainWindow::updateCurrentSolution()
 	m_solutionsModel->dataChanged(QModelIndex(), QModelIndex());
 	m_results->setSolution(m_solution);
 	m_results->positionChanged();
+	m_release->updateData();
 }
 
 QString bkg_color_style(QColor& bkg, const QColor& tint)

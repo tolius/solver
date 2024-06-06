@@ -75,12 +75,12 @@ quint32 SolutionEntry::nodes() const
 
 Chess::Move SolutionEntry::move(const Chess::Board* board) const
 {
-	return board->moveFromGenericMove(move());
+	return isNull() ? Chess::Move() : board->moveFromGenericMove(move());
 }
 
 Chess::Move SolutionEntry::move(std::shared_ptr<Chess::Board> board) const
 {
-	return board->moveFromGenericMove(move());
+	return isNull() ? Chess::Move() : board->moveFromGenericMove(move());
 }
 
 QString SolutionEntry::san(std::shared_ptr<Chess::Board> board) const

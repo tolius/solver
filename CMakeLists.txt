@@ -307,6 +307,7 @@ add_executable(gui
 	projects/gui/src/movecommenttoken.cpp
 	projects/gui/src/movelist.cpp
 	projects/gui/src/evaluation.cpp
+	projects/gui/src/release.cpp
 	projects/gui/src/results.cpp
 	projects/gui/src/titlewidget.cpp
 	projects/gui/src/solutionswidget.cpp
@@ -321,6 +322,7 @@ add_executable(gui
 	projects/gui/ui/solutionswidget.ui
 	projects/gui/ui/evaluationwidget.ui
 	projects/gui/ui/movelistwidget.ui
+	projects/gui/ui/releasewidget.ui
 	projects/gui/ui/resultswidget.ui
 	projects/gui/ui/titlewidget.ui
 

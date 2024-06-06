@@ -305,6 +305,6 @@ void SolutionsWidget::updateEditButton(bool visible)
 
 void SolutionsWidget::on_solvingStatusChanged()
 {
-	bool is_solving = solver && solver->isSolving();
-	ui->btn_Edit->setEnabled(!is_solving);
+	bool is_busy = solver && solver->isBusy();
+	ui->btn_Edit->setEnabled(!is_busy);
 }

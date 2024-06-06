@@ -44,6 +44,7 @@ class GameViewer;
 class MoveList;
 class Evaluation;
 class Results;
+class Release;
 class PlainTextLog;
 class PgnGame;
 class ChessGame;
@@ -155,6 +156,7 @@ class MainWindow : public QMainWindow
 		MoveList* m_moveList;
 		Evaluation* m_evaluation;
 		Results* m_results;
+		Release* m_release;
 		SolutionsModel* m_solutionsModel;
 		SolutionsWidget* m_solutionsWidget;
 

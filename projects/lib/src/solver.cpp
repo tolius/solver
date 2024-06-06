@@ -19,7 +19,6 @@ using namespace std;
 using namespace std::chrono;
 
 constexpr static qint16 FORCED_MOVE = MATE_VALUE - 255;
-constexpr static qint16 ABOVE_EG = 20000;
 constexpr static qint16 DRAW_EG = 0; // = FAKE_DRAW_SCORE
 
 constexpr static auto UPDATE_PERIOD = 70ms;
@@ -431,7 +430,8 @@ void Solver::start(pBoard start_pos, std::function<void(QString)> message, Solve
 
 void Solver::stop()
 {
-	status = Status::idle;
+	if (status != Status::postprocessing)
+		status = Status::idle;
 }
 
 bool Solver::save(pBoard pos, Chess::Move move, std::shared_ptr<SolutionEntry> data, bool is_only_move, bool is_multi_pos)
@@ -504,7 +504,7 @@ void Solver::process(pBoard pos, Chess::Move move, std::shared_ptr<SolutionEntry
 
 void Solver::process_move(std::vector<pMove>& tree, SolverState& info)
 {
-	if (status == Status::idle)
+	if (status == Status::idle || status == Status::postprocessing)
 		throw stopProcessing();
 	if (tree.empty())
 		throw runtime_error("Error: empty tree while processing.");
@@ -1255,6 +1255,11 @@ std::shared_ptr<Chess::Board> Solver::positionToSolve() const
 }
 
 bool Solver::isSolving() const
+{
+	return (status == Status::solving) || (status == Status::waitingEval);
+}
+
+bool Solver::isBusy() const
 {
 	return status != Status::idle;
 }

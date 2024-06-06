@@ -120,7 +120,10 @@ class LIB_EXPORT Solver : public QObject
 public:
 	enum class Status
 	{
-		idle, solving, waitingEval
+		idle, 
+		solving, 
+		waitingEval,
+		postprocessing
 	};
 
 	using pMove = std::shared_ptr<SolverMove>;
@@ -140,6 +143,7 @@ public:
 	std::shared_ptr<SolverSession> whatToSolve() const;
 	pBoard positionToSolve() const;
 	bool isSolving() const;
+	bool isBusy() const;
 	std::list<MoveEntry> entries(Chess::Board* board) const;
 
 	void start(Chess::Board* new_pos, std::function<void(QString)> message, SolverMode mode);
@@ -251,6 +255,8 @@ private:
 	size_t num_evaluated_endgames;
 	bool is_solver_path;
 	size_t num_new_moves;
+
+protected:
 	// Settings
 	SolverSettings s;
 
