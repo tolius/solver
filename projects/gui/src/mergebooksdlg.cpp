@@ -16,7 +16,7 @@ using namespace std;
 MergeBooksDialog::MergeBooksDialog(QWidget* parent, std::shared_ptr<SolverResults> solver)
 	: QDialog(parent)
 	, ui(new Ui::MergeBooksDialog)
-	, book_type(Solution::FileType_SIZE)
+	, book_type(FileType_SIZE)
 {
 	ui->setupUi(this);
 	this->solver = solver;
@@ -33,59 +33,59 @@ MergeBooksDialog::MergeBooksDialog(QWidget* parent, std::shared_ptr<SolverResult
 	auto opening_name = new QTableWidgetItem(ui->label_Opening->text());
 	ui->table_Books->setItem(0, 1, opening_name);
 
-	updateMainBookType(Solution::FileType_SIZE);
-	if (book_type == Solution::FileType_SIZE)
+	updateMainBookType(FileType_SIZE);
+	if (book_type == FileType_SIZE)
 	{
 		warning(tr("The solution \"%1\" has no books. Please first generate a book.").arg(ui->label_Opening->text()));
 		accept();
 		return;
 	}
 	
-	connect(ui->btn_MainBookAuto, &QPushButton::clicked, this, [this]() { updateMainBookType(Solution::FileType_SIZE); });
-	connect(ui->btn_MainBookLowerLevel, &QPushButton::clicked, this, [this]() { updateMainBookType(Solution::FileType_book); });
-	connect(ui->btn_MainBookUpperLevel, &QPushButton::clicked, this, [this]() { updateMainBookType(Solution::FileType_book_upper); });
-	connect(ui->btn_MainBookShort, &QPushButton::clicked, this, [this]() { updateMainBookType(Solution::FileType_book_short); });
+	connect(ui->btn_MainBookAuto, &QPushButton::clicked, this, [this]() { updateMainBookType(FileType_SIZE); });
+	connect(ui->btn_MainBookLowerLevel, &QPushButton::clicked, this, [this]() { updateMainBookType(FileType_book); });
+	connect(ui->btn_MainBookUpperLevel, &QPushButton::clicked, this, [this]() { updateMainBookType(FileType_book_upper); });
+	connect(ui->btn_MainBookShort, &QPushButton::clicked, this, [this]() { updateMainBookType(FileType_book_short); });
 
 	connect(ui->btn_Add, &QPushButton::clicked, this, &MergeBooksDialog::on_AddClicked);
 	connect(ui->btn_Clear, &QPushButton::clicked, this, &MergeBooksDialog::on_ClearClicked);
 	connect(ui->btn_OK, &QPushButton::clicked, this, &MergeBooksDialog::on_OKClicked);
 }
 
-Solution::FileType MergeBooksDialog::autoSelectBook() const
+FileType MergeBooksDialog::autoSelectBook() const
 {
-	using TypeBtn = tuple<Solution::FileType, QToolButton*>;
+	using TypeBtn = tuple<FileType, QToolButton*>;
 	array<TypeBtn, 3> type_buttons = 
 	{
-		TypeBtn(Solution::FileType_book_short, ui->btn_MainBookShort), 
-		TypeBtn(Solution::FileType_book,       ui->btn_MainBookLowerLevel), 
-		TypeBtn(Solution::FileType_book_upper, ui->btn_MainBookUpperLevel)
+		TypeBtn(FileType_book_short, ui->btn_MainBookShort), 
+		TypeBtn(FileType_book,       ui->btn_MainBookLowerLevel), 
+		TypeBtn(FileType_book_upper, ui->btn_MainBookUpperLevel)
 	};
 
-	Solution::FileType auto_type = Solution::FileType_SIZE;
+	FileType auto_type = FileType_SIZE;
 	for (auto& [t, btn] : type_buttons)
 	{
 		bool exists = solver->solution()->fileExists(t);
 		btn->setEnabled(exists);
-		if (exists && auto_type == Solution::FileType_SIZE)
+		if (exists && auto_type == FileType_SIZE)
 			auto_type = t;
 	}
 
 	return auto_type;
 }
 
-void MergeBooksDialog::updateMainBookType(Solution::FileType type)
+void MergeBooksDialog::updateMainBookType(FileType type)
 {
 	ui->btn_MainBookAuto->blockSignals(true);
 	ui->btn_MainBookLowerLevel->blockSignals(true);
 	ui->btn_MainBookUpperLevel->blockSignals(true);
 	ui->btn_MainBookShort->blockSignals(true);
 	
-	ui->btn_MainBookAuto->setChecked(type == Solution::FileType_SIZE);
-	ui->btn_MainBookLowerLevel->setChecked(type == Solution::FileType_book);
-	ui->btn_MainBookUpperLevel->setChecked(type == Solution::FileType_book_upper);
-	ui->btn_MainBookShort->setChecked(type == Solution::FileType_book_short);
+	ui->btn_MainBookAuto->setChecked(type == FileType_SIZE);
+	ui->btn_MainBookLowerLevel->setChecked(type == FileType_book);
+	ui->btn_MainBookUpperLevel->setChecked(type == FileType_book_upper);
+	ui->btn_MainBookShort->setChecked(type == FileType_book_short);
 
-	book_type = (type == Solution::FileType_SIZE) ? autoSelectBook() : type;
+	book_type = (type == FileType_SIZE) ? autoSelectBook() : type;
 	auto path = new QTableWidgetItem(solver->solution()->path(book_type));
 	ui->table_Books->setItem(0, 2, path);
 

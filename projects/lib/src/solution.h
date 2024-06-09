@@ -59,35 +59,6 @@ class LIB_EXPORT Solution : public QObject
 	Q_OBJECT
 
 public:
-	enum FileType : int
-	{
-		FileType_START           = 0,
-		FileType_DATA_START      = 0,
-		FileType_UPPER           = 0,
-		FileType_positions_upper = 0,
-		FileType_multi_upper     = 1,
-		FileType_alts_upper      = 2,
-		FileType_solution_upper  = 3,
-		FileType_endgames_upper  = 4,//
-		FileType_LOWER           = 5,
-		FileType_positions_lower = 5,
-		FileType_multi_lower     = 6,
-		FileType_alts_lower      = 7,
-		FileType_solution_lower  = 8,
-		FileType_endgames_lower  = 9,//
-		FileType_comments        = 10,
-		FileType_DATA_END        = 11,
-		FileType_BOOKS_START     = 11,
-		FileType_book_upper      = 11,
-		FileType_book_short      = 12,
-		FileType_book            = 13,
-		FileType_BOOKS_END       = 14,
-		FileType_META_START      = 14,
-		FileType_state           = 14,//
-		FileType_spec            = 15,
-		FileType_SIZE            = 16
-	};
-
 	enum class FileSubtype
 	{
 		Std, New, Bak
@@ -126,7 +97,8 @@ public:
 	std::shared_ptr<SolutionData> mainData() const;
 
 	void initFilenames();
-	void loadBook(bool update_info);
+	void loadBook();
+	void updateInfo();
 	void activate(bool send_msg = true);
 	void deactivate(bool send_msg = true);
 	bool remove(std::function<bool(const QString&)> are_you_sure, std::function<void(const QString&)> message);
@@ -145,6 +117,7 @@ signals:
 	void Message(const QString&, MessageType type = MessageType::std);
 
 private:
+	int winInValue(std::shared_ptr<Chess::Board> board, FileType type) const;
 	bool hasMergeErrors() const;
 	void saveBranchSettings(QSettings& s, std::shared_ptr<Chess::Board> board);
 	bool mergeFiles(FileType type);

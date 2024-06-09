@@ -37,6 +37,35 @@ class Position;
 struct StateInfo;
 
 
+enum FileType : int
+{
+	FileType_START = 0,
+	FileType_DATA_START = 0,
+	FileType_UPPER = 0,
+	FileType_positions_upper = 0,
+	FileType_multi_upper = 1,
+	FileType_alts_upper = 2,
+	FileType_solution_upper = 3,
+	FileType_endgames_upper = 4, //
+	FileType_LOWER = 5,
+	FileType_positions_lower = 5,
+	FileType_multi_lower = 6,
+	FileType_alts_lower = 7,
+	FileType_solution_lower = 8,
+	FileType_endgames_lower = 9, //
+	FileType_comments = 10,
+	FileType_DATA_END = 11,
+	FileType_BOOKS_START = 11,
+	FileType_book_upper = 11,
+	FileType_book_short = 12,
+	FileType_book = 13,
+	FileType_BOOKS_END = 14,
+	FileType_META_START = 14,
+	FileType_state = 14, //
+	FileType_spec = 15,
+	FileType_SIZE = 16
+};
+
 enum class EntrySource
 {
 	none,
@@ -64,6 +93,16 @@ public:
 enum class MessageType
 {
 	std, info, warning, error, success
+};
+
+enum class SolutionInfoState : int
+{
+	unknown      = 0,
+	all_branches = 1 << 0,
+	improved     = 1 << 1,
+	verified     = 1 << 2,
+	shortened    = 1 << 3,
+	expanded     = 1 << 4
 };
 
 enum class UpdateFrequency : int

@@ -22,8 +22,8 @@ public:
 	MergeBooksDialog(QWidget* parent, std::shared_ptr<SolverResults> solver);
 
 private:
-	Solution::FileType autoSelectBook() const;
-	void updateMainBookType(Solution::FileType type);
+	FileType autoSelectBook() const;
+	void updateMainBookType(FileType type);
 	void warning(const QString& info);
 
 private slots:
@@ -34,7 +34,7 @@ private slots:
 private:
 	Ui::MergeBooksDialog* ui;
 	std::shared_ptr<SolverResults> solver;
-	Solution::FileType book_type;
+	FileType book_type;
 };
 
 #endif // MERGEBOOKSDIALOG_H

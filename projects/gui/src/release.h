@@ -32,16 +32,16 @@ private:
 	void verify();
 
 private:
-	void onBookTypeChanged(Solution::FileType type);
+	void onBookTypeChanged(FileType type);
 
 private:
 	Ui::ReleaseWidget* ui;
 
 	std::shared_ptr<SolverResults> solver;
-	Solution::FileType book_type;
+	FileType book_type;
 
 private:
-	constexpr static auto NO_BOOK = Solution::FileType_SIZE;
+	constexpr static auto NO_BOOK = FileType_SIZE;
 };
 
 #endif // RELEASE_H

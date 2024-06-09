@@ -6,6 +6,7 @@
 #include <QFileInfo>
 #include <QDir>
 #include <QSettings>
+#include <QDateTime>
 
 #include <functional>
 #include <filesystem>
@@ -18,7 +19,6 @@ using namespace std;
 namespace fs = std::filesystem;
 
 constexpr static int CURR_WIN_IN = 30000;
-constexpr static int UNKNOWN_WIN_IN = -32768;
 
 const QString Solution::DATA      = "data";
 const QString Solution::BOOKS     = "books";
@@ -26,41 +26,6 @@ const QString Solution::SPEC_EXT  = "spec";
 const QString Solution::DATA_EXT  = "bin";
 const QString Solution::TDATA_EXT = "tbin";
 const QString Solution::BAK_EXT   = "bak";
-
-//const std::map<QString, QStringList> Watkins_solutions = {
-//	{ "e3wins.rev4",          {                                                 } },
-//	{ "a3e6_rev_new.proof",   { "a3", "e6"                                      } },
-//	{ "b4.LOST.proof",        { "b4", "c5"                                      } },
-//	{ "b4.new.LOST.proof",    { "b4", "c5"                                      } },
-//	{ "b4c5_rev.proof",       { "b4", "c5", "bxc5", "a5"                        } },
-//	{ "c3.LOST.proof",        { "c3", "e5"                                      } },
-//	{ "c3e5.rev",             { "c3", "e5"                                      } },
-//	{ "e3b5.done",            { "e3", "b5", "Bxb5"                              } },
-//	{ "e3b5.rev2",            { "e3", "b5", "Bxb5"                              } },
-//	{ "e3b6.proof",           { "e3", "b6", "a4"                                } },
-//	{ "e3b6.2a4e6.rev2",      { "e3", "b6", "a4"                                } },
-//	{ "e3b6.no2e6.rev2",      { "e3", "b6", "a4"                                } },
-//	{ "e3c5.done",            { "e3", "c5", "Bb5"                               } },
-//	{ "e3c5.rev3",            { "e3", "c5", "Bb5"                               } },
-//	{ "e3c6.done",            { "e3", "c6", "Bb5", "cxb5", "b4"                 } },
-//	{ "e3c6.rev2",            { "e3", "c6", "Bb5", "cxb5", "b4"                 } },
-//	{ "e3e6.done",            { "e3", "e6", "b4"                                } },
-//	{ "e3e6.rev2",            { "e3", "e6", "b4", "Bxb4", "Qg4", "Bxd2", "Qxg7" } },
-//	{ "e3g5.done",            { "e3", "g5", "Ba6"                               } },
-//	{ "e3g5.rev3",            { "e3", "g5", "Ba6"                               } },
-//	{ "e3Nc6.done",           { "e3", "Nc6", "Ba6", "bxa6", "a4"                } },
-//	{ "e3Nc6.rev2",           { "e3", "Nc6", "Ba6", "bxa6", "a4"                } },
-//	{ "e3Nh6.done",           { "e3", "Nh6", "Ba6"                              } },
-//	{ "e3Nh6.rev2",           { "e3", "Nh6", "Ba6"                              } },
-//	{ "easy12.done",          { "e3"                                            } },
-//	{ "easy12.rev",           {                                                 } },
-//	{ "f3d5_new.proof",       { "f3", "d5"                                      } },
-//	{ "h3.LOST.proof",        { "h3", "Nh6"                                     } },
-//	{ "myNa6e3.nob3v2.proof", { "Na3", "e6"                                     } },
-//	{ "Na3e6.proof",          { "Na3", "e6"                                     } },
-//	{ "Na3e6_no_b3.proof",    { "Na3", "e6"                                     } },
-//	{ "old_f3d5_rev.proof",   { "f3", "d5"                                      } },
-//};
 
 
 Solution::Solution(std::shared_ptr<SolutionData> data, const QString& basename, int version, bool is_imported)
@@ -84,13 +49,6 @@ Solution::Solution(std::shared_ptr<SolutionData> data, const QString& basename, 
 			return;
 		}
 		initFilenames();
-		/// Create folders.
-		if (!data->tag.isEmpty())
-		{
-			QDir dir(folder);
-			dir.mkpath(tag.isEmpty() ? DATA : QString("%1/%2").arg(DATA).arg(tag));
-			dir.mkpath(tag.isEmpty() ? BOOKS : QString("%1/%2").arg(BOOKS).arg(tag));
-		}
 		QSettings s(path(FileType_spec), QSettings::IniFormat);
 		s.beginGroup("meta");
 		s.setValue("opening", name);
@@ -101,19 +59,27 @@ Solution::Solution(std::shared_ptr<SolutionData> data, const QString& basename, 
 		}
 		s.setValue("version", version);
 		s.endGroup();
-		info_win_in = UNKNOWN_WIN_IN;
+		info_win_in = UNKNOWN_SCORE;
 	}
 	else
 	{
 		name = basename;
 		initFilenames();
 		QSettings s(path(FileType_spec), QSettings::IniFormat);
-		info_win_in = s.value("info/win_in", UNKNOWN_WIN_IN).toInt();
-		if (info_win_in != UNKNOWN_WIN_IN)
+		info_win_in = s.value("info/win_in", UNKNOWN_SCORE).toInt();
+		if (info_win_in != UNKNOWN_SCORE)
 			info_win_in++; // show #WinIn before the last move of the opening is made, not after
 	}
 	side = opening.size() % 2 == 0 ? Chess::Side::White : Chess::Side::Black;
 	is_solver_upper_level = true;
+
+	/// Create folders.
+	if (!data->tag.isEmpty())
+	{
+		QDir dir(folder);
+		dir.mkpath(tag.isEmpty() ? DATA : QString("%1/%2").arg(DATA).arg(tag));
+		dir.mkpath(tag.isEmpty() ? BOOKS : QString("%1/%2").arg(BOOKS).arg(tag));
+	}
 }
 
 void Solution::initFilenames()
@@ -142,9 +108,22 @@ void Solution::initFilenames()
 	}
 }
 
-void Solution::loadBook(bool update_info)
+void Solution::loadBook()
 {
-	QString path_book = fileExists(FileType_book) ? path(FileType_book) : fileExists(FileType_book_upper) ? path(FileType_book_upper) : "";
+	QSettings s(path(FileType_spec), QSettings::IniFormat);
+	s.beginGroup("info");
+	int state_upper_level = s.value("state_upper_level", (int)SolutionInfoState::unknown).toInt();
+	int state_lower_level = s.value("state_lower_level", (int)SolutionInfoState::unknown).toInt();
+	s.endGroup();
+	bool all_branches_upper = state_upper_level & static_cast<int>(SolutionInfoState::all_branches);
+	bool all_branches_lower = state_lower_level & static_cast<int>(SolutionInfoState::all_branches);
+	bool exists_lower = fileExists(FileType_book);
+	bool exists_upper = fileExists(FileType_book_upper);
+	QString path_book = (exists_lower && all_branches_lower) ? path(FileType_book)
+	                  : (exists_upper && all_branches_upper) ? path(FileType_book_upper)
+	                  : exists_lower                         ? path(FileType_book)
+	                  : exists_upper                         ? path(FileType_book_upper)
+	                                                         : "";
 	if (path_book.isEmpty())
 		return;
 
@@ -163,8 +142,46 @@ void Solution::loadBook(bool update_info)
 		ram_budget += fi.size();
 		return;
 	}
+}
 
-	if (!update_info && info_win_in != UNKNOWN_WIN_IN)
+void Solution::updateInfo()
+{
+	QSettings s(path(FileType_spec), QSettings::IniFormat);
+	s.beginGroup("info");
+
+	int timestamp_upper_level = s.value("timestamp_upper_level", 0).toInt();
+	int state_upper_level = s.value("state_upper_level", (int)SolutionInfoState::unknown).toInt();
+	QFileInfo fi_upper_level(path(FileType_book_upper));
+	bool upper_level_exists = fi_upper_level.exists();
+	bool is_upper_level_ok = upper_level_exists;
+	if (is_upper_level_ok) {
+		int t_upper = static_cast<int>(fi_upper_level.lastModified().toSecsSinceEpoch());
+		if (timestamp_upper_level != t_upper)
+			is_upper_level_ok = false;
+	}
+	if (!is_upper_level_ok) {
+		s.setValue("timestamp_upper_level", 0);
+		s.setValue("state_upper_level", (int)SolutionInfoState::unknown);
+	}
+
+	int timestamp_lower_level = s.value("timestamp_lower_level", 0).toInt();
+	int state_lower_level = s.value("state_lower_level", (int)SolutionInfoState::unknown).toInt();
+	QFileInfo fi_lower_level(path(FileType_book));
+	bool lower_level_exists = fi_lower_level.exists();
+	bool is_lower_level_ok = lower_level_exists;
+	if (is_lower_level_ok) {
+		int t_lower = static_cast<int>(fi_lower_level.lastModified().toSecsSinceEpoch());
+		if (timestamp_lower_level != t_lower)
+			is_lower_level_ok = false;
+	}
+	if (!is_lower_level_ok) {
+		s.setValue("timestamp_lower_level", 0);
+		s.setValue("state_lower_level", (int)SolutionInfoState::unknown);
+	}
+
+	if (is_upper_level_ok && is_lower_level_ok)
+		return;
+	if (!upper_level_exists && !lower_level_exists)
 		return;
 
 	using namespace Chess;
@@ -172,26 +189,40 @@ void Solution::loadBook(bool update_info)
 	board->setFenString(board->defaultFenString());
 	for (const auto& move : opening)
 		board->makeMove(move);
-	auto opening_entries = entries(board.get());
-	if (opening_entries.empty())
-		return;
+	int win_in_upper = upper_level_exists ? winInValue(board, FileType_book_upper) : UNKNOWN_SCORE;
+	int win_in_lower = lower_level_exists ? winInValue(board, FileType_book) : UNKNOWN_SCORE;
+	bool all_branches_upper = state_upper_level & static_cast<int>(SolutionInfoState::all_branches);
+	bool all_branches_lower = state_lower_level & static_cast<int>(SolutionInfoState::all_branches);
+	info_win_in = (win_in_upper == UNKNOWN_SCORE)     ? win_in_lower
+	    : (win_in_lower == UNKNOWN_SCORE)             ? win_in_upper
+	    : (all_branches_upper && !all_branches_lower) ? win_in_upper
+	    : (!all_branches_upper && all_branches_lower) ? win_in_lower
+	                                                  : min(win_in_upper, win_in_lower);
+	s.setValue("win_in", info_win_in);
+	s.endGroup();
+}
 
-	//qint16 add_plies = static_cast<qint16>(opening.size());
-	int score = opening_entries.front().score();
+int Solution::winInValue(std::shared_ptr<Chess::Board> board, FileType type) const
+{
+	auto book = make_shared<SolutionBook>(OpeningBook::Disk);
+	bool is_ok = book->read(path(type));
+	if (!is_ok)
+		return UNKNOWN_SCORE;
+	auto moves = book->bookEntries(board->key());
+	if (moves.empty())
+		return UNKNOWN_SCORE;
+	moves.sort(std::not_fn(SolutionEntry::compare));
+	auto score = moves.front().score();
 	if (score == UNKNOWN_SCORE)
-		return;
-	
-	info_win_in = score == 0       ? 0
-		: score == FAKE_DRAW_SCORE ? CURR_WIN_IN
-		: score > FAKE_MATE_VALUE  ? MATE_VALUE - score
-		: score > MATE_THRESHOLD   ? FAKE_MATE_VALUE - score + CURR_WIN_IN
-		: score < -FAKE_MATE_VALUE ? -MATE_VALUE - score
-		: score < -MATE_THRESHOLD  ? -FAKE_MATE_VALUE - score - CURR_WIN_IN
-						            : UNKNOWN_SCORE;
-	if (info_win_in != UNKNOWN_SCORE) {
-		QSettings s(path(FileType_spec), QSettings::IniFormat);
-		s.setValue("info/win_in", info_win_in);
-	}
+		return UNKNOWN_SCORE;
+	auto win_in = score == 0       ? 0
+	    : score == FAKE_DRAW_SCORE ? CURR_WIN_IN
+	    : score > FAKE_MATE_VALUE  ? MATE_VALUE - score
+	    : score > MATE_THRESHOLD   ? FAKE_MATE_VALUE - score + CURR_WIN_IN
+	    : score < -FAKE_MATE_VALUE ? -MATE_VALUE - score
+	    : score < -MATE_THRESHOLD  ? -FAKE_MATE_VALUE - score - CURR_WIN_IN
+	                               : UNKNOWN_SCORE;
+	return win_in;
 }
 
 void Solution::activate(bool send_msg)
@@ -202,9 +233,12 @@ void Solution::activate(bool send_msg)
 	// Merge files
 	mergeAllFiles();
 
+	// Update info
+	updateInfo();
+
 	// Read the book
 	ram_budget = static_cast<quint64>(QSettings().value("solver/book_cache", 1.0).toDouble() * 1024 * 1024 * 1024);
-	loadBook(false);
+	loadBook();
 
 	// Read alts, positions, and solution books
 	for (FileType type : { FileType_alts_upper, FileType_alts_lower, FileType_positions_upper, FileType_positions_lower, FileType_solution_upper, FileType_solution_lower })
@@ -479,7 +513,7 @@ QString Watkins_nodes(const SolutionEntry& entry)
 	quint32 num = entry.nodes();
 	QString num_nodes = num <= 1 ? ""
 	    : num < 5'000            ? QString("%L1").arg(num)
-	    : num < 5'000'000        ? QString("<b>%L1k</b>").arg((num + 500) / 1000)
+	    : num < 5'000'000        ? QString("%L1<b>k</b>").arg((num + 500) / 1000)
 	                             : QString("<b>%L1M</b>").arg((num + 500'000) / 1000'000);
 	return num_nodes;
 }
@@ -745,7 +779,7 @@ const QString& Solution::nameString() const
 
 QString Solution::score() const
 {
-	if (info_win_in == UNKNOWN_WIN_IN)
+	if (info_win_in == UNKNOWN_SCORE)
 		return "?";
 	if (info_win_in == 0)
 		return "draw";
@@ -913,6 +947,13 @@ void Solution::edit(std::shared_ptr<SolutionData> data)
 void Solution::saveBranchSettings(QSettings& s, std::shared_ptr<Chess::Board> board)
 {
 	s.setValue("branch", line_to_string(branch, board));
+
+	// Delete old values
+	s.beginGroup("branches_to_skip");
+	s.remove("");
+	s.endGroup();
+
+	// Save new values
 	s.beginWriteArray("branches_to_skip");
 	int i = 0;
 	for (const auto& branch_to_skip : branchesToSkip)
@@ -1117,6 +1158,7 @@ std::vector<SolutionEntry> Solution::eSolutionEntries(Chess::Board* board, bool 
 		if (!WatkinsSolution.is_open())
 		{
 			emit Message(QString("Opening Watkins solution file \"%1\"...").arg(Watkins));
+			qApp->processEvents();
 			fs::path filepath = folder.toStdString();
 			filepath /= "Watkins";
 			filepath /= Watkins.toStdString();

@@ -19,12 +19,27 @@ Release::Release(QWidget* parent)
 {
 	ui->setupUi(this);
 
+	auto set_readonly = [](QCheckBox* checkbox)
+	{
+		checkbox->setAttribute(Qt::WA_TransparentForMouseEvents);
+		checkbox->setFocusPolicy(Qt::NoFocus);
+	};
+	set_readonly(ui->chk_Up_AllBranches);
+	set_readonly(ui->chk_Up_Improved);
+	set_readonly(ui->chk_Up_Verified);
+	set_readonly(ui->chk_Up_Expanded);
+	set_readonly(ui->chk_Low_AllBranches);
+	set_readonly(ui->chk_Low_Improved);
+	set_readonly(ui->chk_Low_Verified);
+	set_readonly(ui->chk_Low_Shortened);
+	//ui->widget_UpperLevel->setEnabled(false);
+	//ui->widget_LowerLevel->setEnabled(false);
 	ui->widget_ResultInfo->setVisible(false);
 
-	connect(ui->btn_BookNone,       &QToolButton::toggled, this, [this]() { onBookTypeChanged(NO_BOOK);                       });
-	connect(ui->btn_BookLowerLevel, &QToolButton::toggled, this, [this]() { onBookTypeChanged(Solution::FileType_book);       });
-	connect(ui->btn_BookUpperLevel, &QToolButton::toggled, this, [this]() { onBookTypeChanged(Solution::FileType_book_upper); });
-	connect(ui->btn_BookShort,      &QToolButton::toggled, this, [this]() { onBookTypeChanged(Solution::FileType_book_short); });
+	connect(ui->btn_BookNone,       &QToolButton::toggled, this, [this]() { onBookTypeChanged(NO_BOOK);             });
+	connect(ui->btn_BookLowerLevel, &QToolButton::toggled, this, [this]() { onBookTypeChanged(FileType_book);       });
+	connect(ui->btn_BookUpperLevel, &QToolButton::toggled, this, [this]() { onBookTypeChanged(FileType_book_upper); });
+	connect(ui->btn_BookShort,      &QToolButton::toggled, this, [this]() { onBookTypeChanged(FileType_book_short); });
 
 	connect(ui->btn_Verify, &QPushButton::clicked, this, &Release::verify);
 }
@@ -32,6 +47,7 @@ Release::Release(QWidget* parent)
 void Release::setSolver(std::shared_ptr<SolverResults> solver)
 {
 	this->solver = solver;
+	book_type = NO_BOOK;
 	updateData();
 }
 
@@ -41,18 +57,18 @@ void Release::blockBookSignals(bool flag)
 		btn->blockSignals(flag);
 }
 
-void Release::onBookTypeChanged(Solution::FileType type)
+void Release::onBookTypeChanged(FileType type)
 {
 	if (book_type == type)
 		return;
 
-	auto btn = type == Solution::FileType_book  ? ui->btn_BookLowerLevel
-	    : type == Solution::FileType_book_upper ? ui->btn_BookUpperLevel
-	    : type == Solution::FileType_book_short ? ui->btn_BookShort
-	                                            : ui->btn_BookNone;
+	auto btn = type == FileType_book  ? ui->btn_BookLowerLevel
+	    : type == FileType_book_upper ? ui->btn_BookUpperLevel
+	    : type == FileType_book_short ? ui->btn_BookShort
+	                                  : ui->btn_BookNone;
+	book_type = type;
 	if (!btn->isChecked())
 	{
-		book_type = type;
 		blockBookSignals(true);
 		btn->setChecked(true);
 		blockBookSignals(false);
@@ -70,12 +86,12 @@ void Release::updateData()
 			book_type = NO_BOOK;
 	}
 
-	using TypeBtn = tuple<Solution::FileType, QToolButton*>;
+	using TypeBtn = tuple<FileType, QToolButton*>;
 	array<TypeBtn, 3> type_buttons = 
 	{
-		TypeBtn(Solution::FileType_book_short, ui->btn_BookShort), 
-		TypeBtn(Solution::FileType_book,       ui->btn_BookLowerLevel), 
-		TypeBtn(Solution::FileType_book_upper, ui->btn_BookUpperLevel)
+		TypeBtn(FileType_book_short, ui->btn_BookShort), 
+		TypeBtn(FileType_book,       ui->btn_BookLowerLevel), 
+		TypeBtn(FileType_book_upper, ui->btn_BookUpperLevel)
 	};
 
 	for (auto& [t, btn] : type_buttons)
@@ -98,6 +114,22 @@ void Release::updateData()
 		ui->btn_BookNone->setChecked(true);
 		blockBookSignals(false);
 	}
+
+	QSettings s(solver->solution()->path(FileType_spec), QSettings::IniFormat);
+	s.beginGroup("info");
+	int state_upper_level = s.value("state_upper_level", (int)SolutionInfoState::unknown).toInt();
+	int state_lower_level = s.value("state_lower_level", (int)SolutionInfoState::unknown).toInt();
+	s.endGroup();
+	//ui->widget_UpperLevel->setEnabled(book_type == FileType_book_upper);
+	//ui->widget_LowerLevel->setEnabled(book_type == FileType_book || book_type == FileType_book_short);
+	ui->chk_Up_AllBranches->setChecked(state_upper_level & (int)SolutionInfoState::all_branches);
+	ui->chk_Up_Improved->setChecked(state_upper_level & (int)SolutionInfoState::improved);
+	ui->chk_Up_Verified->setChecked(state_upper_level & (int)SolutionInfoState::verified);
+	ui->chk_Up_Expanded->setChecked(state_upper_level & (int)SolutionInfoState::expanded);
+	ui->chk_Low_AllBranches->setChecked(state_lower_level & (int)SolutionInfoState::all_branches);
+	ui->chk_Low_Improved->setChecked(state_lower_level & (int)SolutionInfoState::improved);
+	ui->chk_Low_Verified->setChecked(state_lower_level & (int)SolutionInfoState::verified);
+	ui->chk_Low_Shortened->setChecked(state_lower_level & (int)SolutionInfoState::shortened);
 
 	ui->btn_Verify->setEnabled(book_type != NO_BOOK && solver && !solver->isBusy());
 }
@@ -133,6 +165,7 @@ void Release::verify()
 	try
 	{
 		solver->verify(book_type);
+		updateData();
 	}
 	catch (exception e)
 	{

@@ -9,6 +9,7 @@
 #include <QTimer>
 #include <QFile>
 #include <QFileInfo>
+#include <QDateTime>
 
 #include <stdexcept>
 #include <thread>
@@ -221,7 +222,7 @@ void Solver::start(Chess::Board* new_pos, std::function<void(QString)> message, 
 					"Please check the solution settings or re-run it in Auto mode.");
 			return;
 		}
-		auto path_pos = sol->path(Solution::FileType_positions_upper);
+		auto path_pos = sol->path(FileType_positions_upper);
 		QFileInfo fi(path_pos);
 		if (fi.size() > 2000) {
 			message("Failed to start because the solution already contains engine-computed data.\n\n"
@@ -340,11 +341,11 @@ void Solver::start(pBoard start_pos, std::function<void(QString)> message, Solve
 				{
 					if (pos->sideToMove() != our_color)
 						continue;
-					if (sol->bookEntry(pos, Solution::FileType_positions_lower) || sol->bookEntry(pos, Solution::FileType_alts_lower)) {
+					if (sol->bookEntry(pos, FileType_positions_lower) || sol->bookEntry(pos, FileType_alts_lower)) {
 						set_level(false); // evaluate_endgames will also be updates
 						break;
 					}
-					if (sol->bookEntry(pos, Solution::FileType_positions_upper) || sol->bookEntry(pos, Solution::FileType_alts_upper))
+					if (sol->bookEntry(pos, FileType_positions_upper) || sol->bookEntry(pos, FileType_alts_upper))
 						break;
 					pos->undoMove();
 				}
@@ -451,8 +452,8 @@ bool Solver::save(pBoard pos, Chess::Move move, std::shared_ptr<SolutionEntry> d
 		|| !isCurrentBranch(pos))
 		return false;
 
-	auto type = is_multi_pos ? (only_upper_level ? Solution::FileType_multi_upper : Solution::FileType_multi_lower)
-	                         : (only_upper_level ? Solution::FileType_positions_upper : Solution::FileType_positions_lower);
+	auto type = is_multi_pos ? (only_upper_level ? FileType_multi_upper : FileType_multi_lower)
+	                         : (only_upper_level ? FileType_positions_upper : FileType_positions_lower);
 	sol->addToBook(pos, *data, type);
 	return false;
 }
@@ -485,7 +486,7 @@ void Solver::saveOverride(Chess::Board* pos, std::shared_ptr<SolutionEntry> data
 	if (is_waiting)
 		eval_result = { data, move, false };
 
-	auto type = only_upper_level ? Solution::FileType_alts_upper : Solution::FileType_alts_lower;
+	auto type = only_upper_level ? FileType_alts_upper : FileType_alts_lower;
 	sol->addToBook(prev_key, *data, type);
 }
 
@@ -1094,8 +1095,8 @@ Solver::pMove Solver::get_solution_move() const
 
 Solver::pMove Solver::get_esolution_move() const
 {
-	auto esol1 = only_upper_level ? Solution::FileType_solution_upper : Solution::FileType_solution_lower;
-	auto esol2 = only_upper_level ? Solution::FileType_solution_lower : Solution::FileType_solution_upper;
+	auto esol1 = only_upper_level ? FileType_solution_upper : FileType_solution_lower;
+	auto esol2 = only_upper_level ? FileType_solution_lower : FileType_solution_upper;
 	auto entry = sol->bookEntry(board, esol1, !to_copy_solution);
 	if (!entry) {
 		entry = sol->bookEntry(board, esol2, !to_copy_solution);
@@ -1107,8 +1108,8 @@ Solver::pMove Solver::get_esolution_move() const
 
 Solver::pMove Solver::get_alt_move() const
 {
-	auto alts1 = only_upper_level ? Solution::FileType_alts_upper : Solution::FileType_alts_lower;
-	auto alts2 = only_upper_level ? Solution::FileType_alts_lower : Solution::FileType_alts_upper;
+	auto alts1 = only_upper_level ? FileType_alts_upper : FileType_alts_lower;
+	auto alts2 = only_upper_level ? FileType_alts_lower : FileType_alts_upper;
 	auto entry = sol->bookEntry(board, alts1);
 	if (!entry) {
 		entry = sol->bookEntry(board, alts2);
@@ -1125,15 +1126,15 @@ Solver::pMove Solver::get_saved() const
 		auto& bytes = it->second;
 		return SolverMove::fromBytes(bytes);
 	}
-	auto alts1 = only_upper_level ? Solution::FileType_alts_upper : Solution::FileType_alts_lower;
-	auto alts2 = only_upper_level ? Solution::FileType_alts_lower : Solution::FileType_alts_upper;
+	auto alts1 = only_upper_level ? FileType_alts_upper : FileType_alts_lower;
+	auto alts2 = only_upper_level ? FileType_alts_lower : FileType_alts_upper;
 	auto entry = sol->bookEntry(board, alts1);
 	if (!entry)
 		entry = sol->bookEntry(board, alts2);
 	if (entry && entry->is_overridden())
 		return make_shared<SolverMove>(entry);
-	auto pos1 = only_upper_level ? Solution::FileType_positions_upper : Solution::FileType_positions_lower;
-	auto pos2 = only_upper_level ? Solution::FileType_positions_lower : Solution::FileType_positions_upper;
+	auto pos1 = only_upper_level ? FileType_positions_upper : FileType_positions_lower;
+	auto pos2 = only_upper_level ? FileType_positions_lower : FileType_positions_upper;
 	entry = sol->bookEntry(board, pos1);
 	if (!entry)
 		entry = sol->bookEntry(board, pos2);
@@ -1229,12 +1230,12 @@ void Solver::save_data(pcMove move, bool to_save)
 {
 	new_positions[board->key()] = move->toBytes();
 	if (to_save)
-		sol->addToBook(board, move->toBytes(), only_upper_level ? Solution::FileType_positions_upper : Solution::FileType_positions_lower);
+		sol->addToBook(board, move->toBytes(), only_upper_level ? FileType_positions_upper : FileType_positions_lower);
 }
 
 void Solver::save_alt(pcMove move)
 {
-	sol->addToBook(board, move->toBytes(), only_upper_level ? Solution::FileType_alts_upper : Solution::FileType_positions_lower);
+	sol->addToBook(board, move->toBytes(), only_upper_level ? FileType_alts_upper : FileType_positions_lower);
 }
 
 Chess::Side Solver::sideToWin() const
@@ -1302,14 +1303,15 @@ void Solver::create_book(pMove tree_front, int num_opening_moves)
 			return true;
 		}
 	);
-	auto path_book = sol->path(only_upper_level ? Solution::FileType_book_upper : Solution::FileType_book);
+	auto path_book = sol->path(only_upper_level ? FileType_book_upper : FileType_book);
 	auto path_bak = Solution::ext_to_bak(path_book);
 	ofstream book(path_bak.toStdString(), ios::binary | ios::out | ios::trunc);
 	for (auto& entry : all_entries)
 		book.write(entry.data(), entry.size());
 	book.close();
 	QFileInfo fi(path_book);
-	if (fi.exists()) {
+	if (fi.exists())
+	{
 		if (sol->book_main) {
 			sol->book_main.reset();
 			sol->ram_budget += fi.size();
@@ -1325,7 +1327,21 @@ void Solver::create_book(pMove tree_front, int num_opening_moves)
 	assert(saved_positions.size() == prepared_transpositions.size());
 	assert(saved_positions.size() == trans.size());
 	prepared_transpositions.clear();
-	sol->loadBook(true);
+
+	fi.refresh();
+	QSettings s(sol->path(FileType_spec), QSettings::IniFormat);
+	s.beginGroup("info");
+	QString state_param = only_upper_level ? "state_upper_level" : "state_lower_level";
+	bool is_full = is_renamed && skip_branches.empty() && fi.exists();
+	int state_value = is_full ? (int)SolutionInfoState::all_branches : (int)SolutionInfoState::unknown;
+	s.setValue(state_param, state_value);
+	QString timestamp_param = only_upper_level ? "timestamp_upper_level" : "timestamp_lower_level";
+	int timestamp = is_full ? static_cast<int>(fi.lastModified().toSecsSinceEpoch()) : 0;
+	s.setValue(timestamp_param, timestamp);
+	s.endGroup();
+
+	sol->updateInfo();
+	sol->loadBook();
 	emit updateCurrentSolution();
 }
 

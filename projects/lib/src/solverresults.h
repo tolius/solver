@@ -20,7 +20,7 @@ public:
 	SolverResults(std::shared_ptr<Solution> solution);
 
 	void merge_books(std::list<QString> books, const std::string& file_to_save);
-	void verify(Solution::FileType book_type);
+	void verify(FileType book_type);
 
 private:
 	std::tuple<bool, qint16, quint32> verify_move(bool is_our_turn);

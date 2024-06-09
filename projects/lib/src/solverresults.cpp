@@ -86,10 +86,15 @@ void SolverResults::merge_books(std::list<QString> books, const std::string& fil
 	emit_message(QString("Merge books: %1 merged").arg(sol->nameToShow(true)));
 }
 
-void SolverResults::verify(Solution::FileType book_type)
+void SolverResults::verify(FileType book_type)
 {
 	if (status != Status::idle) {
 		emit Message(QString("It's already been started."));
+		return;
+	}
+	if (book_type != FileType_book && book_type != FileType_book_upper && book_type != FileType_book_short)
+	{
+		emit Message(QString("Incorrect book type."));
 		return;
 	}
 
@@ -119,6 +124,17 @@ void SolverResults::verify(Solution::FileType book_type)
 			if (is_ok)
 			{
 				auto [is_ok, score, num_nodes] = verify_move(true);
+				QSettings s(sol->path(FileType_spec), QSettings::IniFormat);
+				s.beginGroup("info");
+				QString state_param = (book_type == FileType_book_upper) ? "state_upper_level" : "state_lower_level";
+				int state_value = s.value(state_param, (int)SolutionInfoState::unknown).toInt();
+				constexpr static int state_verified = static_cast<int>(SolutionInfoState::verified);
+				if (is_ok && (state_value & (int)SolutionInfoState::all_branches))
+					state_value |= state_verified;
+				else
+					state_value &= ~state_verified;
+				s.setValue(state_param, state_value);
+				s.endGroup();
 				if (is_ok)
 				{
 					emit Message("--=== SUCCESS ===--", MessageType::success);
