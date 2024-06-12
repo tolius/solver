@@ -190,7 +190,13 @@ const SolverSettings& Solver::settings() const
 
 bool Solver::isCurrentLine(pBoard pos) const
 {
-	return is_branch(board, pos);
+	return isCurrentLine(pos.get());
+}
+
+
+bool Solver::isCurrentLine(Chess::Board* pos) const
+{
+	return is_branch(board.get(), pos);
 }
 
 bool Solver::isCurrentBranch(pBoard pos) const
@@ -772,8 +778,12 @@ void Solver::find_solution(SolverMove& move, SolverState& info, pMove& best_move
 			add_existing(*best_move, is_stop);
 		}
 	}
-	//assert(move.score() == UNKNOWN_SCORE || move.score() <= ABOVE_EG || move.score() <= best_move->score - 1);
-	if (move.score() != UNKNOWN_SCORE && move.score() > ABOVE_EG && move.score() > best_move->score() - 1 && move.score() != FORCED_MOVE) {
+	if (move.score() != UNKNOWN_SCORE
+		&& move.score() > ABOVE_EG
+		&& move.score() > best_move->score() - 1
+		&& move.score() != FORCED_MOVE
+		&& best_move != solver_move)
+	{
 		auto move_stack = get_move_stack(board);
 		emit_message(QString("...NOT BEST %1! %2 in %3").arg(move.score() - (best_move->score() - 1)).arg(best_move->san(board)).arg(move_stack), MessageType::info);
 	}
@@ -892,8 +902,8 @@ void Solver::evaluate_position(SolverMove& move, SolverState& info, pMove& best_
 								.arg(alt_solver_move->san(board))
 								.arg(alt_engine_move->scoreText())
 								.arg(alt_solver_move->scoreText())
-								.arg(get_move_stack(board, false, 400)),
-			             MessageType::info);
+								.arg(get_move_stack(board, false, 400)));
+			//solver_move->set_score(alt_solver_move->score());
 			best_move = solver_move; // alt_solver_move
 			num_moves_from_solver++;
 		}
@@ -1285,30 +1295,10 @@ void Solver::create_book(pMove tree_front, int num_opening_moves)
 	                 .arg(num_opening_moves + mate_score)
 	                 .arg(num_opening_moves)
 	                 .arg(mate_score));
-	sort(all_entries.begin(), all_entries.end(),
-		[](EntryRow& a, EntryRow& b)
-		{
-			for (size_t i = 0; i < 8; i++) {
-			    if (reinterpret_cast<uint8_t&>(a[i]) < reinterpret_cast<uint8_t&>(b[i]))
-				    return true;
-			    if (reinterpret_cast<uint8_t&>(a[i]) > reinterpret_cast<uint8_t&>(b[i]))
-				    return false;
-			}
-			for (size_t i = 10; i < 12; i++) {
-			    if (reinterpret_cast<uint8_t&>(a[i]) < reinterpret_cast<uint8_t&>(b[i]))
-					return false;
-			    if (reinterpret_cast<uint8_t&>(a[i]) > reinterpret_cast<uint8_t&>(b[i]))
-					return true;
-			}
-			return true;
-		}
-	);
+	
 	auto path_book = sol->path(only_upper_level ? FileType_book_upper : FileType_book);
 	auto path_bak = Solution::ext_to_bak(path_book);
-	ofstream book(path_bak.toStdString(), ios::binary | ios::out | ios::trunc);
-	for (auto& entry : all_entries)
-		book.write(entry.data(), entry.size());
-	book.close();
+	save_book(path_bak);
 	QFileInfo fi(path_book);
 	if (fi.exists())
 	{
@@ -1327,6 +1317,7 @@ void Solver::create_book(pMove tree_front, int num_opening_moves)
 	assert(saved_positions.size() == prepared_transpositions.size());
 	assert(saved_positions.size() == trans.size());
 	prepared_transpositions.clear();
+	all_entries.clear();
 
 	fi.refresh();
 	QSettings s(sol->path(FileType_spec), QSettings::IniFormat);
@@ -1343,6 +1334,33 @@ void Solver::create_book(pMove tree_front, int num_opening_moves)
 	sol->updateInfo();
 	sol->loadBook();
 	emit updateCurrentSolution();
+}
+
+void Solver::save_book(const QString& book_path)
+{
+	sort(all_entries.begin(), all_entries.end(),
+		[](EntryRow& a, EntryRow& b)
+		{
+			for (size_t i = 0; i < 8; i++) {
+			    if (reinterpret_cast<uint8_t&>(a[i]) < reinterpret_cast<uint8_t&>(b[i]))
+				    return true;
+			    if (reinterpret_cast<uint8_t&>(a[i]) > reinterpret_cast<uint8_t&>(b[i]))
+				    return false;
+			}
+			for (size_t i = 10; i < 12; i++) {
+			    if (reinterpret_cast<uint8_t&>(a[i]) < reinterpret_cast<uint8_t&>(b[i]))
+					return false;
+			    if (reinterpret_cast<uint8_t&>(a[i]) > reinterpret_cast<uint8_t&>(b[i]))
+					return true;
+			}
+			return true;
+		}
+	);
+
+	ofstream book(book_path.toStdString(), ios::binary | ios::out | ios::trunc);
+	for (auto& entry : all_entries)
+		book.write(entry.data(), entry.size());
+	book.close();
 }
 
 void update(MapT& elements, const MapT& new_elements)
@@ -1576,10 +1594,11 @@ std::list<MoveEntry> Solver::entries(Chess::Board* pos) const
 		}
 	}
 	if (legal_moves) {
+		auto it_start = entries.cbegin();
 		for (auto& m : *legal_moves) {
 			auto pgMove = OpeningBook::moveToBits(temp_board->genericMove(m));
 			QString san = temp_board->moveString(m, Board::StandardAlgebraic);
-			entries.emplace_front(EntrySource::none, san, pgMove, (quint16)UNKNOWN_SCORE, 0);
+			entries.emplace(it_start, EntrySource::none, san, pgMove, reinterpret_cast<const quint16&>(UNKNOWN_SCORE), 0);
 		}
 	}
 	entries.sort(SolutionEntry::compare);

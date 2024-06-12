@@ -7,6 +7,7 @@
 #include <QWidget>
 
 #include <memory>
+#include <functional>
 
 
 class SolverResults;
@@ -29,7 +30,9 @@ public:
 private:
 	void blockBookSignals(bool flag);
 	void warning(const QString& info);
+	void run(const QString& action, std::function<void()> function);
 	void verify();
+	void shorten();
 
 private:
 	void onBookTypeChanged(FileType type);

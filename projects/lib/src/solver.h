@@ -137,6 +137,7 @@ public:
 	std::shared_ptr<Solution> solution() const;
 	const SolverSettings& settings() const;
 	bool isCurrentLine(pBoard pos) const;
+	bool isCurrentLine(Chess::Board* pos) const;
 	bool isCurrentBranch(pBoard pos) const;
 	bool isCurrentBranch(Chess::Board* pos) const;
 	Chess::Side sideToWin() const;
@@ -186,6 +187,7 @@ protected:
 	void save_data(pcMove move, bool to_save = true);
 	void save_alt(pcMove move);
 	void create_book(pMove tree_front, int num_opening_moves);
+	void save_book(const QString& book_path);
 	std::tuple<quint32, qint16, MapT, MapT> prepare_moves(pMove& move);
 	void correct_score(qint16& score, qint16 sub_score, bool is_their_turn, pMove& m);
 	void expand_positions(MapT& saved_positions, MapT& transpositions);

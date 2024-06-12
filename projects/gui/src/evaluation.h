@@ -176,6 +176,7 @@ private:
 	void updateBoard(Chess::Board* board);
 	void updateSync();
 	void updateOverride();
+	void updateSave(bool check_curr_pos);
 	void setMode(SolverStatus new_status);
 	void updateStartStop();
 	void clearEvals();

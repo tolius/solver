@@ -521,6 +521,11 @@ bool is_endgame_available(std::shared_ptr<const Position> pos)
 
 bool is_branch(std::shared_ptr<Chess::Board> main_pos, std::shared_ptr<Chess::Board> branch)
 {
+	return is_branch(main_pos.get(), branch.get());
+}
+
+bool is_branch(Chess::Board* main_pos, Chess::Board* branch)
+{
 	auto& board_history = main_pos->MoveHistory();
 	auto& new_pos_history = branch->MoveHistory();
 	if (new_pos_history.size() < board_history.size())

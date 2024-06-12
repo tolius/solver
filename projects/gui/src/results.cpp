@@ -83,10 +83,10 @@ void Results::onMoveMade(const Chess::GenericMove& move, const QString& sanStrin
 
 void Results::onDataSourceChanged(EntrySource source)
 {
-	auto btn = source == EntrySource::solver ? ui->btn_SourceSolver
-	    : source == EntrySource::book        ? ui->btn_SourceBook
-	    : source == EntrySource::positions   ? ui->btn_SourceEval
-	                                         : ui->btn_SourceAuto;
+	auto btn = source == EntrySource::solver    ? ui->btn_SourceSolver
+	         : source == EntrySource::book      ? ui->btn_SourceBook
+	         : source == EntrySource::positions ? ui->btn_SourceEval
+	                                            : ui->btn_SourceAuto;
 	if (btn->isChecked())
 		return;
 	data_source = source;
@@ -164,6 +164,20 @@ QString Results::positionChanged()
 	ui->label_Info->setVisible(!eSolution_info.isEmpty());
 	ui->label_Info->setText(eSolution_info);
 
+	// Find the line that is currently being solved
+	quint16 solver_pgMove = 0;
+	bool is_curr = solver->isCurrentLine(board);
+	if (is_curr)
+	{
+		auto solver_board = solver->positionToSolve();
+		size_t solver_len = solver_board->MoveHistory().size();
+		size_t pos_len = board->MoveHistory().size();
+		if (solver_len > pos_len) {
+			auto solver_move = solver_board->MoveHistory()[pos_len].move;
+			solver_pgMove = OpeningBook::moveToBits(board->genericMove(solver_move));
+		}
+	}
+
 	// Create buttons
 	std::vector<QPushButton*> buttons;
 	QList<QVector<QWidget*>> move_boxes;
@@ -174,14 +188,19 @@ QString Results::positionChanged()
 		//btn->setMinimumWidth(1);
 		//btn->setSizePolicy(QSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum));
 		//btn->setMaximumWidth(50);
+		if (btn && entry.pgMove == solver_pgMove) {
+			auto bkg = btn->palette().color(QWidget::backgroundRole());
+			bkg.setBlue(bkg.blue() + 20);
+			btn->setStyleSheet(QString("background-color: rgba(%1, %2, %3, %4);").arg(bkg.red()).arg(bkg.green()).arg(bkg.blue()).arg(bkg.alpha()));
+		}
 		if (btn && entry.score() != UNKNOWN_SCORE && entry.source == EntrySource::book) {
 			quint32 nodes_threshold = (board->sideToMove() == solution->winSide()) ? 1 : 0;
 			if (entry.nodes() <= nodes_threshold)
 				btn->setEnabled(false);
 		}
 		buttons.push_back(btn);
-		QString score = (all_unknown || (entry.source == EntrySource::positions && entry.info == "only move"))
-		    ? ""
+		QString score = (all_unknown || (entry.source == EntrySource::positions && entry.info == "only move")) ? ""
+		    : (entry.source == EntrySource::solver && entry.score() == ESOLUTION_VALUE && entry.info == "~") ? "sol"
 		    : entry.getScore(entry.source == EntrySource::book || entry.source == EntrySource::solver);
 		if (entry.info.isEmpty() && entry.score() != UNKNOWN_SCORE) {
 			if (entry.source == EntrySource::book && entry.nodes())

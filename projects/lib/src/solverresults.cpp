@@ -3,6 +3,8 @@
 #include "tb/egtb/tb_reader.h"
 #include "tb/egtb/elements.h"
 
+#include <QFileInfo>
+
 #include <fstream>
 #include <utility>
 #include <vector>
@@ -14,7 +16,18 @@ using namespace std::chrono;
 
 SolverResults::SolverResults(std::shared_ptr<Solution> solution)
 	: Solver(solution)
-{}
+{
+	// Shortener
+	s_to_ignore_no_engine_data = false;
+	s_endgame_depth = 4;
+	s_endgame_depth_to_just_copy_moves = 5;
+	s_score_limit = MATE_VALUE - 20;
+	s_score_hard_limit = MATE_VALUE - 9;
+	s_engine_t_limit = 30;
+	s_evaluate_endgames = false;
+	s_min_score_with_t0 = MATE_VALUE - 10; // 0 to not evaluate positions with t=0
+	s_to_print_t0 = false;
+}
 
 void SolverResults::merge_books(std::list<QString> books, const std::string& file_to_save)
 {
@@ -105,7 +118,8 @@ void SolverResults::verify(FileType book_type)
 	{
 		init();
 		t_gui_update = steady_clock::now();
-		emit Message("Verifying... ", MessageType::info);
+		QString path_book = sol->path(book_type);
+		emit Message(QString("Verifying %1... ").arg(sol->filenames[book_type]), MessageType::info);
 		
 		v_num_TBs = 0;
 		v_num_overridden_TBs = 0;
@@ -116,7 +130,6 @@ void SolverResults::verify(FileType book_type)
 		v_tb_needed.clear();
 		v_deepness = 0;
 
-		QString path_book = sol->path(book_type);
 		if (sol->fileExists(book_type))
 		{
 			v_book = make_shared<SolutionBook>(OpeningBook::Ram);
@@ -137,7 +150,7 @@ void SolverResults::verify(FileType book_type)
 				s.endGroup();
 				if (is_ok)
 				{
-					emit Message("--=== SUCCESS ===--", MessageType::success);
+					emit Message(QString("Verified %1").arg(sol->nameToShow()), MessageType::success);
 					emit Message(QString("#Nodes: %1").arg(v_num_analysed));
 					emit Message(QString("#TBs: %1").arg(v_num_TBs));
 					emit Message(QString("#Overridden TBs: %1").arg(v_num_overridden_TBs));
@@ -171,8 +184,6 @@ void SolverResults::verify(FileType book_type)
 					}
 					emit Message(QString::fromStdString(ss.str()));
 				}
-				v_already_analysed.clear();
-				v_tb_needed.clear();
 			}
 			else
 			{
@@ -191,9 +202,11 @@ void SolverResults::verify(FileType book_type)
 	catch (...) {
 		emit Message("Error while verifying. Please restart the app.");
 	}
-	
-	status = Status::idle;
+
+	v_already_analysed.clear();
+	v_tb_needed.clear();
 	v_book.reset();
+	status = Status::idle;
 	emit solvingStatusChanged();
 }
 
@@ -461,4 +474,236 @@ std::tuple<bool, qint16, quint32> SolverResults::verify_move(bool is_our_turn)
 		}
 	}
 	return { true, score, num_nodes };
+}
+
+void SolverResults::shorten()
+{
+	if (status != Status::idle)
+	{
+		emit Message(QString("It's already been started."));
+		return;
+	}
+
+	status = Status::postprocessing;
+	emit solvingStatusChanged();
+
+	try
+	{
+		init();
+		t_gui_update = steady_clock::now();
+		emit Message("Shortening... ", MessageType::info);
+
+		s_num_processed = 0;
+		s_min_dtw = MATE_VALUE;
+		s_max_dtw = 0;
+		s_max_endgame_dtw = 0;
+		s_stop_t_score = 0;
+		s_stop_endgame = 0;
+		s_stop_hard_score = 0;
+		s_stop_win = 0;
+		s_stop_engine_no_data = 0;
+		s_skip_branches = 0;
+		s_max_not_best = 0;
+		s_positions_processed.clear();
+		all_entries.clear();
+
+		QString path_book = sol->path(FileType_book);
+		if (sol->fileExists(FileType_book))
+		{
+			s_book = make_shared<SolutionBook>(OpeningBook::Ram);
+			bool is_ok = s_book->read(path_book);
+			if (is_ok)
+			{
+				shorten_move();
+				emit Message(QString("Success for %1: %L2").arg(sol->nameToShow()).arg(all_entries.size()), MessageType::success);
+				emit Message(QString("Dtw: #%1..%2  max EG: #%3").arg(s_min_dtw).arg(s_max_dtw).arg(s_max_endgame_dtw));
+				emit Message(QString("Stop due to Score/T-value:    %L1").arg(s_stop_t_score));
+				emit Message(QString("Stop due to Endgame:          %L1").arg(s_stop_endgame));
+				emit Message(QString("Stop due to Hard Score Limit: %L1").arg(s_stop_hard_score));
+				emit Message(QString("Stop due to Win:              %L1").arg(s_stop_win));
+				emit Message(QString("Stop due to NO ENGINE DATA:   %L1").arg(s_stop_engine_no_data));
+				emit Message(QString("Stop due to Skip Branches:    %L1").arg(s_skip_branches));
+				emit Message(QString("Max not best delta: %1").arg(s_max_not_best));
+				emit Message("Creating a book...");
+				QString path_book_short = sol->path(FileType_book_short);
+				save_book(path_book_short);
+				QFileInfo fi(path_book_short);
+				if (fi.exists())
+					emit Message("Done");
+				else
+					emit Message(QString("Failed to save the \"%1\" book").arg(path_book_short), MessageType::error);
+			}
+			else
+			{
+				emit Message(QString("Failed to read the \"%1\" book.").arg(path_book), MessageType::error);
+			}
+		}
+		else
+		{
+			emit Message(QString("Can't open the \"%1\" book.").arg(path_book), MessageType::error);
+		}
+	}
+	catch (runtime_error e)
+	{
+		emit Message(QString("%1. Aborted").arg(QString::fromStdString(e.what())), MessageType::error);
+	}
+	catch (exception e)
+	{
+		emit Message(QString("Error: %1").arg(e.what()), MessageType::error);
+		emit Message("Due to the error, the app may not work properly. Please restart it.");
+	}
+	catch (...)
+	{
+		emit Message("Error while shortening. Please restart the app.");
+	}
+
+	s_positions_processed.clear();
+	all_entries.clear();
+	s_book.reset();
+	status = Status::idle;
+	emit solvingStatusChanged();
+}
+
+std::shared_ptr<SolutionEntry> SolverResults::get_engine_data()
+{
+	auto engine_entry = sol->bookEntry(board, FileType_positions_lower);
+	if (engine_entry)
+		return engine_entry;
+	engine_entry = sol->bookEntry(board, FileType_positions_upper);
+	if (engine_entry)
+		return engine_entry;
+
+	auto legal_moves = board->legalMoves();
+	if (legal_moves.size() == 1) // the only move
+	{
+		auto pgMove = OpeningBook::moveToBits(board->genericMove(legal_moves.front()));
+		auto weight = reinterpret_cast<const quint16&>(UNKNOWN_SCORE);
+		return make_shared<SolutionEntry>(pgMove, weight, 0);
+	}
+
+	size_t num_pieces = board->numPieces();
+	if (num_pieces > s_endgame_depth_to_just_copy_moves)
+		emit_message(QString("NO ENGINE DATA: %1").arg(get_move_stack(board))); // Happens if 5-piece endgame is not saved
+	return nullptr;
+}
+
+void SolverResults::shorten_move()
+{
+	constexpr static quint32 NO_TIME = numeric_limits<uint32_t>::max();
+
+	bool is_their_turn = (board->sideToMove() != our_color);
+	if (is_their_turn)
+	{
+		auto legal_moves = board->legalMoves();
+		if (legal_moves.empty())
+			throw runtime_error("No legal moves (is it a loss?)");
+		for (auto& m : legal_moves)
+		{
+			board->makeMove(m);
+			shorten_move();
+			board->undoMove();
+		}
+		return;
+	}
+
+	// Our move:
+	if (board->result().winner() == our_color)
+	{
+		s_stop_win++;
+		return;
+	}
+	if (s_positions_processed.find(board->key()) != s_positions_processed.end())
+		return; // Transposition
+
+	bool is_stop = true;
+	auto moves = s_book->bookEntries(board->key());
+	if (moves.size() != 1)
+		throw runtime_error(QString("Incorrect number of book entries: %1").arg(moves.size()).toStdString());
+	auto& book_entry = moves.front();
+	auto row = entry_to_bytes(board->key(), book_entry);
+	all_entries.push_back(row);
+	qint16 score = book_entry.score();
+	size_t num_pieces = board->numPieces();
+	bool is_endgame = (!s_evaluate_endgames && num_pieces <= s_endgame_depth);
+	if (score <= s_score_hard_limit)
+	{
+		if (!is_endgame)
+		{
+			if (!book_entry.isNull())
+			{
+				auto engine_entry = get_engine_data();
+				if (engine_entry || !s_to_ignore_no_engine_data)
+				{
+					if (!engine_entry && score >= MATE_THRESHOLD && score < FAKE_MATE_VALUE)
+						throw runtime_error("Wrong engine score");
+					qint32 time = engine_entry ? engine_entry->time() : NO_TIME;
+					bool is_endgame_to_copy = (num_pieces == s_endgame_depth_to_just_copy_moves);
+					if (!is_endgame_to_copy && !engine_entry)
+						throw runtime_error("No engine score");
+					if (is_endgame_to_copy
+						|| score < s_score_limit
+						|| (time != NO_TIME && time > s_engine_t_limit)
+						|| book_entry.pgMove != engine_entry->pgMove
+					    || engine_entry->score() == UNKNOWN_SCORE
+						|| (time == 0 && score < s_min_score_with_t0))
+					{
+						if (!is_endgame_to_copy)
+						{
+							if (s_to_print_t0 && time == 0 && score < s_min_score_with_t0)
+								emit_message(QString("...t=0 while DTW #%1: %2").arg(MATE_VALUE - score).arg(get_move_stack(board)));
+							if (engine_entry->score() != UNKNOWN_SCORE && engine_entry->score() > score)
+							{
+								qint16 delta = engine_entry->score() - score;
+								if (delta > s_max_not_best)
+									s_max_not_best = delta;
+								emit_message(QString("! Not best %1:  #%2 -> #%3: %4")
+								                 .arg(delta)
+								                 .arg(MATE_VALUE - engine_entry->score())
+								                 .arg(MATE_VALUE - score)
+								                 .arg(get_move_stack(board)));
+							}
+						}
+						board->makeMove(book_entry.move(board));
+						shorten_move();
+						board->undoMove();
+						is_stop = false;
+					}
+					else {
+						s_stop_t_score++;
+					}
+				}
+				else {
+					s_stop_engine_no_data++;
+				}
+			}
+			else {
+				s_skip_branches++;
+			}
+		}
+		else {
+			s_stop_endgame++;
+		}
+	}
+	else {
+		s_stop_hard_score++;
+	}
+	qint16 dtw = MATE_VALUE - score;
+	if (is_stop)
+	{
+		if (is_endgame) {
+			if (dtw > s_max_endgame_dtw)
+				s_max_endgame_dtw = dtw;
+		}
+		else if (dtw > s_max_dtw) {
+			s_max_dtw = dtw;
+		}
+	}
+	else if (dtw < s_min_dtw) {
+		s_min_dtw = dtw;
+	}
+	s_num_processed++;
+	if (s_num_processed % 1000 == 0)
+		emit_message(QString("%1: {move_stack}").arg(s_num_processed).arg(get_move_stack(board)));
+	// Add a transposition
+	s_positions_processed.insert(board->key());
 }

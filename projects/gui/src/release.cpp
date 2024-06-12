@@ -42,11 +42,16 @@ Release::Release(QWidget* parent)
 	connect(ui->btn_BookShort,      &QToolButton::toggled, this, [this]() { onBookTypeChanged(FileType_book_short); });
 
 	connect(ui->btn_Verify, &QPushButton::clicked, this, &Release::verify);
+	connect(ui->btn_Shorten, &QPushButton::clicked, this, &Release::shorten);
 }
 
 void Release::setSolver(std::shared_ptr<SolverResults> solver)
 {
+	if (this->solver)
+		disconnect(this->solver.get(), nullptr, this, nullptr);
 	this->solver = solver;
+	if (solver)
+		connect(solver.get(), &Solver::solvingStatusChanged, this, [this]() { updateData(); });
 	book_type = NO_BOOK;
 	updateData();
 }
@@ -132,6 +137,7 @@ void Release::updateData()
 	ui->chk_Low_Shortened->setChecked(state_lower_level & (int)SolutionInfoState::shortened);
 
 	ui->btn_Verify->setEnabled(book_type != NO_BOOK && solver && !solver->isBusy());
+	ui->btn_Shorten->setEnabled(book_type == FileType_book && solver && !solver->isBusy());
 }
 
 void Release::warning(const QString& info)
@@ -139,21 +145,21 @@ void Release::warning(const QString& info)
 	QMessageBox::warning(this, QApplication::applicationName(), info);
 }
 
-void Release::verify()
+void Release::run(const QString& action, std::function<void()> function)
 {
 	if (!solver)
 	{
-		warning("To verify the solution, please open/load it first.");
+		warning(QString("To %1 the solution, please open/load it first.").arg(action));
 		return;
 	}
 	if (solver->isBusy())
 	{
-		warning("To verify the solution, please stop the evaluation first.");
+		warning(QString("To %1 the solution, please stop the evaluation first.").arg(action));
 		return;
 	}
 	if (book_type == NO_BOOK)
 	{
-		warning("To verify the solution, please select the book type first.");
+		warning(QString("To %1 the solution, please select the book type first.").arg(action));
 		return;
 	}
 	if (!solver->solution()->fileExists(book_type))
@@ -164,17 +170,26 @@ void Release::verify()
 
 	try
 	{
-		solver->verify(book_type);
-		updateData();
+		function();
 	}
 	catch (exception e)
 	{
-		warning(QString("Failed to verify the solution: %1").arg(e.what()));
+		warning(QString("Failed to %1 the solution: %2").arg(action).arg(e.what()));
 		return;
 	}
 	catch (...)
 	{
-		warning("Failed to verify the solution.");
+		warning(QString("Failed to %1 the solution.").arg(action));
 		return;
 	}
+}
+
+void Release::verify()
+{
+	run("verify", [this]() { solver->verify(book_type); });
+}
+
+void Release::shorten()
+{
+	run("shorten", [this]() { solver->shorten(); });
 }

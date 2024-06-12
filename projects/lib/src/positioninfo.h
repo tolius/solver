@@ -177,6 +177,7 @@ bool init_EGTB();
 quint32 egtb_version();
 bool is_endgame_available(std::shared_ptr<const Position> pos);
 bool is_branch(std::shared_ptr<Chess::Board> main_pos, std::shared_ptr<Chess::Board> branch);
+bool is_branch(Chess::Board* main_pos, Chess::Board* branch);
 bool is_branch(Chess::Board* pos, const Line& opening, const Line& branch);
 
 uint64_t load_bigendian(const void* bytes);

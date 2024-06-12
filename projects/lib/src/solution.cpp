@@ -683,6 +683,8 @@ QString Solution::positionInfo(std::shared_ptr<Chess::Board> board)
 		           .arg(esol_entry.san(board))
 		           .arg(num_nodes);
 	}
+	if (entry || alt_entry)
+		return "Saved: " + info;
 	return info;
 }
 

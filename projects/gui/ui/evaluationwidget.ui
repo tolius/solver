@@ -440,13 +440,6 @@
           <number>0</number>
          </property>
          <item>
-          <widget class="QLabel" name="label">
-           <property name="text">
-            <string>Saved:</string>
-           </property>
-          </widget>
-         </item>
-         <item>
           <widget class="QLabel" name="label_SolutionInfo">
            <property name="sizePolicy">
             <sizepolicy hsizetype="Expanding" vsizetype="Preferred">

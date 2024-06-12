@@ -286,6 +286,16 @@ void Evaluation::updateOverride()
 	                             && solver->isCurrentBranch(game->board()));
 }
 
+void Evaluation::updateSave(bool check_curr_pos)
+{	
+	bool enabled = solver && solver->solution() && board_ && (board_->sideToMove() == solver->solution()->winSide()) && board_->key() == curr_key;
+	if (enabled && check_curr_pos && solver->isSolving())
+		enabled = game->board() && solver->positionToSolve()->key() == game->board()->key();
+	if (enabled)
+		enabled = solver->whatToSolve() ? solver->whatToSolve()->alt_step == NO_ALT_STEPS : solver->isCurrentBranch(board_);
+	ui->btn_Save->setEnabled(enabled);
+}
+
 void Evaluation::setMode(SolverStatus new_status)
 {
 	auto mode = new_status == SolverStatus::CopyWatkins   ? SolverMode::Copy_Watkins
@@ -665,6 +675,7 @@ void Evaluation::positionChanged()
 		solver->saveOverride(game->board(), data);
 		ui->btn_Override->setChecked(false);
 	}
+	updateSave(true);
 	Chess::Board* new_board = (solver_status != SolverStatus::Manual && solver) ? solver->positionToSolve().get() : game->board();
 	if (!new_board)
 		new_board = game->board();
@@ -882,10 +893,13 @@ void Evaluation::startEngine()
 	{
 		if (!board_->result().isNone())
 			return; // otherwise engine returns "null"
-		bool is_solver_side = solver && solver->solution() && (board_->sideToMove() == solver->solution()->winSide());
 		bool auto_multi_pv = ui->btn_MultiPV_Auto->isChecked();
 		clearEvals();
-		bool is_solving = solver && is_solver_side && solver->positionToSolve() && solver->positionToSolve()->key() == board_->key();
+		bool is_solving = solver
+			&& solver->solution()
+			&& (board_->sideToMove() == solver->solution()->winSide())
+			&& solver->positionToSolve()
+			&& (solver->positionToSolve()->key() == board_->key());
 		bool is_multi_boost;
 		if (is_solving)
 		{
@@ -934,10 +948,7 @@ void Evaluation::startEngine()
 		session.was_multi = (/*(!session.is_auto && !auto_multi_pv) ||*/ session.multi_mode == 0); //!! false;
 		session.start_time = steady_clock::now();
 		timer_engine.start();
-		bool enabled = solver && is_solver_side && board_->key() == curr_key;
-		if (enabled)
-			enabled = solver->whatToSolve() ? solver->whatToSolve()->alt_step == NO_ALT_STEPS : solver->isCurrentBranch(board_);
-		ui->btn_Save->setEnabled(enabled);
+		//updateSave(false);
 		//ui->btn_Save->setText("Save move");
 	}
 	num_pieces = board_->numPieces();

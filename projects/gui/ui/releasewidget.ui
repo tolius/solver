@@ -135,9 +135,6 @@
           <property name="text">
            <string>Imrove</string>
           </property>
-          <property name="checkable">
-           <bool>true</bool>
-          </property>
          </widget>
         </item>
         <item>
@@ -147,9 +144,6 @@
           </property>
           <property name="text">
            <string>Verify</string>
-          </property>
-          <property name="checkable">
-           <bool>true</bool>
           </property>
          </widget>
         </item>
@@ -161,9 +155,6 @@
           <property name="text">
            <string>Shorten</string>
           </property>
-          <property name="checkable">
-           <bool>true</bool>
-          </property>
          </widget>
         </item>
         <item>
@@ -173,9 +164,6 @@
           </property>
           <property name="text">
            <string>Export</string>
-          </property>
-          <property name="checkable">
-           <bool>true</bool>
           </property>
          </widget>
         </item>
