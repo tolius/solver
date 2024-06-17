@@ -1179,6 +1179,7 @@ void MainWindow::openSolution(QModelIndex index, SolutionItem* item)
 		connect(m_solver.get(), SIGNAL(clearLog()), this, SLOT(clearLog()));
 		connect(m_solver.get(), SIGNAL(updateCurrentSolution()), this, SLOT(updateCurrentSolution()));
 		connect(m_settingsDlg, SIGNAL(logUpdateFrequencyChanged(UpdateFrequency)), m_solver.get(), SLOT(onLogUpdateFrequencyChanged(UpdateFrequency)));
+		connect(m_settingsDlg, SIGNAL(solverMoveOrderChanged(SolverMoveOrder)), m_solver.get(), SLOT(onSolverMoveOrderChanged(SolverMoveOrder)));
 	}
 	m_results->setSolution(m_solution);
 	m_results->setSolver(m_solver);

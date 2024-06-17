@@ -13,6 +13,7 @@
 #include <filesystem>
 #include <thread>
 #include <cmath>
+#include <map>
 
 
 namespace fs = std::filesystem;
@@ -188,6 +189,23 @@ SettingsDialog::SettingsDialog(QWidget* parent)
 		        set_label(ui->m_label_LogUpdate, val);
 		        emit logUpdateFrequencyChanged(value_to_frequency(val));
 	        });
+
+	SolverMoveOrder move_order = value_to_move_order(s.value("move_order", (int)SolverMoveOrder::Default).toInt());
+	std::map<SolverMoveOrder, QRadioButton*> radio_MoveOrder = {
+		{ SolverMoveOrder::Default,         ui->m_radio_moveOrder_Default         },
+		{ SolverMoveOrder::EasyToDifficult, ui->m_radio_moveOrder_EasyToDifficult },
+		{ SolverMoveOrder::DifficultToEasy, ui->m_radio_moveOrder_DifficultToEasy } };
+	radio_MoveOrder[move_order]->setChecked(true);
+	for (auto& [order, radio] : radio_MoveOrder) {
+		connect(radio, &QRadioButton::toggled, this,
+				[=](int flag)
+				{
+			        if (!flag)
+				        return;
+			        QSettings().setValue("solver/move_order", (int)order);
+			        emit solverMoveOrderChanged(order);
+				});
+	}
 	s.endGroup();
 
 	/// UI
@@ -317,7 +335,6 @@ void SettingsDialog::readSettings()
 	ui->m_openLastSolution->setChecked(s.value("open_last_solution", true).toBool());
 	s.endGroup();
 }
-
 
 void SettingsDialog::onTintChanged(int value)
 {

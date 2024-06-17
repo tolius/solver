@@ -88,6 +88,13 @@ UpdateFrequency value_to_frequency(int val)
 	return static_cast<UpdateFrequency>(val);
 }
 
+SolverMoveOrder value_to_move_order(int val)
+{
+	if (val < static_cast<int>(SolverMoveOrder::Default) || val >= static_cast<int>(SolverMoveOrder::size))
+		return SolverMoveOrder::Default;
+	return static_cast<SolverMoveOrder>(val);
+}
+
 
 LineToLog::LineToLog()
 	: win_len(UNKNOWN_SCORE)

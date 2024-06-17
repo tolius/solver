@@ -1127,6 +1127,7 @@ std::vector<SolutionEntry> Solution::eSolutionEntries(Chess::Board* board, bool 
 	vector<SolutionEntry> entries;
 	if (!board)
 		return entries;
+	using namespace Chess;
 	if (board->sideToMove() == side)
 	{
 		auto entry = bookEntry(board, FileType_solution_upper, use_cache);
@@ -1148,6 +1149,25 @@ std::vector<SolutionEntry> Solution::eSolutionEntries(Chess::Board* board, bool 
 			if (it_cache != cache.end())
 				return it_cache->second;
 		}
+		shared_ptr<Board> temp_board(board->copy());
+		auto legal_moves = temp_board->legalMoves();
+		for (auto& m : legal_moves)
+		{
+			temp_board->makeMove(m);
+			auto entry = bookEntry(temp_board, FileType_solution_upper, use_cache);
+			if (!entry)
+				entry = bookEntry(temp_board, FileType_solution_lower, use_cache);
+			temp_board->undoMove();
+			if (!entry || !entry->pgMove)
+				break;
+			auto pgMove = OpeningBook::moveToBits(temp_board->genericMove(m));
+			SolutionEntry prev_entry(pgMove, entry->weight, entry->learn + 1);
+			entries.push_back(prev_entry);
+		}
+		if (entries.size() == legal_moves.size())
+			return entries;
+		else
+			entries.clear();
 	}
 
 	if (!hasWatkinsSolution())
@@ -1155,7 +1175,6 @@ std::vector<SolutionEntry> Solution::eSolutionEntries(Chess::Board* board, bool 
 
 	try
 	{
-		using namespace Chess;
 		shared_ptr<vector<uint16_t>> opening_moves;
 		if (!WatkinsSolution.is_open())
 		{
@@ -1253,7 +1272,7 @@ std::vector<SolutionEntry> Solution::eSolutionEntries(Chess::Board* board, bool 
 			moves.push_back(pgMove);
 			temp_board->makeMove(m);
 		}
-		entries = WatkinsSolution.get_solution(moves, true /*temp_board->sideToMove() == side*/);
+		entries = WatkinsSolution.get_solution(moves, true);
 #if defined(DEBUG) || defined(_DEBUG)
 		for (auto& entry : entries) {
 			if ((entry.pgMove & 0x7000) >= 0x6000)
@@ -1262,28 +1281,73 @@ std::vector<SolutionEntry> Solution::eSolutionEntries(Chess::Board* board, bool 
 #endif
 		for (auto it = entries.begin(); it != entries.end();)
 		{
-			auto m = board->moveFromGenericMove(it->move());
-			if (board->isLegalMove(m)) {
+			auto m = temp_board->moveFromGenericMove(it->move());
+			if (temp_board->isLegalMove(m)) {
 				++it;
 			}
 			else {
 				emit Message(QString("Error: wrong move %1 (%2) from Watkins's solution, ZS=0x%3")
-				                 .arg(it->san(board))
-				                 .arg(it->pgMove)
-				                 .arg(board->key(), 16, 16, QChar('0')),
-				             MessageType::warning);
+									.arg(it->san(temp_board))
+									.arg(it->pgMove)
+									.arg(temp_board->key(), 16, 16, QChar('0')),
+								MessageType::warning);
 				it = entries.erase(it);
 			}
 		}
-		if (board->sideToMove() == side) {
-			auto type = is_solver_upper_level ? FileType_solution_upper : FileType_solution_lower;
+		auto type = is_solver_upper_level ? FileType_solution_upper : FileType_solution_lower;
+		if (temp_board->sideToMove() == side)
+		{
+			if (entries.size() > 1)
+				emit Message(QString("Warning: %1 > 1 entries from Watkins's solution: ZS=0x%2")
+				                 .arg(entries.size())
+				                 .arg(temp_board->key(), 16, 16, QChar('0')),
+				             MessageType::warning);
 			if (!entries.empty())
 				addToBook(temp_board->key(), entries.front(), type);
 			else if (fileExists(type) || fileExists(type, FileSubtype::New))
 				addToBook(temp_board->key(), SolutionEntry(0, ESOLUTION_VALUE, 0), type);
 		}
-		else if (use_cache) {
-			cache[board->key()] = entries;
+		else
+		{
+			if (use_cache)
+				cache[temp_board->key()] = entries;
+			if (!entries.empty())
+			{
+				auto legal_moves = temp_board->legalMoves();
+				if (entries.size() != legal_moves.size())
+				{
+					emit Message(QString("Error: Incorrect number of moves %1 != %2 in Watkins's solution: ZS=0x%3")
+									 .arg(entries.size())
+									 .arg(legal_moves.size())
+									 .arg(temp_board->key(), 16, 16, QChar('0')),
+								 MessageType::warning);
+				}
+				else
+				{
+					for (auto& m : legal_moves)
+					{
+						auto pgMove = OpeningBook::moveToBits(temp_board->genericMove(m));
+						moves.push_back(pgMove);
+						temp_board->makeMove(m);
+						auto next_entries = WatkinsSolution.get_solution(moves, true);
+						moves.pop_back();
+						if (next_entries.empty())
+							break;
+						if (next_entries.size() > 1)
+							emit Message(QString("Warning: %1 > 1 entries from Watkins's solution: ZS=0x%2")
+											 .arg(next_entries.size())
+											 .arg(temp_board->key(), 16, 16, QChar('0')),
+										 MessageType::warning);
+						if (next_entries.front().isNull()) {
+							emit Message(QString("Error: null-move from Watkins's solution: ZS=0x%1").arg(temp_board->key(), 16, 16, QChar('0')), MessageType::warning);
+							break;
+						}
+						addToBook(temp_board->key(), next_entries.front(), type);
+						temp_board->undoMove();
+					}
+					// here temp_board might be one move ahead due to "break"
+				}
+			}
 		}
 	}
 	catch (exception e)

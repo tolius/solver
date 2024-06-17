@@ -948,7 +948,7 @@ void Evaluation::startEngine()
 		session.was_multi = (/*(!session.is_auto && !auto_multi_pv) ||*/ session.multi_mode == 0); //!! false;
 		session.start_time = steady_clock::now();
 		timer_engine.start();
-		//updateSave(false);
+		updateSave(false);
 		//ui->btn_Save->setText("Save move");
 	}
 	num_pieces = board_->numPieces();

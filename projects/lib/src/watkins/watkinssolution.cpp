@@ -487,7 +487,6 @@ std::vector<SolutionEntry> WatkinsTree::get_solution(const std::vector<uint16_t>
 	std::vector<SolutionEntry> entries;
 
 	query_result_t result;
-	//bool calc_num_nodes = (moves.size() % 2 == 1);
 	const node_t* node = root;
 	for (size_t i = 0; i < moves.size(); i++)
 	{

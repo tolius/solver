@@ -163,6 +163,7 @@ signals:
 public slots:
 	void onLogUpdate();
 	void onLogUpdateFrequencyChanged(UpdateFrequency frequency);
+	void onSolverMoveOrderChanged(SolverMoveOrder move_order);
 
 protected:
 	void init();
@@ -214,6 +215,7 @@ protected:
 
 	QTimer timer_log_update;
 	UpdateFrequency frequency_log_update;
+	SolverMoveOrder move_order;
 	std::chrono::steady_clock::time_point t_log_update;
 	std::chrono::steady_clock::time_point t_gui_update;
 	LineToLog line_to_log;

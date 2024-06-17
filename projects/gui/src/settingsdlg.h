@@ -37,6 +37,7 @@ signals:
 	void bookCacheChanged(int cache_size);
 	void boardUpdateFrequencyChanged(UpdateFrequency frequency);
 	void logUpdateFrequencyChanged(UpdateFrequency frequency);
+	void solverMoveOrderChanged(SolverMoveOrder order);
 
 private:
 	void readSettings();

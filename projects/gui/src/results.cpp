@@ -166,7 +166,7 @@ QString Results::positionChanged()
 
 	// Find the line that is currently being solved
 	quint16 solver_pgMove = 0;
-	bool is_curr = solver->isCurrentLine(board);
+	bool is_curr = is_branch(board, solver->positionToSolve().get());
 	if (is_curr)
 	{
 		auto solver_board = solver->positionToSolve();
@@ -188,11 +188,6 @@ QString Results::positionChanged()
 		//btn->setMinimumWidth(1);
 		//btn->setSizePolicy(QSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum));
 		//btn->setMaximumWidth(50);
-		if (btn && entry.pgMove == solver_pgMove) {
-			auto bkg = btn->palette().color(QWidget::backgroundRole());
-			bkg.setBlue(bkg.blue() + 20);
-			btn->setStyleSheet(QString("background-color: rgba(%1, %2, %3, %4);").arg(bkg.red()).arg(bkg.green()).arg(bkg.blue()).arg(bkg.alpha()));
-		}
 		if (btn && entry.score() != UNKNOWN_SCORE && entry.source == EntrySource::book) {
 			quint32 nodes_threshold = (board->sideToMove() == solution->winSide()) ? 1 : 0;
 			if (entry.nodes() <= nodes_threshold)
@@ -218,6 +213,12 @@ QString Results::positionChanged()
 				btn->setFont(font);
 			font.setPointSize(9);
 			label_score->setFont(font);
+		}
+		if (btn && entry.pgMove == solver_pgMove) {
+			auto bkg = ui->widget_Solution->palette().color(QWidget::backgroundRole());
+			bkg.setRed(bkg.red() + 20);
+			bkg.setGreen(bkg.green() + 15);
+			btn->setStyleSheet(QString("background-color: rgba(%1, %2, %3, %4);").arg(bkg.red()).arg(bkg.green()).arg(bkg.blue()).arg(bkg.alpha()));
 		}
 		auto label_nodes = new QLabel(entry.info, ui->widget_Solution);
 		QVector<QWidget*> element;

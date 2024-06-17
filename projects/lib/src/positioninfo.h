@@ -116,6 +116,16 @@ enum class UpdateFrequency : int
 
 UpdateFrequency value_to_frequency(int val);
 
+enum class SolverMoveOrder : int
+{
+	Default = 0,
+	EasyToDifficult = 1,
+	DifficultToEasy = 2,
+	size = 3
+};
+
+SolverMoveOrder value_to_move_order(int val);
+
 struct LineToLog
 {
 	QString text;

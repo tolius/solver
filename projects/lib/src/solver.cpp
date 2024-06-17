@@ -118,6 +118,8 @@ Solver::Solver(std::shared_ptr<Solution> solution)
 	connect(&timer_log_update, SIGNAL(timeout()), this, SLOT(onLogUpdate()));
 	int log_update = QSettings().value("solver/log_update", (int)UpdateFrequency::standard).toInt();
 	frequency_log_update = value_to_frequency(log_update);
+	int order = QSettings().value("solver/move_order", (int)SolverMoveOrder::Default).toInt();
+	move_order = value_to_move_order(order);
 }
 
 Solver::~Solver() 
@@ -192,7 +194,6 @@ bool Solver::isCurrentLine(pBoard pos) const
 {
 	return isCurrentLine(pos.get());
 }
-
 
 bool Solver::isCurrentLine(Chess::Board* pos) const
 {
@@ -527,8 +528,47 @@ void Solver::process_move(std::vector<pMove>& tree, SolverState& info)
 		assert(!legal_moves.isEmpty()); // otherwise it's a loss
 		if (move->moves.empty()) {
 			move->moves.resize(legal_moves.size());
-			for (int i = 0; i < legal_moves.size(); i++)
-				move->moves[i] = make_shared<SolverMove>(legal_moves[i], board, move->score(), move->depth_time());
+			bool is_filled = false;
+			SolverMoveOrder order = !is_solver_path             ? SolverMoveOrder::Default
+			    : (info.to_force_solver && info.alt_steps >= 0) ? SolverMoveOrder::DifficultToEasy
+			                                                    : move_order;
+			if (order != SolverMoveOrder::Default) {
+				// Sort according to the existing solution
+				auto esol_entries = sol->eSolutionEntries(board, false); // sorted from difficult to easy
+				if (esol_entries.size() == legal_moves.size())
+				{
+					if (order == SolverMoveOrder::EasyToDifficult)
+						reverse(esol_entries.begin(), esol_entries.end());
+					vector<int> refs(legal_moves.size());
+					list<int> all_moves;
+					for (int i = 0; i < legal_moves.size(); i++)
+						all_moves.push_back(i);
+					for (size_t i = 0; i < esol_entries.size(); i++)
+					{
+						is_filled = false;
+						for (auto it = all_moves.begin(); it != all_moves.end(); ++it)
+						{
+							int j = *it;
+							if (legal_moves[j] == esol_entries[i].move(board)) {
+								refs[i] = j;
+								all_moves.erase(it);
+								is_filled = true;
+								break;
+							}
+						}
+						if (!is_filled)
+							break;
+					}
+					if (is_filled) {
+						for (int i = 0; i < refs.size(); i++)
+							move->moves[i] = make_shared<SolverMove>(legal_moves[refs[i]], board, move->score(), move->depth_time());
+					}
+				}
+			}
+			if (!is_filled) {
+				for (int i = 0; i < legal_moves.size(); i++)
+					move->moves[i] = make_shared<SolverMove>(legal_moves[i], board, move->score(), move->depth_time());
+			}
 		}
 		for (auto& m : move->moves) {
 			if (!m->is_solved()) {
@@ -1508,6 +1548,11 @@ void Solver::onLogUpdate()
 void Solver::onLogUpdateFrequencyChanged(UpdateFrequency frequency)
 {
 	frequency_log_update = frequency;
+}
+
+void Solver::onSolverMoveOrderChanged(SolverMoveOrder order)
+{
+	move_order = order;
 }
 
 std::list<MoveEntry> Solver::entries(Chess::Board* pos) const

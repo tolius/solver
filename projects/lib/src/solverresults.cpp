@@ -117,6 +117,8 @@ void SolverResults::verify(FileType book_type)
 	try
 	{
 		init();
+		for (const auto& move : sol->branch)
+			board->makeMove(move);
 		t_gui_update = steady_clock::now();
 		QString path_book = sol->path(book_type);
 		emit Message(QString("Verifying %1... ").arg(sol->filenames[book_type]), MessageType::info);
@@ -230,10 +232,13 @@ std::tuple<bool, qint16, quint32> SolverResults::verify_move(bool is_our_turn)
 	auto add_tb_needed = [this](const string& tb_name, qint16 new_tb_val)
 	{
 		auto it_tb = v_tb_needed.find(tb_name);
-		if (it_tb == v_tb_needed.end())
+		if (it_tb == v_tb_needed.end()) {
+			emit_message(QString("Skipped TB: %1").arg(tb_name.c_str()));
 			v_tb_needed[tb_name] = new_tb_val;
-		else if (new_tb_val > it_tb->second)
+		}
+		else if (new_tb_val > it_tb->second) {
 			it_tb->second = new_tb_val;
+		}
 	};
 
 	if (is_our_turn)
@@ -435,7 +440,6 @@ std::tuple<bool, qint16, quint32> SolverResults::verify_move(bool is_our_turn)
 					}
 					else
 					{
-						emit_message(QString("Skipped TB: %1").arg(tb_name.c_str()));
 						add_tb_needed(tb_name, new_tb_val);
 					}
 				}
@@ -490,6 +494,8 @@ void SolverResults::shorten()
 	try
 	{
 		init();
+		for (const auto& move : sol->branch)
+			board->makeMove(move);
 		t_gui_update = steady_clock::now();
 		emit Message("Shortening... ", MessageType::info);
 

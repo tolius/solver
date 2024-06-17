@@ -23,7 +23,7 @@
    <item>
     <widget class="QTabWidget" name="tabWidget">
      <property name="currentIndex">
-      <number>0</number>
+      <number>2</number>
      </property>
      <widget class="QWidget" name="m_generalTab">
       <attribute name="title">
@@ -474,10 +474,22 @@
        </item>
        <item>
         <widget class="QGroupBox" name="m_engines">
+         <property name="styleSheet">
+          <string notr="true">QGroupBox {border:0;}</string>
+         </property>
          <property name="title">
-          <string>Engine</string>
+          <string>Engine:</string>
+         </property>
+         <property name="flat">
+          <bool>true</bool>
          </property>
          <layout class="QVBoxLayout" name="verticalLayout_7">
+          <property name="spacing">
+           <number>3</number>
+          </property>
+          <property name="topMargin">
+           <number>12</number>
+          </property>
           <item>
            <widget class="QRadioButton" name="m_rbNoEngine">
             <property name="text">
@@ -679,6 +691,48 @@
         </spacer>
        </item>
        <item>
+        <widget class="QGroupBox" name="groupBox_moveOrder">
+         <property name="styleSheet">
+          <string notr="true">QGroupBox {border:0;}</string>
+         </property>
+         <property name="title">
+          <string>Move order in auto mode when Watkins solution is provided:</string>
+         </property>
+         <property name="flat">
+          <bool>true</bool>
+         </property>
+         <layout class="QVBoxLayout" name="verticalLayout_5">
+          <property name="spacing">
+           <number>4</number>
+          </property>
+          <property name="topMargin">
+           <number>12</number>
+          </property>
+          <item>
+           <widget class="QRadioButton" name="m_radio_moveOrder_Default">
+            <property name="text">
+             <string>Default</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QRadioButton" name="m_radio_moveOrder_EasyToDifficult">
+            <property name="text">
+             <string>From Easy to Difficult</string>
+            </property>
+           </widget>
+          </item>
+          <item>
+           <widget class="QRadioButton" name="m_radio_moveOrder_DifficultToEasy">
+            <property name="text">
+             <string>From Difficult to Easy</string>
+            </property>
+           </widget>
+          </item>
+         </layout>
+        </widget>
+       </item>
+       <item>
         <widget class="QCheckBox" name="m_lowerLevel">
          <property name="text">
           <string>Continue to solve at the lower level after completing the solution at the upper level</string>
@@ -714,7 +768,7 @@
        <item>
         <widget class="QCheckBox" name="m_clearLogWhenAutoStarted">
          <property name="text">
-          <string>Clear the log when Auto mode is started</string>
+          <string>Clear the log when auto mode is started</string>
          </property>
          <property name="checked">
           <bool>true</bool>
