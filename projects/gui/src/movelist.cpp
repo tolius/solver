@@ -242,6 +242,7 @@ void MoveList::regenerateMoveButtons()
 			Chess::GenericMove generic_move = m_game->board()->genericMove(legal_moves[i]);
 			connect(buttons[i], &QToolButton::clicked, player, 
 				[=]() {
+					std::lock_guard<std::mutex> lock(m_game->board()->update_mutex);
 					for (auto& btn : buttons)
 						disconnect(btn, nullptr, player, nullptr);
 					((HumanPlayer*)player)->onHumanMove(generic_move, side);
@@ -469,7 +470,7 @@ void MoveList::setTint(QColor tint)
 		return QString("background-color: rgba(%1, %2, %3, %4);").arg(bkg.red()).arg(bkg.green()).arg(bkg.blue()).arg(bkg.alpha());
 	};
 
-	auto bkg = palette().color(QWidget::backgroundRole());
+	QColor bkg = palette().color(QWidget::backgroundRole());
 	QString style = bkg_color_style(bkg, tint);
 	ui->widget_Moves->setStyleSheet(style);
 }

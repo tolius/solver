@@ -380,7 +380,7 @@ void MainWindow::createSolutionsModel()
 						for (int j = 0; j < parent_item->childCount(); j++)
 						{
 							auto item = parent_item->child(j);
-							if (item && item->name() == name)
+							if (item)
 							{
 								auto solution = item->solution();
 								if (solution && solution->nameString() == name)
@@ -414,9 +414,22 @@ void MainWindow::createDockWindows()
 	connect(m_evaluation, &Evaluation::ShortMessage, m_log, 
 		[this](const QString& msg)
 		{
-			m_log->moveCursor(QTextCursor::End);
+			QTextCursor cursor = m_log->textCursor();
+			cursor.movePosition(QTextCursor::End);
+			if (!cursor.atStart() && (msg == "-" || msg == "+" || msg == "="))
+			{
+				QTextCursor cursor = m_log->textCursor();
+				QString last_line = cursor.selectedText();
+				if (!last_line.isEmpty() && !last_line.endsWith("-") && !last_line.endsWith("+") && !last_line.endsWith("=")) {
+					cursor.insertBlock();
+					cursor.insertHtml(QString("<span>%1</span>").arg(msg));
+					m_log->verticalScrollBar()->setValue(m_log->verticalScrollBar()->maximum());
+					return;
+				}
+			}
+
 			m_log->insertPlainText(msg);
-			m_log->moveCursor(QTextCursor::End);
+			cursor.movePosition(QTextCursor::End);
 		}
 	);
 	connect(m_log, SIGNAL(applyMoves(std::shared_ptr<Chess::Board>)), m_evaluation, SLOT(onSyncPositions(std::shared_ptr<Chess::Board>)));
@@ -725,7 +738,7 @@ void MainWindow::initSolutionGame()
 {
 	if (!m_solution || m_tabs.isEmpty())
 		return;
-	auto game = m_tabs[0].m_game;
+	auto& game = m_tabs[0].m_game;
 	if (!game)
 		return;
 	auto board = game->board();
@@ -735,6 +748,7 @@ void MainWindow::initSolutionGame()
 		m_gameViewer->gotoFirstMove();
 
 	//!! workaround
+	std::lock_guard<std::mutex> lock(board->update_mutex);
 	auto side = board->sideToMove();
 	for (auto& m : m_solution->openingMoves(true))
 	{
@@ -1215,7 +1229,7 @@ void MainWindow::openSolution(std::shared_ptr<Solution> solution)
 	if (!solution)
 		return;
 
-	auto tag = solution->subTag();
+	auto& tag = solution->subTag();
 	if (tag.isEmpty())
 	{
 		for (int i = 0; i < m_solutionsModel->rowCount(); i++)
@@ -1290,7 +1304,7 @@ void MainWindow::setTint(QColor tint, bool to_color_move_buttons)
 		return;
 
 	auto central_widget = this->centralWidget();
-	auto bkg = central_widget->palette().color(QWidget::backgroundRole());
+	QColor bkg = central_widget->palette().color(QWidget::backgroundRole());
 	QString style = bkg_color_style(bkg, tint);
 	this->centralWidget()->setStyleSheet(style);
 }

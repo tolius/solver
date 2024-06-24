@@ -272,7 +272,7 @@ void Evaluation::updateSync()
 		return;
 
 	int add_tint = 20; // 4 * std::max(3, QSettings().value("ui/status_highlighting", 5).toInt());
-	auto bkg = ui->widget_Engine->palette().color(QWidget::backgroundRole());
+	QColor bkg = ui->widget_Engine->palette().color(QWidget::backgroundRole());
 	bkg = QColor(bkg.red() + add_tint, bkg.green() + add_tint, bkg.blue() + add_tint);
 	ui->widget_Engine->setStyleSheet(bkg_color_style(bkg));
 }
@@ -646,7 +646,7 @@ void Evaluation::onOverrideToggled(bool flag)
 	int add_tint = 4 * std::max(3, QSettings().value("ui/status_highlighting", 5).toInt());
 	if (flag)
 	{
-		auto bkg = ui->btn_Override->palette().color(QWidget::backgroundRole());
+		QColor bkg = ui->btn_Override->palette().color(QWidget::backgroundRole());
 		bkg.setBlue(bkg.blue() + add_tint);
 		ui->btn_Override->setStyleSheet(bkg_color_style(bkg));
 		emit tintChanged(QColor(0, 0, add_tint, 0), true);
@@ -805,13 +805,13 @@ void Evaluation::onSyncPositions(std::shared_ptr<Chess::Board> ref_board)
 	if (!ref_board)
 		return;
 
-	static std::mutex sync_mutex;
 	timer_sync.stop();
 	t_last_sync = steady_clock::now();
-	std::lock_guard<std::mutex> lock(sync_mutex);
 	disconnect(this->game, SIGNAL(moveMade(Chess::GenericMove, QString, QString)), this, SLOT(positionChanged()));
 	try
 	{
+		std::lock_guard<std::mutex> lock_dest(game_board->update_mutex);
+		std::lock_guard<std::mutex> lock_source(ref_board->change_mutex);
 		auto& game_history = game_board->MoveHistory();
 		auto& ref_history = ref_board->MoveHistory();
 		int i = 0;
@@ -832,14 +832,14 @@ void Evaluation::onSyncPositions(std::shared_ptr<Chess::Board> ref_board)
 		for (; i < ref_history.size(); i++)
 		{
 			ChessPlayer* player(game->player(side));
-			int num_attempts = 20;
+			int num_attempts = 1;
 			for (; num_attempts > 0; num_attempts--)
 			{
 				if (game_board->key() == ref_history[i].key && game_board->isLegalMove(ref_history[i].move))
 					break;
 				qApp->processEvents();
 			}
-			if (num_attempts == 0)
+			if (num_attempts < 0)
 				throw std::runtime_error("the position may have been changed during the update");
 			auto generic_move = game_board->genericMove(ref_history[i].move);
 			((HumanPlayer*)player)->onHumanMove(generic_move, side);
@@ -1197,7 +1197,7 @@ void Evaluation::processEngineOutput(const MoveEvaluation& eval, const QString& 
 			good_moves.insert(str_move);
 	}
 	/// Check the results
-	bool no_progress = (best_time - t_progress > NO_PROGRESS_TIME || best_time == 0 || (solver && best_score >= s->multiPV_stop_score));
+	bool no_progress = (best_time - t_progress > NO_PROGRESS_TIME || best_time == 0 || (solver && s && best_score >= s->multiPV_stop_score));
 	if (best_move.isEmpty())
 		emit Message(tr("!!NONE MOVE in %1").arg(get_move_stack(board_, false, 400)), MessageType::warning);
 	if (session.is_auto && no_progress && pv == 1 && is_only_move && solver && best_score < s->score_limit

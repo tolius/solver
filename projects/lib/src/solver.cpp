@@ -516,7 +516,7 @@ void Solver::process_move(std::vector<pMove>& tree, SolverState& info)
 		throw stopProcessing();
 	if (tree.empty())
 		throw runtime_error("Error: empty tree while processing.");
-	auto move = tree.back();
+	pMove move = tree.back();
 	if (!move)
 		throw runtime_error("Error: null move while processing.");
 
@@ -1009,7 +1009,7 @@ Solver::pMove Solver::get_engine_move(SolverMove& move, SolverState& info, bool 
 		assert(best_move->score() != ESOLUTION_VALUE || best_move->depth() != ESOLUTION_VALUE); // a esolution move might have been saved in a previous version of the app => skip it
 		return best_move;
 	}
-	auto old_best_move = best_move;
+	pMove old_best_move = best_move;
 
 	/// Run engine.
 	if (!re_ensure)
@@ -1568,7 +1568,7 @@ std::list<MoveEntry> Solver::entries(Chess::Board* pos) const
 	temp_board->setFenString(temp_board->defaultFenString());
 	for (const auto& move : sol->opening)
 		temp_board->makeMove(move);
-	auto t = tree.front();
+	pMove t = tree.front();
 	auto& history = pos->MoveHistory();
 	for (int i = sol->opening.size(); i < history.size(); i++)
 	{

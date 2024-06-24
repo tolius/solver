@@ -19,18 +19,21 @@
 #ifndef BOARD_H
 #define BOARD_H
 
-#include <QString>
-#include <QVector>
-#include <QVarLengthArray>
-#include <QSharedPointer>
-#include <QDebug>
-#include <QCoreApplication>
 #include "square.h"
 #include "piece.h"
 #include "move.h"
 #include "genericmove.h"
 #include "zobrist.h"
 #include "result.h"
+
+#include <QString>
+#include <QVector>
+#include <QVarLengthArray>
+#include <QSharedPointer>
+#include <QDebug>
+#include <QCoreApplication>
+
+#include <mutex>
 
 
 namespace Chess {
@@ -108,6 +111,7 @@ class LIB_EXPORT Board
 		 * the zobrist object and takes care of deleting it.
 		 */
 		Board(Zobrist* zobrist);
+		Board(const Board& board);
 		/*! Destructs the Board object. */
 		virtual ~Board();
 		/*! Creates and returns a deep copy of this board. */
@@ -558,6 +562,10 @@ class LIB_EXPORT Board
 		QVarLengthArray<Piece> m_squares;
 		QVector<MoveData> m_moveHistory;
 		QVector<int> m_reserve[2];
+
+	public:
+		std::mutex change_mutex;
+		std::mutex update_mutex;
 };
 
 

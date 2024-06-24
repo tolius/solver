@@ -17,12 +17,13 @@
 */
 
 #include "board.h"
+#include "zobrist.h"
+
 #include <QStringList>
+#include <QRegularExpression>
 #if QT_VERSION >= QT_VERSION_CHECK(6, 0, 0)
 #include <QStringView>
 #endif
-#include <QRegularExpression>
-#include "zobrist.h"
 
 
 namespace Chess {
@@ -70,6 +71,25 @@ Board::Board(Zobrist* zobrist)
 	Q_ASSERT(zobrist != nullptr);
 
 	setPieceType(Piece::NoPiece, QString(), QString());
+}
+
+Board::Board(const Board& board)
+{
+	m_initialized = board.m_initialized;
+	m_width = board.m_width;
+	m_height = board.m_height;
+	m_side = board.m_side;
+	m_startingSide = board.m_startingSide;
+	m_startingFen = board.m_startingFen;
+	m_maxPieceSymbolLength = board.m_maxPieceSymbolLength;
+	m_key = board.m_key;
+	m_zobrist = board.m_zobrist;
+	m_sharedZobrist = board.m_sharedZobrist;
+	m_pieceData = board.m_pieceData;
+	m_squares = board.m_squares;
+	m_moveHistory = board.m_moveHistory;
+	m_reserve[0] = board.m_reserve[0];
+	m_reserve[1] = board.m_reserve[1];
 }
 
 Board::~Board()
@@ -527,6 +547,8 @@ bool Board::setFenString(const QString& fen)
 	QStringList::iterator token = strList.begin();
 	if (token->length() < m_height * 2)
 		return false;
+	
+	std::lock_guard<std::mutex> lock(change_mutex);
 
 	initialize();
 
@@ -702,6 +724,8 @@ void Board::makeMove(const Move& move, BoardTransition* transition)
 {
 	Q_ASSERT(!m_side.isNull());
 	Q_ASSERT(!move.isNull());
+	
+	std::lock_guard<std::mutex> lock(change_mutex);
 
 	MoveData md = { move, m_key };
 
@@ -716,6 +740,8 @@ void Board::undoMove()
 {
 	Q_ASSERT(!m_moveHistory.isEmpty());
 	Q_ASSERT(!m_side.isNull());
+	
+	std::lock_guard<std::mutex> lock(change_mutex);
 
 	m_side = m_side.opposite();
 	vUndoMove(m_moveHistory.last().move);
@@ -839,7 +865,7 @@ int Board::captureType(const Move& move) const
 bool Board::vIsLegalMove(const Move& move)
 {
 	Q_ASSERT(!move.isNull());
-
+	
 	makeMove(move);
 	bool isLegal = isLegalPosition();
 	undoMove();
@@ -875,7 +901,7 @@ int Board::reversibleMoveCount() const
 bool Board::isRepetition(const Chess::Move& move)
 {
 	Q_ASSERT(!move.isNull());
-
+	
 	makeMove(move);
 	bool isRepeat = (repeatCount() > 0);
 	undoMove();

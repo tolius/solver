@@ -215,7 +215,7 @@ QString Results::positionChanged()
 			label_score->setFont(font);
 		}
 		if (btn && entry.pgMove == solver_pgMove) {
-			auto bkg = ui->widget_Solution->palette().color(QWidget::backgroundRole());
+			QColor bkg = ui->widget_Solution->palette().color(QWidget::backgroundRole());
 			bkg.setRed(bkg.red() + 20);
 			bkg.setGreen(bkg.green() + 15);
 			btn->setStyleSheet(QString("background-color: rgba(%1, %2, %3, %4);").arg(bkg.red()).arg(bkg.green()).arg(bkg.blue()).arg(bkg.alpha()));
@@ -265,6 +265,7 @@ QString Results::positionChanged()
 			connect(buttons[i], &QPushButton::clicked, player,
 				[=]()
 				{
+					std::lock_guard<std::mutex> lock(game->board()->update_mutex);
 					for (auto& btn : buttons)
 						disconnect(btn, nullptr, player, nullptr);
 					((HumanPlayer*)player)->onHumanMove(move, side);
