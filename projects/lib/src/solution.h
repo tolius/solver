@@ -81,6 +81,7 @@ public:
 	std::list<MoveEntry> nextEntries(Chess::Board* board, std::list<MoveEntry>* missing_entries = nullptr) const;
 	std::list<MoveEntry> positionEntries(Chess::Board* board, bool use_esolution = true);
 	std::list<MoveEntry> nextPositionEntries(Chess::Board* board, std::list<MoveEntry>* missing_entries = nullptr);
+	std::list<MoveEntry> esolEntries(Chess::Board* board, std::list<MoveEntry>* missing_entries = nullptr);
 	std::shared_ptr<SolutionEntry> bookEntry(std::shared_ptr<Chess::Board> board, FileType type, bool check_cache = true) const;
 	std::shared_ptr<SolutionEntry> bookEntry(Chess::Board* board, FileType type, bool check_cache = true) const;
 	QString positionInfo(std::shared_ptr<Chess::Board> board);
@@ -120,7 +121,7 @@ private:
 	int winInValue(std::shared_ptr<Chess::Board> board, FileType type) const;
 	bool hasMergeErrors() const;
 	void saveBranchSettings(QSettings& s, std::shared_ptr<Chess::Board> board);
-	bool mergeFiles(FileType type);
+	bool mergeFiles(FileType type) const;
 	void addToBook(const EntryRow& row, FileType type) const;
 
 private:

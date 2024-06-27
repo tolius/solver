@@ -1,6 +1,8 @@
 #include "mergebooksdlg.h"
 #include "ui_mergebooksdlg.h"
 
+#include "solution.h"
+
 #include <QMessageBox>
 #include <QApplication>
 #include <QFileDialog>
@@ -86,7 +88,8 @@ void MergeBooksDialog::updateMainBookType(FileType type)
 	ui->btn_MainBookShort->setChecked(type == FileType_book_short);
 
 	book_type = (type == FileType_SIZE) ? autoSelectBook() : type;
-	auto path = new QTableWidgetItem(solver->solution()->path(book_type));
+	QString book_path = (book_type == FileType_SIZE) ? "" : solver->solution()->path(book_type);
+	auto path = new QTableWidgetItem(book_path);
 	ui->table_Books->setItem(0, 2, path);
 
 	ui->btn_MainBookAuto->blockSignals(false);

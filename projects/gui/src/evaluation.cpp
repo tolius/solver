@@ -534,7 +534,7 @@ void Evaluation::onEngineReady()
 			int num = str_num.toInt(&ok);
 			if (ok) {
 				engine_version = 
-				      (240226 <= num && num <= 240430) ? 3
+				      (240226 <= num && num <= 240630) ? 3
 				    : (num == 230811)                  ? 2
 				    : (num == 230803)                  ? 1
 				    : (230409 <= num && num <= 230415) ? 1
@@ -807,11 +807,11 @@ void Evaluation::onSyncPositions(std::shared_ptr<Chess::Board> ref_board)
 
 	timer_sync.stop();
 	t_last_sync = steady_clock::now();
-	disconnect(this->game, SIGNAL(moveMade(Chess::GenericMove, QString, QString)), this, SLOT(positionChanged()));
 	try
 	{
 		std::lock_guard<std::mutex> lock_dest(game_board->update_mutex);
 		std::lock_guard<std::mutex> lock_source(ref_board->change_mutex);
+		disconnect(this->game, SIGNAL(moveMade(Chess::GenericMove, QString, QString)), this, SLOT(positionChanged()));
 		auto& game_history = game_board->MoveHistory();
 		auto& ref_history = ref_board->MoveHistory();
 		int i = 0;
@@ -832,14 +832,14 @@ void Evaluation::onSyncPositions(std::shared_ptr<Chess::Board> ref_board)
 		for (; i < ref_history.size(); i++)
 		{
 			ChessPlayer* player(game->player(side));
-			int num_attempts = 1;
+			int num_attempts = 20;
 			for (; num_attempts > 0; num_attempts--)
 			{
 				if (game_board->key() == ref_history[i].key && game_board->isLegalMove(ref_history[i].move))
 					break;
 				qApp->processEvents();
 			}
-			if (num_attempts < 0)
+			if (num_attempts == 0)
 				throw std::runtime_error("the position may have been changed during the update");
 			auto generic_move = game_board->genericMove(ref_history[i].move);
 			((HumanPlayer*)player)->onHumanMove(generic_move, side);
@@ -1071,10 +1071,9 @@ void Evaluation::onEngineEval(const MoveEvaluation& eval)
 		eval_data.time_ms = eval.time();
 		eval_data.nps = eval.nps();
 		eval_data.tb_hits = eval.tbHits();
-		if (san_moves.size() > 1) {
-			eval_data.best_move = eval_best_move;
+		eval_data.best_move = eval_best_move;
+		if (!san_moves.isEmpty())
 			eval_data.move_sequence = get_san_sequence(board_->plyCount() + 3, san_moves);
-		}
 	}
 	if (pv - 1 < move_labels.size())
 	{
@@ -1165,8 +1164,15 @@ void Evaluation::processEngineOutput(const MoveEvaluation& eval, const QString& 
 		best_move = str_move;
 		best_score = curr_score;
 		abs_score = is_endgame ? abs(best_score) : best_score;
-		if (solver && abs_score < s->min_score && board_->sideToMove() == solver->sideToWin())
-			emit Message(tr("...NOT WINNING at depth=%1! %2 in %3").arg(depth).arg(str_move).arg(get_move_stack(board_)), MessageType::warning);
+		
+
+		if (solver && abs_score < s->min_score && board_->sideToMove() == solver->sideToWin()) {
+			auto now = steady_clock::now();
+			if (now - t_last_not_win_warning >= 5000ms) {
+				emit Message(tr("...NOT WINNING at depth=%1! %2 in %3").arg(depth).arg(str_move).arg(get_move_stack(board_)), MessageType::warning);
+				t_last_not_win_warning = now;
+			}
+		}
 		is_score_ok = (!solver || !s->dont_lose_winning_sequence || move_score == NULL_SCORE
 					   || abs(move_score) <= WIN_THRESHOLD || abs_score > abs(move_score));
 		depth_limit = get_max_depth(best_score, num_pieces);
@@ -1350,8 +1356,9 @@ void Evaluation::updateProgress(int val)
 
 void Evaluation::onEngineStopped()
 {
-	//auto eval = engine->evaluation();
-	//onEngineEval(eval);
+	auto& eval = engine->evaluation();
+	if (eval.depth() > 200) // happens in endgames where onEngineEval() may not be called even once
+		onEngineEval(eval);
 }
 
 void Evaluation::onEngineFinished()

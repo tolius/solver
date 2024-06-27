@@ -312,6 +312,9 @@ typedef struct dictData {
    const char    *start;	/* start of mmap'd area */
    const char    *end;		/* end of mmap'd area */
    unsigned long size;		/* size of mmap */
+#ifdef _WIN32
+   void          *mapping;
+#endif
    
    int           type;
    const char    *filename;

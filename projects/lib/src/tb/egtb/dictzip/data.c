@@ -27,16 +27,17 @@
 #endif
 #include <sys/stat.h>
 #ifdef HAVE_MMAP
+#ifdef _WIN32
+#include <io.h>
+#define NOMINMAX
+#include <windows.h>
+#else
 #include <sys/mman.h>
 #endif
+#endif // HAVE_MMAP
 //#include <ctype.h>
 #include <fcntl.h>
 #include <assert.h>
-#ifdef HAVE_MMAP
-#include <sys/mman.h>
-#endif
-
-//#include <sys/stat.h>
 
 #define USE_CACHE 1
 
@@ -259,11 +260,26 @@ dictData *dict_data_open(const char *filename, int computeCRC)
 
 	if (mmap_mode) {
 #ifdef HAVE_MMAP
-		h->start = mmap(NULL, h->size, PROT_READ, MAP_SHARED, h->fd, 0);
-		if ((void *)h->start == (void *)(-1))
-			err_fatal_errno(
-				__func__,
-				"Cannot mmap data file \"%s\"\n", filename);
+#	ifdef _WIN32
+		h->mapping = NULL;
+		HANDLE handle = (HANDLE)_get_osfhandle(h->fd);
+		if (handle == INVALID_HANDLE_VALUE)
+			err_fatal_errno(__func__, "Cannot get mmap data file \"%s\"\n", filename);
+		else {
+			DWORD size_high;
+			DWORD size_low = GetFileSize(handle, &size_high);
+			h->mapping = CreateFileMapping(handle, NULL, PAGE_READONLY, size_high, size_low, NULL);
+			CloseHandle(handle);
+			if (h->mapping)
+				h->start = (char*)MapViewOfFile(h->mapping, FILE_MAP_READ, 0, 0, 0);
+			else
+				err_fatal_errno(__func__, "Cannot mmap data file \"%s\"\n", filename);
+		}
+#	else
+		h->start = (char*)mmap(NULL, h->size, PROT_READ, MAP_SHARED, h->fd, 0);
+		if ((void*)h->start == (void*)(-1))
+			err_fatal_errno(__func__, "Cannot mmap data file \"%s\"\n", filename);
+#	endif
 #else
 		err_fatal(__func__, "This should not happen");
 #endif
@@ -271,10 +287,7 @@ dictData *dict_data_open(const char *filename, int computeCRC)
 	else {
 		h->start = xmalloc(h->size);
 		if (-1 == read(h->fd, (char *)h->start, h->size))
-			err_fatal_errno(
-				__func__,
-				"Cannot read data file \"%s\"\n", filename);
-
+			err_fatal_errno(__func__, "Cannot read data file \"%s\"\n", filename);
 		close(h->fd);
 		h->fd = 0;
 	}
@@ -301,8 +314,14 @@ void dict_data_close(dictData *header)
 	if (header->fd >= 0) {
 		if (mmap_mode) {
 #ifdef HAVE_MMAP
-			munmap((void *)header->start, header->size);
+	#ifdef _WIN32
+			UnmapViewOfFile(header->start);
+			CloseHandle((HANDLE)header->mapping);
+			header->mapping = NULL;
+	#else
+			munmap((void*)header->start, header->size);
 			close(header->fd);
+	#endif
 			header->fd = 0;
 			header->start = header->end = NULL;
 #else

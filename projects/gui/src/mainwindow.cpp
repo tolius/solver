@@ -187,6 +187,8 @@ void MainWindow::createActions()
 
 //	m_pasteFenAct = new QAction(tr("&Paste FEN"), this);
 //	m_pasteFenAct->setShortcut(QKeySequence(QKeySequence::Paste));
+	m_pastePgnAct = new QAction(tr("&Paste PGN"), this);
+	m_pastePgnAct->setShortcut(QKeySequence(QKeySequence::Paste));
 
 	m_copyPgnAct = new QAction(tr("Copy PG&N"), this);
 	m_copyZsAct = new QAction(tr("Copy &ZS"), this);
@@ -235,6 +237,7 @@ void MainWindow::createActions()
 //	connect(m_pasteFenAct, SIGNAL(triggered()), this, SLOT(pasteFen()));
 	connect(copyFenSequence, SIGNAL(triggered()), this, SLOT(copyFen()));
 	connect(m_copyPgnAct, SIGNAL(triggered()), this, SLOT(copyPgn()));
+	connect(m_pastePgnAct, SIGNAL(triggered()), this, SLOT(pastePgn()));
 	connect(m_copyZsAct, SIGNAL(triggered()), this, SLOT(copyZS()));
 	connect(m_mergeBooksAct, SIGNAL(triggered()), this, SLOT(mergeBooks()));
 	connect(m_flipBoardAct, SIGNAL(triggered()), m_gameViewer->boardScene(), SLOT(flip()));
@@ -291,6 +294,7 @@ void MainWindow::createMenus()
 	m_toolsMenu->addAction(m_copyPgnAct);
 	m_toolsMenu->addAction(m_copyZsAct);
 //	m_toolsMenu->addAction(m_pasteFenAct);
+	m_toolsMenu->addAction(m_pastePgnAct);
 	m_toolsMenu->addSeparator();
 	m_toolsMenu->addAction(m_mergeBooksAct);
 	m_toolsMenu->addSeparator();
@@ -946,6 +950,17 @@ void MainWindow::pasteFen()
 	CuteChessApplication::instance()->gameManager()->newGame(game,
 		new HumanBuilder(CuteChessApplication::userName()),
 		new HumanBuilder(CuteChessApplication::userName()));
+}
+
+void MainWindow::pastePgn()
+{
+	if (!m_evaluation)
+		return;
+
+	auto cb = CuteChessApplication::clipboard();
+	auto [line, board] = parse_moves(cb->text());
+	if (board)
+		m_evaluation->onSyncPositions(board);
 }
 
 void MainWindow::copyZS()

@@ -135,6 +135,7 @@ private:
 public slots:
 	void positionChanged();
 	void gotoCurrentMove();
+	void onSyncPositions(std::shared_ptr<Chess::Board> ref_board = nullptr);
 	void engineChanged(const QString& engine_filename);
 	void engineHashChanged(int hash_size);
 	void engineNumThreadsChanged(int num_threads);
@@ -167,7 +168,6 @@ private slots:
 	void onMultiPVClicked(int multiPV);
 	void onEvaluatePosition();
 	void onSolvingStatusChanged();
-	void onSyncPositions(std::shared_ptr<Chess::Board> ref_board = nullptr);
 	void onUpdateEval();
 private:
 	void onEngineToggled(bool flag);
@@ -234,6 +234,7 @@ private:
 	bool is_position_update;
 	bool is_restart;
 	bool to_keep_solving;
+	std::chrono::steady_clock::time_point t_last_not_win_warning;
 
 	EngineSession session;
 	QTimer timer_engine;

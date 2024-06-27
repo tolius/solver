@@ -27,7 +27,8 @@ namespace fs = std::filesystem;
 
 // "override" must be after "alts":
 static const vector<string> list_old_bases = { "positions", "multi",    "alts",   "override", "esolution"}; //, "endgames" };
-static const vector<string> list_new_bases = { "pos_up",    "multi_up", "alt_up", "alt_up",   "sol_up"}; //,    "eg_up"};
+static const vector<string> list_new_bases = { "pos_",      "multi_",   "alt_",   "alt_",     "sol_"};      //, "eg_"};
+static const vector<string> list_level = { "up", "low" };
 
 static const char* IMPORTED = "IMPORTED";
 static const char* EXISTS = "EXISTS";
@@ -461,15 +462,18 @@ void ImportDialog::on_ImportClicked()
 		}
 		for (auto& base : list_new_bases)
 		{
-			for (auto ending : { end_std, end_new })
+			for (auto& ending : { end_std, end_new })
 			{
-				stringstream ss;
-				ss << filename << '_' << base << ending;
-				fs::path path_i = dir / ss.str();
-				if (fs::exists(path_i)) {
-					warning(tr("the file \"%1\" already exists.").arg(path_to_QString(path_i)));
-					solution_files.info->setText(EXISTS);
-					return;
+				for (auto& level : list_level)
+				{
+					stringstream ss;
+					ss << filename << '_' << base << level << ending;
+					fs::path path_i = dir / ss.str();
+					if (fs::exists(path_i)) {
+						warning(tr("the file \"%1\" already exists.").arg(path_to_QString(path_i)));
+						solution_files.info->setText(EXISTS);
+						return;
+					}
 				}
 			}
 		}
@@ -494,13 +498,14 @@ void ImportDialog::on_ImportClicked()
 					if (val >= MATE_THRESHOLD)
 						num_wins++;
 				};
-				if (false && num_wins >= num / 2) {//!! remove false
-					warning(tr("the file \"%1\" contains the lower-level solution. The current version of %2 can only import upper-level solutions.")
-					             .arg(path_to_QString(file.path)).arg(QApplication::applicationName()));
+				if (num_wins >= num / 2) {
 					solution_files.info->setText(LOWER_LEVEL);
-					return;
+					solution_files.is_lower = true;
+					break;
 				}
 			}
+			if (solution_files.is_lower)
+				break;
 		}
 		add_progress(5.0f / files.size());
 
@@ -526,7 +531,7 @@ void ImportDialog::on_ImportClicked()
 			bool is_new = (it_new != solution_files.New.end()) && (it_new->second.size > 0);
 			if (!is_std && !is_new)
 				continue;
-			auto& sol_base = list_new_bases[i];
+			auto sol_base = list_new_bases[i] + (solution_files.is_lower ? list_level.back() : list_level.front());
 			if (is_std)
 			{
 				if (old_base == "override")

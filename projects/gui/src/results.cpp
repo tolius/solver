@@ -36,10 +36,11 @@ Results::Results(QWidget* parent)
 	ui->label_Info->setVisible(false);
 	ui->btn_SourceAuto->setChecked(true);
 
-	connect(ui->btn_SourceAuto, &QToolButton::toggled, this, [this]()   { onDataSourceChanged(EntrySource::none);      });
-	connect(ui->btn_SourceSolver, &QToolButton::toggled, this, [this]() { onDataSourceChanged(EntrySource::solver);    });
-	connect(ui->btn_SourceBook, &QToolButton::toggled, this, [this]()   { onDataSourceChanged(EntrySource::book);      });
-	connect(ui->btn_SourceEval, &QToolButton::toggled, this, [this]()   { onDataSourceChanged(EntrySource::positions); });
+	connect(ui->btn_SourceAuto,    &QToolButton::toggled, this, [this]() { onDataSourceChanged(EntrySource::none);      });
+	connect(ui->btn_SourceSolver,  &QToolButton::toggled, this, [this]() { onDataSourceChanged(EntrySource::solver);    });
+	connect(ui->btn_SourceBook,    &QToolButton::toggled, this, [this]() { onDataSourceChanged(EntrySource::book);      });
+	connect(ui->btn_SourceEval,    &QToolButton::toggled, this, [this]() { onDataSourceChanged(EntrySource::positions); });
+	connect(ui->btn_SourceWatkins, &QToolButton::toggled, this, [this]() { onDataSourceChanged(EntrySource::watkins);   });
 }
 
 void Results::setSolution(std::shared_ptr<Solution> solution)
@@ -86,6 +87,7 @@ void Results::onDataSourceChanged(EntrySource source)
 	auto btn = source == EntrySource::solver    ? ui->btn_SourceSolver
 	         : source == EntrySource::book      ? ui->btn_SourceBook
 	         : source == EntrySource::positions ? ui->btn_SourceEval
+	         : source == EntrySource::watkins   ? ui->btn_SourceWatkins
 	                                            : ui->btn_SourceAuto;
 	if (btn->isChecked())
 		return;
@@ -121,9 +123,9 @@ QString Results::positionChanged()
 		{
 			if (data_source == EntrySource::none || data_source == EntrySource::book)
 				solution_entries = solution->entries(board);
-			if ((data_source == EntrySource::none || data_source == EntrySource::positions) && solution_entries.empty())
+			if ((data_source == EntrySource::none || data_source == EntrySource::positions || data_source == EntrySource::watkins) && solution_entries.empty())
 			{
-				solution_entries = solution->positionEntries(board);
+				solution_entries = (data_source == EntrySource::watkins) ? solution->esolEntries(board) : solution->positionEntries(board);
 				if (solution_entries.empty())
 				{
 					auto legal_moves = board->legalMoves();
@@ -142,9 +144,9 @@ QString Results::positionChanged()
 			std::list<MoveEntry> missing_entries;
 			if (data_source == EntrySource::none || data_source == EntrySource::book)
 				solution_entries = solution->nextEntries(board, &missing_entries);
-			if ((data_source == EntrySource::none || data_source == EntrySource::positions) && solution_entries.empty()) {
+			if ((data_source == EntrySource::none || data_source == EntrySource::positions || data_source == EntrySource::watkins) && solution_entries.empty()) {
 				missing_entries.clear();
-				solution_entries = solution->nextPositionEntries(board, &missing_entries);
+				solution_entries = (data_source == EntrySource::watkins) ?  solution->esolEntries(board, &missing_entries) : solution->nextPositionEntries(board, &missing_entries);
 				solution_entries.splice(solution_entries.begin(), missing_entries);
 			}
 			else {
@@ -194,7 +196,7 @@ QString Results::positionChanged()
 				btn->setEnabled(false);
 		}
 		buttons.push_back(btn);
-		QString score = (all_unknown || (entry.source == EntrySource::positions && entry.info == "only move")) ? ""
+		QString score = (all_unknown || ((entry.source == EntrySource::positions || entry.source == EntrySource::watkins) && entry.info == "only move")) ? ""
 		    : (entry.source == EntrySource::solver && entry.score() == ESOLUTION_VALUE && entry.info == "~") ? "sol"
 		    : entry.getScore(entry.source == EntrySource::book || entry.source == EntrySource::solver);
 		if (entry.info.isEmpty() && entry.score() != UNKNOWN_SCORE) {

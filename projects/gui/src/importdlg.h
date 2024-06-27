@@ -28,6 +28,7 @@ struct SolutionFiles
 	std::map<std::string, SolutionFile> Std;
 	std::map<std::string, SolutionFile> New;
 	QTableWidgetItem* info = nullptr;
+	bool is_lower = false;
 
 	bool isImported() const;
 	void set_info(const QString& text);

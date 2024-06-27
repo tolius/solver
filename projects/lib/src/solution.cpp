@@ -609,6 +609,46 @@ std::list<MoveEntry> Solution::nextPositionEntries(Chess::Board* board, std::lis
 	return next_entries;
 }
 
+std::list<MoveEntry> Solution::esolEntries(Chess::Board* board, std::list<MoveEntry>* missing_entries)
+{
+	auto entries = eSolutionEntries(board);
+
+	uint32_t sum = 0;
+	for (auto& entry : entries)
+		sum += entry.nodes();
+	uint32_t best_threshold = (sum < 1000) ? numeric_limits<uint32_t>::max() : static_cast<uint32_t>(sum * 0.20f);
+
+	std::list<MoveEntry> esol_entries;
+	for (auto& entry : entries)
+	{
+		entry.weight = reinterpret_cast<const quint16&>(UNKNOWN_SCORE);
+		esol_entries.emplace_back(EntrySource::watkins, entry.san(board), entry);
+		auto& e = esol_entries.back();
+		e.is_best = (entry.nodes() >= best_threshold);
+		e.info = entry.nodes() > 1 ? Watkins_nodes(entry) : "W";
+	}
+
+	if (missing_entries) {
+		auto legal_moves = board->legalMoves();
+		for (auto& m : legal_moves)
+		{
+			auto pgMove = OpeningBook::moveToBits(board->genericMove(m));
+			for (auto& entry : entries) {
+				if (entry.pgMove == pgMove) {
+					pgMove = 0;
+					break;
+				}
+			}
+			if (pgMove) {
+				QString san = board->moveString(m, Chess::Board::StandardAlgebraic);
+				missing_entries->emplace_back(EntrySource::none, san, pgMove, (quint16)UNKNOWN_SCORE, 0);
+			}
+		}
+	}
+
+	return esol_entries;
+}
+
 std::shared_ptr<SolutionEntry> Solution::bookEntry(std::shared_ptr<Chess::Board> board, FileType type, bool check_cache) const
 {
 	return bookEntry(board.get(), type, check_cache);
@@ -967,7 +1007,7 @@ void Solution::saveBranchSettings(QSettings& s, std::shared_ptr<Chess::Board> bo
 	s.endArray();
 }
 
-bool Solution::mergeFiles(FileType type)
+bool Solution::mergeFiles(FileType type) const
 {
 	auto path_new = path(type, FileSubtype::New);
 	QFileInfo fi_new(path_new);
@@ -1164,10 +1204,11 @@ std::vector<SolutionEntry> Solution::eSolutionEntries(Chess::Board* board, bool 
 			SolutionEntry prev_entry(pgMove, entry->weight, entry->learn + 1);
 			entries.push_back(prev_entry);
 		}
-		if (entries.size() == legal_moves.size())
+		if (entries.size() == legal_moves.size()) {
+			sort(entries.begin(), entries.end(), SolutionEntry::compare);
 			return entries;
-		else
-			entries.clear();
+		}
+		entries.clear();
 	}
 
 	if (!hasWatkinsSolution())

@@ -37,6 +37,7 @@ set_property(TARGET ${PROJECT_NAME} PROPERTY POSITION_INDEPENDENT_CODE 1)
 if (WIN32)
 	target_compile_definitions(${PROJECT_NAME}
 		PRIVATE _CRT_SECURE_NO_WARNINGS
+		PRIVATE HAVE_MMAP
 	)
 	target_compile_options(${PROJECT_NAME}
 		PRIVATE "/Ox"
@@ -45,6 +46,7 @@ if (WIN32)
 else()
 	target_compile_definitions(${PROJECT_NAME}
 		PRIVATE HAVE_UNISTD_H
+		PRIVATE HAVE_MMAP
 		PRIVATE NDEBUG
 	)
 	target_compile_options(${PROJECT_NAME}

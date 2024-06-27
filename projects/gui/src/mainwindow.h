@@ -97,6 +97,7 @@ class MainWindow : public QMainWindow
 		void copyFen();
 		void pasteFen();
 		void copyPgn();
+		void pastePgn();
 		void copyZS();
 		void mergeBooks();
 		void showAboutDialog();
@@ -168,6 +169,7 @@ class MainWindow : public QMainWindow
 		QAction* m_copyFenAct;
 		QAction* m_pasteFenAct;
 		QAction* m_copyPgnAct;
+		QAction* m_pastePgnAct;
 		QAction* m_copyZsAct;
 		QAction* m_mergeBooksAct;
 		QAction* m_flipBoardAct;

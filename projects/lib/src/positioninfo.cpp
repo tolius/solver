@@ -218,7 +218,7 @@ QString get_move_stack(Chess::Board* game_board, bool add_fen, int move_limit)
 {
 	using namespace Chess;
 	QStringList moves;
-	auto move_data = game_board->MoveHistory();
+	auto& move_data = game_board->MoveHistory();
 	std::shared_ptr<Board> board(BoardFactory::create("antichess"));
 	board->setFenString(game_board->defaultFenString());
 	int num = 0;
@@ -373,6 +373,48 @@ std::tuple<Line, std::shared_ptr<Chess::Board>> parse_line(const QString& line, 
 	return { moves, board };
 }
 
+std::tuple<Line, std::shared_ptr<Chess::Board>> parse_moves(QString text, const QString* ptr_opening)
+{
+	if (text.isEmpty())
+		return { Line(), nullptr };
+
+	static const QString tag = "[Variant \"Antichess\"]";
+	int i1 = text.indexOf(tag);
+	if (i1 >= 0)
+	{
+		i1 += tag.length();
+	}
+	else
+	{
+		if (ptr_opening)
+		{
+			auto& opening = *ptr_opening;
+			i1 = opening.isEmpty() ? -1 : text.indexOf(opening);
+			if (i1 < 0)
+				throw runtime_error(QString("The currently selected line \"%1\" does not contain any moves. "
+					"Please select a line that contains moves to set the corresponding position on the board.").arg(text).toStdString());
+			i1++;
+		}
+		else
+		{
+			i1 = 0;
+		}
+	}
+	int i2 = text.length() - 1;
+	auto check_line_end = [&](QChar ch)
+	{
+		int i = text.indexOf(ch, i1);
+		if (i >= 0 && i < i2)
+			i2 = i;
+	};
+	check_line_end('#');
+	check_line_end('+');
+	check_line_end('-');
+	check_line_end(':');
+	text = text.midRef(i1, i2 - i1 + 1).trimmed().toString();
+	return parse_line(text, true);
+}
+
 int get_max_depth(int score, size_t numPieces)
 {
 	int num_pieces = static_cast<int>(numPieces);
@@ -436,7 +478,7 @@ std::tuple<std::list<SolverMove>, uint8_t> get_endgame_moves(std::shared_ptr<Che
 		return { moves, tb_dtz };
 	auto depth_time = [](uint32_t dtz_value) { return (dtz_value << 16) | EGTB_VERSION; };
 	auto our_color = board->sideToMove();
-	uint8_t dtz = 100 - board->plyCount();
+	int dtz = 100 - board->reversibleMoveCount();
 	auto legal_moves = board->legalMoves();
 	for (auto& move : legal_moves)
 	{

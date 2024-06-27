@@ -28,6 +28,9 @@
 #include <QTextStream>
 #include <QTextBlock>
 
+#include <stdexcept>
+
+
 PlainTextLog::PlainTextLog(QWidget* parent)
 	: QPlainTextEdit(parent)
 {
@@ -55,40 +58,16 @@ void PlainTextLog::mouseDoubleClickEvent(QMouseEvent* e)
 void PlainTextLog::sendMoves()
 {
 	auto text = textCursor().block().text();
-	if (text.isEmpty())
-		return;
-	static const QString tag = "[Variant \"Antichess\"]";
-	int i1 = text.indexOf(tag);
-	if (i1 >= 0)
+	try
 	{
-		i1 += tag.length();
+		auto [line, board] = parse_moves(text, &opening);
+		if (board)
+			emit applyMoves(board);
 	}
-	else
+	catch (std::runtime_error e)
 	{
-		i1 = opening.isEmpty() ? -1 : text.indexOf(opening);
-		if (i1 < 0) {
-			QMessageBox::information(
-				this, "Log",
-				QString("The currently selected line \"%1\" does not contain any moves. "
-					"Please select a line that contains moves to set the corresponding position on the board.").arg(text));
-			return;
-		}
-		i1++;
+		QMessageBox::information(this, "Log", e.what());
 	}
-	int i2 = text.length() - 1;
-	auto check_line_end = [&](QChar ch)
-	{
-		int i = text.indexOf(ch, i1);
-		if (i >= 0 && i < i2)
-			i2 = i;
-	};
-	check_line_end('#');
-	check_line_end('+');
-	check_line_end('-');
-	check_line_end(':');
-	text = text.midRef(i1, i2 - i1 + 1).trimmed().toString();
-	auto [line, board] = parse_line(text, true);
-	emit applyMoves(board);
 }
 
 void PlainTextLog::contextMenuEvent(QContextMenuEvent* event)

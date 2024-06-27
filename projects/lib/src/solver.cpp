@@ -1651,7 +1651,7 @@ std::list<MoveEntry> Solver::entries(Chess::Board* pos) const
 	return entries;
 }
 
-std::chrono::seconds Solver::log_update_time()
+std::chrono::seconds Solver::log_update_time() const
 {
 	return (frequency_log_update == UpdateFrequency::always)      ? 0s
 	    : (frequency_log_update == UpdateFrequency::frequently)   ? 10s

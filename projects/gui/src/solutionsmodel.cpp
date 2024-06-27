@@ -24,7 +24,7 @@ void SolutionsModel::addSolutions(const SolutionCollection& solutions)
 	{
 		if (tag.isEmpty())
 		{
-			for (auto solution : items)
+			for (auto& solution : items)
 			{
 				rootItem->appendChild(new SolutionItem(solution->nameToShow(), solution, rootItem));
 			}
@@ -33,7 +33,7 @@ void SolutionsModel::addSolutions(const SolutionCollection& solutions)
 		{
 			auto item = new SolutionItem(tag, nullptr, rootItem);
 			rootItem->appendChild(item);
-			for (auto solution : items)
+			for (auto& solution : items)
 			{
 				item->appendChild(new SolutionItem(solution->nameToShow(), solution, item));
 			}
@@ -43,7 +43,7 @@ void SolutionsModel::addSolutions(const SolutionCollection& solutions)
 
 void SolutionsModel::addSolution(std::shared_ptr<Solution> solution)
 {
-	auto tag = solution->subTag();
+	auto& tag = solution->subTag();
 	if (tag.isEmpty())
 	{
 		int i = 0;
