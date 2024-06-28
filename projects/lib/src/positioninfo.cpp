@@ -436,7 +436,7 @@ std::tuple<std::list<SolverMove>, uint8_t> get_endgame_moves(std::shared_ptr<Che
 		return { moves, tb_dtz };
 	auto depth_time = [](uint32_t dtz_value) { return (dtz_value << 16) | EGTB_VERSION; };
 	auto our_color = board->sideToMove();
-	uint8_t dtz = 100 - board->plyCount();
+	int dtz = 100 - board->reversibleMoveCount();
 	auto legal_moves = board->legalMoves();
 	for (auto& move : legal_moves)
 	{
