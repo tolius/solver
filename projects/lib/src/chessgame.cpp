@@ -490,6 +490,72 @@ void ChessGame::setAdjudicator(const GameAdjudicator& adjudicator)
 	m_adjudicator = adjudicator;
 }
 
+void ChessGame::setPosition(Chess::Board* board)
+{
+	std::lock_guard<std::mutex> lock(m_board->update_mutex);
+	auto& game_history = m_board->MoveHistory();
+	auto& ref_history = board->MoveHistory();
+	int i = 0;
+	if (!game_history.isEmpty())
+	{
+		for (; i < std::min(ref_history.size(), game_history.size()); i++)
+		{
+			if (game_history[i].move != ref_history[i].move)
+				break;
+		}
+		int num_back = game_history.size() - i;
+		while (num_back --> 0)
+		{
+			m_board->undoMove();
+			m_scores.remove(game_history.size());
+			m_moves.pop_back();
+			m_pgn->undoMove();
+		}
+	}
+
+	for (; i < ref_history.size(); i++)
+	{
+		auto& move = ref_history[i].move;
+		Q_ASSERT(m_board->key() == ref_history[i].key && m_board->isLegalMove(move));
+		PgnGame::MoveData md;
+		md.key = ref_history[i].key;
+		md.move = m_board->genericMove(move);
+		md.moveString = m_board->moveString(move, Chess::Board::StandardAlgebraic);
+		//md.comment = "";
+		m_board->makeMove(move);
+		m_moves.append(move);
+		m_pgn->addMove(md);
+	}
+
+	Q_ASSERT(m_board->MoveHistory().size() == m_moves.size());
+	Q_ASSERT(m_pgn->moves().size() == m_moves.size());
+
+	m_result = m_board->result();
+	emit positionSet();
+	startTurn();
+	//!! workaround:
+	if (!m_result.isNone())
+		emit finished_for_animation(this, m_result);
+}
+
+void ChessGame::setMove(int i)
+{
+	Q_ASSERT(m_board->MoveHistory().size() == m_moves.size());
+	Q_ASSERT(m_pgn->moves().size() == m_moves.size());
+	int num = std::min(m_moves.size() - i - 1, m_moves.size());
+	if (num <= 0)
+		return;
+	while (num--)
+	{
+		m_moves.pop_back();
+		m_scores.remove(m_moves.size());
+		m_board->undoMove();
+		m_pgn->undoMove();
+	}
+	Q_ASSERT(m_board->MoveHistory().size() == m_moves.size());
+	Q_ASSERT(m_pgn->moves().size() == m_moves.size());
+}
+
 void ChessGame::generateOpening()
 {
 	if (m_book[Chess::Side::White] == nullptr || m_book[Chess::Side::Black] == nullptr)

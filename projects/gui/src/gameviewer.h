@@ -78,6 +78,7 @@ class GameViewer : public QWidget
 
 		void onFenChanged(const QString& fen);
 		void onMoveMade(const Chess::GenericMove& move);
+	    void onPositionSet();
 
 	private:
 		void viewFirstMove();

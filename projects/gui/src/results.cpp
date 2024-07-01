@@ -61,7 +61,10 @@ void Results::setGame(ChessGame* game)
 		this->game->disconnect(this);
 	this->game = game;
 	if (game)
+	{
 		connect(game, SIGNAL(moveMade(Chess::GenericMove, QString, QString)), this, SLOT(onMoveMade(Chess::GenericMove, QString, QString)));
+		connect(game, SIGNAL(positionSet()), this, SLOT(onMoveMade()));
+	}
 }
 
 void Results::onMoveMade(const Chess::GenericMove& move, const QString& sanString, const QString& comment)
@@ -74,11 +77,7 @@ void Results::onMoveMade(const Chess::GenericMove& move, const QString& sanStrin
 	{
 		auto board = game->board();
 		if (board)
-		{
-			//if (board->sideToMove() == solution->winSide())
-			qApp->processEvents(); //!! TODO: change logic
 			emit addComment(board->plyCount() - 1, best_score);
-		}
 	}
 }
 

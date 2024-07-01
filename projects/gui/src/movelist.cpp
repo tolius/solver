@@ -164,6 +164,20 @@ void MoveList::setGame(ChessGame* game, PgnGame* pgn)
 	}
 
 	m_pgn = pgn;
+	resetMovesToPgn();
+
+	if (m_game != nullptr)
+	{
+		connect(m_game, SIGNAL(moveMade(Chess::GenericMove, QString, QString)),
+			this, SLOT(onMoveMade(Chess::GenericMove, QString, QString)));
+		connect(m_game, SIGNAL(positionSet()), this, SLOT(setPosition()));
+		connect(m_game, SIGNAL(moveChanged(int, Chess::GenericMove, QString, QString)), this,
+		        SLOT(setMove(int, Chess::GenericMove, QString, QString)));
+	}
+}
+
+void MoveList::resetMovesToPgn()
+{
 	ui->m_moveList->clear();
 	m_moves.clear();
 	m_selectedMove = -1;
@@ -174,22 +188,14 @@ void MoveList::setGame(ChessGame* game, PgnGame* pgn)
 	cursor.beginEditBlock();
 	cursor.movePosition(QTextCursor::End);
 
-	m_startingSide = pgn->startingSide();
+	m_startingSide = m_pgn->startingSide();
 	m_moveCount = 0;
-	for (const PgnGame::MoveData& md : pgn->moves())
+	for (const PgnGame::MoveData& md : m_pgn->moves())
 	{
 		insertMove(m_moveCount++, md.moveString, md.comment, cursor);
 	}
 	cursor.endEditBlock();
 	updateButtons();
-
-	if (m_game != nullptr)
-	{
-		connect(m_game, SIGNAL(moveMade(Chess::GenericMove, QString, QString)),
-			this, SLOT(onMoveMade(Chess::GenericMove, QString, QString)));
-		connect(m_game, SIGNAL(moveChanged(int, Chess::GenericMove, QString, QString)),
-			this, SLOT(setMove(int, Chess::GenericMove, QString, QString)));
-	}
 
 	QScrollBar* sb = ui->m_moveList->verticalScrollBar();
 	sb->setValue(sb->maximum());
@@ -308,6 +314,11 @@ void MoveList::onMoveMade(const Chess::GenericMove& move,
 		sb->setValue(sb->maximum());
 }
 
+void MoveList::setPosition()
+{
+	resetMovesToPgn();
+}
+
 // TODO: Handle changes to actual moves (eg. undo), not just comments
 void MoveList::setMove(int ply,
 		       const Chess::GenericMove& move,
@@ -354,6 +365,9 @@ void MoveList::setMove(int ply,
 
 void MoveList::selectChosenMove()
 {
+	if (m_moveToBeSelected >= m_moveCount)
+		return; // happens when the slider is moved all the way to the left
+
 	int moveNum = m_moveToBeSelected;
 	m_moveToBeSelected = -1;
 	Q_ASSERT(moveNum >= 0 && moveNum < m_moveCount);

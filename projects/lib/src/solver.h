@@ -187,7 +187,7 @@ protected:
 	void add_existing(const SolverMove& move, bool is_stop_move);
 	void save_data(pcMove move, bool to_save = true);
 	void save_alt(pcMove move);
-	void create_book(pMove tree_front, int num_opening_moves);
+	bool create_book(pMove tree_front, int num_opening_moves);
 	void save_book(const QString& book_path);
 	std::tuple<quint32, qint16, MapT, MapT> prepare_moves(pMove& move);
 	void correct_score(qint16& score, qint16 sub_score, bool is_their_turn, pMove& m);

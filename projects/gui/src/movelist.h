@@ -73,6 +73,7 @@ public slots:
 			    const Chess::GenericMove& move,
 			    const QString& sanString,
 			    const QString& comment);
+	void setPosition();
 	void goodMovesReported(const std::set<QString>& good_moves);
 	void badMoveReported(const QString& bad_move);
 
@@ -120,6 +121,7 @@ private:
 			const QString& comment,
 			QTextCursor cursor = QTextCursor());
 	void regenerateMoves();
+	void resetMovesToPgn();
 	void regenerateMoveButtons();
 	void updateButtons();
 

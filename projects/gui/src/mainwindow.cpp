@@ -751,21 +751,12 @@ void MainWindow::initSolutionGame()
 	if (!board->MoveHistory().isEmpty())
 		m_gameViewer->gotoFirstMove();
 
-	//!! workaround
-	std::lock_guard<std::mutex> lock(board->update_mutex);
-	auto side = board->sideToMove();
+	std::shared_ptr<Chess::Board> ref_board(Chess::BoardFactory::create("antichess"));
+	ref_board->setFenString(ref_board->defaultFenString());
 	for (auto& m : m_solution->openingMoves(true))
-	{
-		// PgnGame::MoveData move;
-		// move.move = m_game->board()->genericMove(m);
-		// gameData.m_pgn->addMove(move);
-		ChessPlayer* player(game->player(side));
-		auto generic_move = board->genericMove(m);
-		((HumanPlayer*)player)->onHumanMove(generic_move, side);
-		side = side.opposite();
-		qApp->processEvents();
-	}
-	m_results->positionChanged();
+		ref_board->makeMove(m);
+	game->setPosition(ref_board.get());
+	//m_results->positionChanged();
 }
 
 void MainWindow::closeCurrentGame()

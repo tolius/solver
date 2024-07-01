@@ -141,7 +141,8 @@ void Solver::init()
 			board->makeMove(move);
 			num_moves++;
 		}
-		int16_t score = (branch_to_skip.score == 0) ? FAKE_DRAW_SCORE : static_cast<int16_t>(FAKE_MATE_VALUE - branch_to_skip.score + board->plyCount() / 2);
+		int16_t dist = max(0, branch_to_skip.score - board->plyCount() / 2);
+		int16_t score = (branch_to_skip.score == 0) ? FAKE_DRAW_SCORE : static_cast<int16_t>(FAKE_MATE_VALUE - dist);
 		skip_branches[board->key()] = score;
 		while (num_moves--)
 			board->undoMove();
@@ -411,8 +412,10 @@ void Solver::start(pBoard start_pos, std::function<void(QString)> message, Solve
 	emit Message(QString("Number of solution moves: %1").arg(num_moves_from_solver));
 	emit Message(QString("Number of evaluated endgames: %1").arg(num_evaluated_endgames));
 
-	create_book(t, num_opening_moves);
-	sol->mergeAllFiles();
+	bool is_created = create_book(t, num_opening_moves);
+	bool is_merged = sol->mergeAllFiles();
+	if (is_created && is_merged)
+		emit Message(QString("Book generation completed for %1.").arg(sol_name), MessageType::success);
 
 	auto stop_solving = [this]()
 	{
@@ -859,7 +862,9 @@ void Solver::evaluate_position(SolverMove& move, SolverState& info, pMove& best_
 		bool is_super_boost = solver_move && (is_solver_path || !is_solver_Watkins);
 		best_move = get_engine_move(move, info, is_super_boost);
 	}
-	if (best_move->score() >= solver_stop_score || (info.is_alt() && info.alt_steps >= max_alt_steps))
+	if (best_move->score() >= solver_stop_score
+		|| (info.is_alt() && info.alt_steps >= max_alt_steps)
+		|| (!info.is_alt() && best_move->is_overridden()))
 		return;
 
 	if (force_cached_transpositions)
@@ -948,7 +953,14 @@ void Solver::evaluate_position(SolverMove& move, SolverState& info, pMove& best_
 			num_moves_from_solver++;
 		}
 	}
-	save_alt(best_move);
+	assert(!best_move->is_overridden());
+	if (best_move->is_overridden())
+		emit_message(QString("Overridden move has been replaced with %1: %2")
+		            .arg(best_move->san(board))
+		            .arg(get_move_stack(board)),
+			MessageType::warning);
+	else
+		save_alt(best_move);
 }
 
 Solver::pMove Solver::get_only_move(SolverMove& move, SolverState& info)
@@ -1315,8 +1327,9 @@ bool Solver::isBusy() const
 	return status != Status::idle;
 }
 
-void Solver::create_book(pMove tree_front, int num_opening_moves)
+bool Solver::create_book(pMove tree_front, int num_opening_moves)
 {
+	bool is_ok = true;
 	positions.clear();
 	prepared_transpositions.clear();
 	all_entries.clear();
@@ -1347,15 +1360,28 @@ void Solver::create_book(pMove tree_front, int num_opening_moves)
 			sol->ram_budget += fi.size();
 		}
 		bool is_removed = QFile::remove(path_book);
-		if (!is_removed)
+		if (!is_removed) {
 			emit Message(QString("Failed to delete the existing book:\n\n%1").arg(path_book), MessageType::error);
+			is_ok = false;
+		}
 	}
 	bool is_renamed = QFile::rename(path_bak, path_book);
-	if (!is_renamed)
+	if (!is_renamed) {
 		emit Message(QString("Failed to save the book:\n\nTemporary file path: %1\nBook file path: %2").arg(path_bak).arg(path_book), MessageType::error);
-	assert(transpositions.size() == 0);
-	assert(saved_positions.size() == prepared_transpositions.size());
-	assert(saved_positions.size() == trans.size());
+		is_ok = false;
+	}
+	if (transpositions.size()) {
+		emit Message(QString("Number of unused transpositions: %1").arg(transpositions.size()), MessageType::warning);
+		is_ok = false;
+	}
+	if (saved_positions.size() != prepared_transpositions.size()) {
+		emit Message(QString("Number of saved transpositions %1 is different from the number of prepared transpositions %2")
+		                 .arg(saved_positions.size())
+		                 .arg(prepared_transpositions.size()),
+		             MessageType::warning);
+		is_ok = false;
+	}
+	//assert(saved_positions.size() == trans.size());
 	prepared_transpositions.clear();
 	all_entries.clear();
 
@@ -1374,6 +1400,7 @@ void Solver::create_book(pMove tree_front, int num_opening_moves)
 	sol->updateInfo();
 	sol->loadBook();
 	emit updateCurrentSolution();
+	return is_ok;
 }
 
 void Solver::save_book(const QString& book_path)

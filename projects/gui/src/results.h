@@ -54,7 +54,7 @@ signals:
 	void addComment(int ply, const QString& score);
 
 private slots:
-	void onMoveMade(const Chess::GenericMove& move, const QString& sanString, const QString& comment);
+	void onMoveMade(const Chess::GenericMove& move = Chess::GenericMove(), const QString& sanString = "", const QString& comment = "");
 private:
 	void onDataSourceChanged(EntrySource source);
 

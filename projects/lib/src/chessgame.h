@@ -71,6 +71,8 @@ class LIB_EXPORT ChessGame : public QObject
 		void setAdjudicator(const GameAdjudicator& adjudicator);
 		void setStartDelay(int time);
 		void setBookOwnership(bool enabled);
+	    void setPosition(Chess::Board* board);
+	    void setMove(int i);
 
 		void generateOpening();
 
@@ -98,6 +100,7 @@ class LIB_EXPORT ChessGame : public QObject
 				 const Chess::GenericMove& move,
 				 const QString& sanString,
 				 const QString& comment);
+	    void positionSet();
 		void scoreChanged(int ply, int score);
 		void initialized(ChessGame* game = nullptr);
 		void started(ChessGame* game = nullptr);

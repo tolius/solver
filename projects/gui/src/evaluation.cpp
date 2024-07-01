@@ -421,6 +421,7 @@ void Evaluation::setGame(ChessGame* game)
 	this->game = game;
 	if (game) {
 		connect(this->game, SIGNAL(moveMade(Chess::GenericMove, QString, QString)), this, SLOT(positionChanged()));
+		connect(this->game, SIGNAL(positionSet()), this, SLOT(positionChanged()));
 		updateBoard(game->board());
 	}
 	if (!game || !game->board())
@@ -809,52 +810,16 @@ void Evaluation::onSyncPositions(std::shared_ptr<Chess::Board> ref_board)
 	t_last_sync = steady_clock::now();
 	try
 	{
-		std::lock_guard<std::mutex> lock_dest(game_board->update_mutex);
 		std::lock_guard<std::mutex> lock_source(ref_board->change_mutex);
-		disconnect(this->game, SIGNAL(moveMade(Chess::GenericMove, QString, QString)), this, SLOT(positionChanged()));
-		auto& game_history = game_board->MoveHistory();
-		auto& ref_history = ref_board->MoveHistory();
-		int i = 0;
-		if (!game_history.isEmpty())
-		{
-			for (; i < std::min(ref_history.size(), game_history.size()); i++) {
-				if (game_history[i].move != ref_history[i].move)
-					break;
-			}
-			int num_back = game_history.size() - i;
-			if (num_back > 0) {
-				game_viewer->gotoPreviousMove(num_back);
-				qApp->processEvents();
-			}
-		}
-
-		auto side = game_board->sideToMove();
-		for (; i < ref_history.size(); i++)
-		{
-			ChessPlayer* player(game->player(side));
-			int num_attempts = 20;
-			for (; num_attempts > 0; num_attempts--)
-			{
-				if (game_board->key() == ref_history[i].key && game_board->isLegalMove(ref_history[i].move))
-					break;
-				qApp->processEvents();
-			}
-			if (num_attempts == 0)
-				throw std::runtime_error("the position may have been changed during the update");
-			auto generic_move = game_board->genericMove(ref_history[i].move);
-			((HumanPlayer*)player)->onHumanMove(generic_move, side);
-			side = side.opposite();
-			qApp->processEvents();
-		}
+		game->setPosition(ref_board.get());
 	}
 	catch (std::exception e)
 	{
 		emit Message(tr("Failed to synchronise the board: %1.").arg(e.what()), MessageType::std);
 	}
-	connect(this->game, SIGNAL(moveMade(Chess::GenericMove, QString, QString)), this, SLOT(positionChanged()));
 	//updateSync();
 	//updateOverride();
-	positionChanged();
+	//positionChanged();
 }
 
 void Evaluation::startEngine()

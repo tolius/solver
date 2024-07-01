@@ -427,6 +427,9 @@
      </item>
      <item>
       <widget class="QSpinBox" name="spinBox_WinIn">
+       <property name="toolTip">
+        <string>Counting from move 1, not from the specified position</string>
+       </property>
        <property name="alignment">
         <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
        </property>

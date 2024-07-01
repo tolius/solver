@@ -67,7 +67,7 @@
      <item row="1" column="1">
       <widget class="QPushButton" name="btn_Stop">
        <property name="toolTip">
-        <string>Stop evaluation</string>
+        <string>Stop the engine</string>
        </property>
        <property name="text">
         <string>Stop</string>

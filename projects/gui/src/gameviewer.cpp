@@ -163,6 +163,7 @@ void GameViewer::setGame(ChessGame* game)
 
 	connect(m_game, SIGNAL(fenChanged(QString)), this, SLOT(onFenChanged(QString)));
 	connect(m_game, SIGNAL(moveMade(Chess::GenericMove, QString, QString)), this, SLOT(onMoveMade(Chess::GenericMove)));
+	connect(m_game, SIGNAL(positionSet()), this, SLOT(onPositionSet()));
 	connect(m_game, SIGNAL(humanEnabled(bool)), m_boardView, SLOT(setEnabled(bool)));
 
 	for (int i = 0; i < 2; i++)
@@ -254,20 +255,18 @@ void GameViewer::undoMoves(int num)
 	if (num <= 0)
 		return;
 	while (num--)
-	{
 		m_moves.pop_back();
-		m_game->board()->undoMove();
-		m_game->pgn()->undoMove();
-	}
+
 	m_moveNumberSlider->setMaximum(m_moves.count());
+	m_game->setMove(m_moveIndex - 1);
 	updateCurrentLine();
+	emit moveSelected(m_moveIndex - 1);
 }
 
 void GameViewer::viewFirstMoveClicked()
 {
 	viewFirstMove();
 	undoMoves(m_moves.size());
-	emit moveSelected(m_moveIndex - 1);
 }
 
 void GameViewer::viewFirstMove()
@@ -280,7 +279,6 @@ void GameViewer::viewPreviousMoveClicked()
 {
 	viewPreviousMove();
 	undoMoves(1);
-	emit moveSelected(m_moveIndex - 1);
 }
 
 void GameViewer::viewPreviousMove()
@@ -310,6 +308,7 @@ void GameViewer::viewPreviousMove()
 void GameViewer::viewNextMoveClicked()
 {
 	viewNextMove();
+	m_game->setMove(m_moveIndex - 1);
 	emit moveSelected(m_moveIndex - 1);
 }
 
@@ -337,6 +336,7 @@ void GameViewer::viewNextMove()
 void GameViewer::viewLastMoveClicked()
 {
 	viewLastMove();
+	m_game->setMove(m_moveIndex - 1);
 	emit moveSelected(m_moveIndex - 1);
 }
 
@@ -350,7 +350,6 @@ void GameViewer::viewPositionClicked(int index)
 {
 	viewPosition(index);
 	undoMoves(m_moves.size() - index);
-	emit moveSelected(m_moveIndex - 1);
 }
 
 void GameViewer::viewPosition(int index)
@@ -385,7 +384,6 @@ void GameViewer::viewMove(int index, bool keyLeft)
 			viewNextMove();
 	}
 	undoMoves(m_moves.size() - 1 - index);
-	emit moveSelected(m_moveIndex - 1);
 }
 
 void GameViewer::gotoFirstMove()
@@ -411,7 +409,6 @@ void GameViewer::gotoPreviousMove(int num)
 		}
 	}
 	undoMoves(n);
-	emit moveSelected(m_moveIndex - 1);
 }
 
 void GameViewer::onFenChanged(const QString& fen)
@@ -434,7 +431,6 @@ void GameViewer::onMoveMade(const Chess::GenericMove& move)
 	m_moves.append(move);
 
 	updateCurrentLine();
-
 	m_moveNumberSlider->setEnabled(true);
 	m_moveNumberSlider->setMaximum(m_moves.count());
 
@@ -443,6 +439,27 @@ void GameViewer::onMoveMade(const Chess::GenericMove& move)
 
 	if (m_humanGame)
 		autoFlip();
+}
+
+void GameViewer::onPositionSet()
+{
+	m_moves.clear();
+	for (auto& md : m_game->pgn()->moves())
+		m_moves.append(md.move);
+
+	updateCurrentLine();
+	m_viewFirstMoveBtn->setEnabled(false);    // --> will be set in viewNextMove()
+	m_viewPreviousMoveBtn->setEnabled(false); // --> will be set in viewNextMove()
+	m_viewNextMoveBtn->setEnabled(m_game->result().isNone());
+	m_viewLastMoveBtn->setEnabled(m_game->result().isNone());
+	m_moveNumberSlider->setEnabled(!m_moves.isEmpty());
+	m_moveNumberSlider->setMaximum(m_moves.count());
+
+	m_moveIndex = 0;
+	while (!m_boardScene->board()->MoveHistory().isEmpty())
+		m_boardScene->undoMove();
+	while (m_moveIndex < m_moves.count())
+		viewNextMove();
 }
 
 std::mutex& GameViewer::mutex()

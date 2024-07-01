@@ -466,6 +466,27 @@ void SolutionDialog::on_OKClicked()
 		QString line = ui->table_BranchesToSkip->item(i, 1)->text();
 		auto [opening_branch, _] = parse_line(line);
 		assert(_);
+		if (score != 0)
+		{
+			auto start_move = (opening_branch.size() + 1) / 2;
+			if (start_move >= score)
+			{
+				warn(line, tr("The \"Win in\" value %1 is counted from the 1st move, not from the specified position.").arg(str_score));
+				return;
+			}
+			if (start_move + 19 >= score)
+			{
+				QString text = tr("The \"Win in\" value %1 is counted from the 1st move, not from the specified position.\n\n"
+				                  "The position you have specified starts on move %2. Are you sure you want to skip this short win in #%3")
+				                   .arg(str_score)
+				                   .arg(start_move + 1)
+				                   .arg(score - start_move);
+				int ret = QMessageBox::question(this, QApplication::applicationName(), text,
+					                            QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel, QMessageBox::No);
+				if (ret != QMessageBox::Yes)
+					return;
+			}
+		}
 		if (opening_branch.empty())
 		{
 			using namespace Chess;
