@@ -508,16 +508,6 @@ std::list<MoveEntry> Solution::nextEntries(Chess::Board* board, std::list<MoveEn
 	return entries;
 }
 
-QString Watkins_nodes(const SolutionEntry& entry)
-{
-	quint32 num = entry.nodes();
-	QString num_nodes = num <= 1 ? ""
-	    : num < 5'000            ? QString("%L1").arg(num)
-	    : num < 5'000'000        ? QString("%L1<b>k</b>").arg((num + 500) / 1000)
-	                             : QString("<b>%L1M</b>").arg((num + 500'000) / 1000'000);
-	return num_nodes;
-}
-
 std::list<MoveEntry> Solution::positionEntries(Chess::Board* board, bool use_esolution)
 {
 	auto entry = bookEntry(board, FileType_positions_upper);
@@ -551,7 +541,7 @@ std::list<MoveEntry> Solution::positionEntries(Chess::Board* board, bool use_eso
 		position_entries.emplace_back(EntrySource::positions, alt_entry->san(board), *alt_entry);
 		auto& e = position_entries.back();
 		e.is_best = !entry;
-		//e.weight = MATE_VALUE - MANUAL_VALUE;
+		//e.weight = FORCED_MOVE;
 		e.info = alt_entry->is_overridden() ? "Overridden" : "Alt";
 		if (sol_entry && sol_entry->pgMove == alt_entry->pgMove) {
 			e.info = e.info.isEmpty() ? w() : QString("%1 %2").arg(w()).arg(e.info);

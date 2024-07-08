@@ -196,13 +196,27 @@ QString Results::positionChanged()
 		}
 		buttons.push_back(btn);
 		QString score = (all_unknown || ((entry.source == EntrySource::positions || entry.source == EntrySource::watkins) && entry.info == "only move")) ? ""
-		    : (entry.source == EntrySource::solver && entry.score() == ESOLUTION_VALUE && entry.info == "~") ? "sol"
+		//    : (entry.source == EntrySource::solver && entry.score() == ESOLUTION_VALUE && entry.info == "~") ? "sol"
+		    : (entry.source == EntrySource::solver && entry.info == "~") ? "~"
 		    : entry.getScore(entry.source == EntrySource::book || entry.source == EntrySource::solver);
-		if (entry.info.isEmpty() && entry.score() != UNKNOWN_SCORE) {
-			if (entry.source == EntrySource::book && entry.nodes())
-				entry.info = entry.getNodes();
-			else if (entry.source == EntrySource::positions && (entry.score() < MATE_VALUE - MANUAL_VALUE - 1 || entry.score() > WIN_THRESHOLD))
-				entry.info = "eval";
+		if (entry.source == EntrySource::solver)
+		{
+			if (entry.nodes()) {
+				QString str_w = QString("W=%L1").arg(Watkins_nodes(entry));
+				entry.info = (entry.info.isEmpty() || entry.info == "~") ? str_w : QString("%1 %2").arg(str_w).arg(entry.info);
+			}
+			else if (entry.info == "~") {
+				entry.info = "";
+			}
+		}
+		else if (entry.info.isEmpty())
+		{
+			if (entry.score() != UNKNOWN_SCORE) {
+				if (entry.source == EntrySource::book && entry.nodes())
+					entry.info = entry.getNodes();
+				else if (entry.source == EntrySource::positions && (entry.score() < MATE_VALUE - MANUAL_VALUE - 1 || entry.score() > WIN_THRESHOLD))
+					entry.info = "eval";
+			}
 		}
 		auto label_score = new QLabel(score, ui->widget_Solution);
 		if (entry.is_best)

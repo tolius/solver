@@ -15,11 +15,12 @@
 #include <thread>
 #include <algorithm>
 #include <fstream>
+#include <set>
+#include <map>
 
 using namespace std;
 using namespace std::chrono;
 
-constexpr static qint16 FORCED_MOVE = MATE_VALUE - 255;
 constexpr static qint16 DRAW_EG = 0; // = FAKE_DRAW_SCORE
 
 constexpr static auto UPDATE_PERIOD = 70ms;
@@ -483,11 +484,11 @@ void Solver::saveOverride(Chess::Board* pos, std::shared_ptr<SolutionEntry> data
 	pos->makeMove(move);
 	if (data) {
 		data->pgMove = pgMove;
-		if (data->score() < MATE_VALUE - MANUAL_VALUE)
-			data->weight = MATE_VALUE - MANUAL_VALUE;
+		if (data->score() < FORCED_MOVE)
+			data->weight = FORCED_MOVE;
 	}
 	else {
-		data = std::make_shared<SolutionEntry>(pgMove, MATE_VALUE - MANUAL_VALUE, static_cast<quint32>(MANUAL_VALUE));
+		data = std::make_shared<SolutionEntry>(pgMove, FORCED_MOVE, static_cast<quint32>(MANUAL_VALUE));
 	}
 	data->learn |= OVERRIDE_MASK;
 
@@ -591,7 +592,12 @@ void Solver::process_move(std::vector<pMove>& tree, SolverState& info)
 		if (move->score() != UNKNOWN_SCORE && move->score() > ABOVE_EG && move->score() > worst_score 
 				&& !info.is_alt() && move->score() != FORCED_MOVE) {
 			QString move_stack = get_move_stack(board);
-			emit_message(QString("...NOT BEST %1! Moves in %2").arg(move->score() - worst_score).arg(move_stack), MessageType::info);
+			emit_message(QString("...WORST WIN %1! %2-->%3: Moves in %4")
+			                .arg(move->score() - worst_score)
+			                .arg(move->scoreText())
+			                .arg(SolutionEntry::score2Text(worst_score))
+			                .arg(move_stack),
+				MessageType::info);
 			//assert(move.score() <= worst_score + 1);  // error no greater than 1
 		}
 		move->set_score(worst_score);
@@ -612,7 +618,8 @@ void Solver::process_move(std::vector<pMove>& tree, SolverState& info)
 			assert(move->moves.size() <= 1);
 			if (move->moves.empty())
 				analyse_position(*move, info);
-			assert(move->moves.size() <= 1);
+			if (move->moves.size() > 1)
+				emit_message(QString("...TOO MANY MOVES: %1 in %2").arg(move->moves.size()).arg(get_move_stack(board, false, 400)), MessageType::warning);
 			for (auto& m : move->moves) {
 				if (!is_stop_move(*m, info) && (!info.is_alt() || (info.alt_steps < max_alt_steps 
 						&& (move->score() == UNKNOWN_SCORE || move->score() - info.alt_steps < info.score_to_skip)))) {
@@ -621,6 +628,8 @@ void Solver::process_move(std::vector<pMove>& tree, SolverState& info)
 					process_move(tree, info);
 					board->undoMove();
 					tree.pop_back();
+					if (!info.is_alt())
+						update_existing(m);
 				}
 				m->set_solved();
 				//assert (move->score() <= ABOVE_EG || move->score() <= m->score() - 1);
@@ -629,7 +638,14 @@ void Solver::process_move(std::vector<pMove>& tree, SolverState& info)
 						&& move->score() > m->score() - 1 
 						&& !info.is_alt() 
 						&& move->score() != FORCED_MOVE) {
-					emit_message(QString("...NOT BEST %1! %2 in %3").arg(move->score() - (m->score() - 1)).arg(m->san(board)).arg(get_move_stack(board, false, 400)), MessageType::info);
+					QString num_not_best = (m->score() > ABOVE_EG) ? QString::number(move->score() - (m->score() - 1)) : "!!";
+					emit_message(QString("...NOT BEST %1 %2-->%3! %4 in %5")
+					                .arg(num_not_best)
+					                .arg(move->scoreText())
+					                .arg(SolutionEntry::score2Text(m->score() - 1))
+					                .arg(m->san(board))
+					                .arg(get_move_stack(board)),
+						MessageType::info);
 					//assert(move->score() <= m->score());  // error no greater than 1
 				}
 				if (m->score() != FAKE_DRAW_SCORE)
@@ -650,6 +666,31 @@ void Solver::process_move(std::vector<pMove>& tree, SolverState& info)
 			}
 		}
 	}
+}
+
+void Solver::update_existing(pMove& m)
+{
+	auto it_existing = positions.find(board->key());
+	if (it_existing == positions.end())
+		return;
+
+	auto& bytes = it_existing->second;
+	auto m_existing = SolverMove::fromBytes(bytes);
+	if (m_existing->isNull())
+		return;
+
+	if (m->score() > m_existing->score()) {
+		m_existing->set_score(m->score());
+		bytes = m_existing->toBytes();
+	}
+	//else if (m->score() < m_existing->score()) {
+	//	emit_message(QString("...Worst score after %1: %2-->%3: %4")
+	//					.arg(m->san(board))
+	//					.arg(m_existing->scoreText())
+	//					.arg(m->scoreText())
+	//					.arg(get_move_stack(board, false, 400)),
+	//		MessageType::info);
+	//}
 }
 
 void Solver::analyse_position(SolverMove& move, SolverState& info)
@@ -807,7 +848,7 @@ void Solver::find_solution(SolverMove& move, SolverState& info, pMove& best_move
 			update_max_move(best_move->score());
 			num_evaluated_endgames++;
 			if (!to_copy_solution && best_move->score() < MATE_VALUE - 267)
-				emit_message(QString(".....EGTB score %1: %2").arg(best_move->score()).arg(get_move_stack(board)), MessageType::warning);
+				emit_message(QString(".....EGTB score %1: %2").arg(best_move->scoreText()).arg(get_move_stack(board)), MessageType::warning);
 		}
 		else
 		{
@@ -824,11 +865,19 @@ void Solver::find_solution(SolverMove& move, SolverState& info, pMove& best_move
 	if (move.score() != UNKNOWN_SCORE
 		&& move.score() > ABOVE_EG
 		&& move.score() > best_move->score() - 1
-		&& move.score() != FORCED_MOVE
+		&& (move.score() < FORCED_MOVE || move.score() > WIN_THRESHOLD)
+		&& (best_move->score() < FORCED_MOVE || best_move->score() > WIN_THRESHOLD)
 		&& best_move != solver_move)
 	{
 		auto move_stack = get_move_stack(board);
-		emit_message(QString("...NOT BEST %1! %2 in %3").arg(move.score() - (best_move->score() - 1)).arg(best_move->san(board)).arg(move_stack), MessageType::info);
+		QString num_not_best = (best_move->score() > ABOVE_EG) ? QString::number(move.score() - (best_move->score() - 1)) : "!!";
+		emit_message(QString("...WORST EVAL %1! %2-->%3: %4 in %5")
+		                .arg(num_not_best)
+		                .arg(move.scoreText())
+		                .arg(SolutionEntry::score2Text(best_move->score() - 1))
+		                .arg(best_move->san(board))
+		                .arg(move_stack),
+			MessageType::info);
 	}
 	if ((is_endgame && !evaluate_endgames
 			&& (num_pieces <= 4 || (num_pieces == 5 && !to_copy_solution && best_move->score() > endgame5_score_limit)))
@@ -875,14 +924,14 @@ void Solver::evaluate_position(SolverMove& move, SolverState& info, pMove& best_
 		{
 			QString msg;
 			if (best_move->score() == cached_move->score()) {
-				msg = QString("..TRANSP %1->%2 %3: %4")
+				msg = QString("..Transp %1->%2 %3: %4")
 				    .arg(best_move->san(board))
 				    .arg(cached_move->san(board))
 				    .arg(best_move->scoreText())
 				    .arg(get_move_stack(board));
 			}
 			else {
-				msg = QString("..TRANSP %1->%2: %3->%4 %5")
+				msg = QString("..Transp %1->%2: %3->%4 %5")
 				          .arg(best_move->san(board))
 				          .arg(cached_move->san(board))
 				          .arg(best_move->scoreText())
@@ -1005,7 +1054,7 @@ Solver::pMove Solver::get_engine_move(SolverMove& move, SolverState& info, bool 
 								   //!! TODO: it should use the prev. score in this case, save it as move+1, not only return it?
 	bool re_ensure = (!is_score_ok && best_move);
 	if (re_ensure)
-		emit_message(QString("...Re-ensure winning %1: %2->%3: %4 < %5: %6")
+		emit_message(QString("...Re-ensure winning %1: %2->%3, %4 < %5: %6")
 		                 .arg(best_move->san(board))
 		                 .arg(move.scoreText())
 		                 .arg(best_move->scoreText())
@@ -1028,7 +1077,7 @@ Solver::pMove Solver::get_engine_move(SolverMove& move, SolverState& info, bool 
 		num_new_moves++;
 	solver_session->is_endgame = false;
 	solver_session->is_super_boost = is_super_boost;
-	solver_session->move_score = move.isNull() ? MoveEvaluation::NULL_SCORE : move.score();
+	solver_session->move_score = (move.isNull() || move.score() == UNKNOWN_SCORE) ? MoveEvaluation::NULL_SCORE : move.score();
 	solver_session->alt_step = (info.alt_steps == NO_ALT_STEPS) ? NO_ALT_STEPS : (max_alt_steps - info.alt_steps + 1);
 //	best_move = Move(None);
 	int depth = min_depth;
@@ -1112,10 +1161,14 @@ void Solver::update_max_move(int16_t score, QString move_sequence)
 	auto move_stack = get_move_stack(board, false);
 	if (!move_sequence.isEmpty())
 		move_sequence = " " + move_sequence;
-	if (mate_in <= WIN_THRESHOLD)
+	if (mate_in <= WIN_THRESHOLD) {
+		if (new_num_moves > max_num_moves)
+			onLogUpdate();
 		emit_message(QString("MAX #%1: %2%3").arg(new_num_moves).arg(move_stack).arg(move_sequence), new_num_moves > max_num_moves ? MessageType::info : MessageType::std);
-	else
-		emit_message(QString("..WRONG mate_in=%1: %2 %3").arg(mate_in).arg(move_stack).arg(move_sequence), MessageType::warning);
+	}
+	else {
+		emit_message(QString("..WRONG win_in=%1: %2 %3").arg(mate_in).arg(move_stack).arg(move_sequence), MessageType::warning);
+	}
 }
 
 bool Solver::is_stop_move(const SolverMove& best_move, const SolverState& info) const
@@ -1263,6 +1316,7 @@ void Solver::add_existing(const SolverMove& move, bool is_stop_move)
 		//	new_num_moves -= 1
 		if (new_num_moves > max_num_moves) {
 			max_num_moves = new_num_moves;
+			onLogUpdate();
 			auto move_stack = get_move_stack(board, false);
 			emit_message(QString("MAX #%1: %2").arg(max_num_moves).arg(move_stack), MessageType::info);
 		}
@@ -1276,11 +1330,13 @@ void Solver::add_existing(const SolverMove& move, bool is_stop_move)
 		if (new_num_moves > max_num_moves) {
 			max_num_moves = new_num_moves;
 			if (is_stop_move) {
+				onLogUpdate();
 				auto move_stack = get_move_stack(board, false);
 				emit_message(QString("MAX #%1: %2").arg(max_num_moves).arg(move_stack), MessageType::info);
 			}
 		}
 		else if (to_print_all_max && new_num_moves == max_num_moves && is_stop_move) {
+			onLogUpdate();
 			auto move_stack = get_move_stack(board, false);
 			emit_message(QString("nMAX #%1: %2").arg(new_num_moves).arg(move_stack));
 		}
@@ -1521,13 +1577,13 @@ void Solver::correct_score(qint16& score, qint16 sub_score, bool is_their_turn, 
 		if (m->score() > new_score) {
 			emit_message(QString("...Wrong trans score %1: %2 > %3! in %4")
 				                .arg(m->score() - new_score)
-				                .arg(m->score())
-				                .arg(new_score)
+				                .arg(m->scoreText())
+				                .arg(SolutionEntry::score2Text(new_score))
 				                .arg(get_move_stack(board)),
 			             MessageType::info);
 		}
 		//else if (m->score() < new_score) {
-		//	//emit_message(QString("Correct score from %1 to %2 for %3").arg(m->score()).arg(new_score).arg(get_move_stack(board)));
+		//	//emit_message(QString("Correct score from %1 to %2 for %3").arg(m->scoreText()).arg(SolutionEntry::score2Text(new_score)).arg(get_move_stack(board)));
 		//}
 		m->set_score(new_score);
 	}
@@ -1568,6 +1624,8 @@ void Solver::onLogUpdate()
 {
 	timer_log_update.stop();
 	t_log_update = steady_clock::now();
+	if (line_to_log.empty())
+		return;
 	emit_message(line_to_log.text, MessageType::std, true);
 	line_to_log.clear();
 }
@@ -1620,28 +1678,40 @@ std::list<MoveEntry> Solver::entries(Chess::Board* pos) const
 		legal_moves = make_shared<set<Chess::Move>>(legal_moves_vector.begin(), legal_moves_vector.end());
 	}
 	bool skip_transp = (board->MoveHistory().size() <= sol->opening.size()) || is_branch(temp_board, board);
+
+	auto esol_entries = sol->eSolutionEntries(temp_board);
+	map<quint32, SolutionEntry> esol;
+	transform(esol_entries.begin(), esol_entries.end(), std::inserter(esol, esol.end()),
+	          [](const SolutionEntry& s) { return make_pair(s.pgMove, s); });
+
 	for (auto& m : t->moves)
 	{
 		auto move = m->move(temp_board);
 		if (legal_moves)
 			legal_moves->erase(move);
 		QString san = temp_board->moveString(move, Board::StandardAlgebraic);
-		entries.emplace_back(EntrySource::solver, san, m->pgMove, m->weight, 0);
+		auto it_esol = esol.find(m->pgMove);
+		quint32 nodes = (it_esol == esol.end()) ? 0 : it_esol->second.nodes();
+		entries.emplace_back(EntrySource::solver, san, m->pgMove, m->weight, nodes);
+		if (it_esol != esol.end())
+			esol.erase(it_esol);
 		if (m->is_solved())
 			continue;
-		if (m->score() < MATE_VALUE - MANUAL_VALUE - 1 || m->score() > WIN_THRESHOLD)
-			entries.back().info = "~"; // if not overridden
+		entries.back().info = "~"; // if not overridden
 
 		// Find transpositions
 		if (skip_transp)
 			continue;
 		qint16 score_i = UNKNOWN_SCORE;
+		QString san_i;
 		temp_board->makeMove(move);
 		if (temp_board->sideToMove() == our_color)
 		{
 			auto cached_move = get_existing(temp_board);
-			if (cached_move)
+			if (cached_move) {
 				score_i = cached_move->score();
+				san_i = cached_move->san(temp_board);
+			}
 		}
 		else
 		{
@@ -1654,15 +1724,17 @@ std::list<MoveEntry> Solver::entries(Chess::Board* pos) const
 					score_i = UNKNOWN_SCORE;
 					break;
 				}
-				if (score_i == UNKNOWN_SCORE || cached_move->score() < score_i)
+				if (score_i == UNKNOWN_SCORE || cached_move->score() < score_i) {
 					score_i = cached_move->score();
+					san_i = cached_move->san(temp_board);
+				}
 			}
 		}
 		temp_board->undoMove();
 		if (score_i != UNKNOWN_SCORE) {
 			qint16 score_i_1 = (score_i >= MATE_THRESHOLD) ? (score_i - 1) : score_i;
 			entries.back().weight = reinterpret_cast<const quint16&>(score_i_1);
-			entries.back().info = "tr";
+			entries.back().info = QString("Tr=%1").arg(san_i);
 		}
 	}
 	if (legal_moves) {
@@ -1670,11 +1742,13 @@ std::list<MoveEntry> Solver::entries(Chess::Board* pos) const
 		for (auto& m : *legal_moves) {
 			auto pgMove = OpeningBook::moveToBits(temp_board->genericMove(m));
 			QString san = temp_board->moveString(m, Board::StandardAlgebraic);
-			entries.emplace(it_start, EntrySource::none, san, pgMove, reinterpret_cast<const quint16&>(UNKNOWN_SCORE), 0);
+			auto it_esol = esol.find(OpeningBook::moveToBits(board->genericMove(m)));
+			quint32 nodes = (it_esol == esol.end()) ? 0 : it_esol->second.nodes();
+			entries.emplace(it_start, EntrySource::none, san, pgMove, reinterpret_cast<const quint16&>(UNKNOWN_SCORE), nodes);
+			if (it_esol != esol.end())
+				esol.erase(it_esol);
 		}
 	}
-	entries.sort(SolutionEntry::compare);
-	MoveEntry::set_best_moves(entries);
 	return entries;
 }
 

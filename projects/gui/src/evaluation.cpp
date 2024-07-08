@@ -1124,7 +1124,7 @@ void Evaluation::processEngineOutput(const MoveEvaluation& eval, const QString& 
 			    : (best_time > 0)               ? (curr_time - best_time) / delta_depth
 			                                    : 0;
 		best_time = curr_time;
-		if (best_score != NULL_SCORE && (abs(best_score - curr_score) >= 100 || (curr_score >= 20'000 && best_score != curr_score)))
+		if (best_score != NULL_SCORE && (abs(best_score - curr_score) >= 100 || (curr_score > ABOVE_EG && best_score != curr_score)))
 			t_progress = best_time;
 		best_move = str_move;
 		best_score = curr_score;
@@ -1206,10 +1206,10 @@ void Evaluation::checkProgress(quint64 nodes, bool no_progress, int depth)
 	quint64 move_time = nodes / NODES_PER_S;
 	int ti = (int)move_time;
 	bool is_score_good = false;
-	if (abs_score > s.score_to_add_time || is_endgame || is_super_boost || (move_score == NULL_SCORE && abs(move_score) > 20'000))
+	if (abs_score > s.score_to_add_time || is_endgame || is_super_boost || (move_score == NULL_SCORE && abs(move_score) > ABOVE_EG))
 	{
 		// Check if depth is sufficient
-		is_score_good = (move_score == NULL_SCORE || abs(move_score) <= 20'000 || abs_score > abs(move_score));
+		is_score_good = (move_score == NULL_SCORE || abs(move_score) <= ABOVE_EG || abs_score > abs(move_score));
 		if (session.is_auto && no_progress && is_score_good && depth > depth_limit)
 		{
 			updateProgress(100);
@@ -1225,7 +1225,7 @@ void Evaluation::checkProgress(quint64 nodes, bool no_progress, int depth)
 		{
 			// Check if progress is expected
 			if (!is_score_ok || !no_progress || (abs_score <= 15'000 && progress_time < s.add_engine_time / 5)
-			    || (15'000 < abs_score && abs_score <= 20'000) || (progress_time <= 0)
+			    || (15'000 < abs_score && abs_score <= ABOVE_EG) || (progress_time <= 0)
 			    || (depth + s.add_engine_time / progress_time > get_max_depth(abs_score + 1, num_pieces)))
 			{
 				ti -= s.add_engine_time;

@@ -109,10 +109,12 @@ QString SolutionEntry::info(Chess::Board* board, bool is_book) const
 
 QString SolutionEntry::score2Text(qint16 score)
 {
+	if (score == UNKNOWN_SCORE)
+		return "UNKNOWN";
 	qint16 abs_score = abs(score);
 	if (abs_score > WIN_THRESHOLD)
 		return (score < 0 ? "#-" : "#") + QString::number(MATE_VALUE - abs_score);
-	if (abs_score >= MATE_VALUE - MANUAL_VALUE - 1 && abs_score <= WIN_THRESHOLD)  // -1 for nextEntries()
+	if (abs_score >= FORCED_MOVE - 1 && abs_score <= WIN_THRESHOLD)  // -1 for nextEntries()
 		return score < 0 ? "**" : "*";
 	if (score == FAKE_DRAW_SCORE)
 		return "Draw?";

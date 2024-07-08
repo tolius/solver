@@ -604,6 +604,17 @@ bool is_branch(Chess::Board* pos, const Line& opening, const Line& branch)
 	return true;
 }
 
+
+QString Watkins_nodes(const SolutionEntry& entry)
+{
+	quint32 num = entry.nodes();
+	QString num_nodes = num <= 1 ? ""
+	    : num < 5'000            ? QString("%L1").arg(num)
+	    : num < 5'000'000        ? QString("%L1<b>k</b>").arg((num + 500) / 1000)
+	                             : QString("<b>%L1M</b>").arg((num + 500'000) / 1000'000);
+	return num_nodes;
+}
+
 uint64_t load_bigendian(const void* bytes)
 {
 	uint64_t result = 0;

@@ -467,9 +467,7 @@ bool ChessGame::setMoves(const PgnGame& pgn)
 	return true;
 }
 
-void ChessGame::setOpeningBook(const OpeningBook* book,
-			       Chess::Side side,
-			       int depth)
+void ChessGame::setOpeningBook(const OpeningBook* book, Chess::Side side, int depth)
 {
 	Q_ASSERT(!m_gameInProgress);
 

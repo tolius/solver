@@ -23,6 +23,7 @@ constexpr static qint16 MATE_THRESHOLD = 31500;
 constexpr static qint16 WIN_THRESHOLD = MATE_VALUE - 190; // #190
 constexpr static qint16 ABOVE_EG = 20000;
 constexpr static qint16 MANUAL_VALUE = 0xFF;
+constexpr static qint16 FORCED_MOVE = MATE_VALUE - MANUAL_VALUE;
 constexpr static qint16 ESOLUTION_VALUE = 0xDD;
 constexpr static quint32 OVERRIDE_MASK = 0xFF00;
 constexpr static quint32 REAL_DEPTH_LIMIT = 200;
@@ -191,6 +192,7 @@ bool is_endgame_available(std::shared_ptr<const Position> pos);
 bool is_branch(std::shared_ptr<Chess::Board> main_pos, std::shared_ptr<Chess::Board> branch);
 bool is_branch(Chess::Board* main_pos, Chess::Board* branch);
 bool is_branch(Chess::Board* pos, const Line& opening, const Line& branch);
+QString Watkins_nodes(const SolutionEntry& entry);
 
 uint64_t load_bigendian(const void* bytes);
 template<typename T>

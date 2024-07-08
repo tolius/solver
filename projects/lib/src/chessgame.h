@@ -61,18 +61,15 @@ class LIB_EXPORT ChessGame : public QObject
 		void setError(const QString& message);
 		void setPlayer(Chess::Side side, ChessPlayer* player);
 		void setStartingFen(const QString& fen);
-		void setTimeControl(const TimeControl& timeControl,
-				    Chess::Side side = Chess::Side());
+		void setTimeControl(const TimeControl& timeControl, Chess::Side side = Chess::Side());
 		void setMoves(const QVector<Chess::Move>& moves);
 		bool setMoves(const PgnGame& pgn);
-		void setOpeningBook(const OpeningBook* book,
-				    Chess::Side side = Chess::Side(),
-				    int depth = 1000);
+		void setOpeningBook(const OpeningBook* book, Chess::Side side = Chess::Side(), int depth = 1000);
 		void setAdjudicator(const GameAdjudicator& adjudicator);
 		void setStartDelay(int time);
 		void setBookOwnership(bool enabled);
-	    void setPosition(Chess::Board* board);
-	    void setMove(int i);
+		void setPosition(Chess::Board* board);
+		void setMove(int i);
 
 		void generateOpening();
 
@@ -93,14 +90,9 @@ class LIB_EXPORT ChessGame : public QObject
 	signals:
 		void humanEnabled(bool);
 		void fenChanged(const QString& fenString);
-		void moveMade(const Chess::GenericMove& move,
-			      const QString& sanString,
-			      const QString& comment);
-		void moveChanged(int ply,
-				 const Chess::GenericMove& move,
-				 const QString& sanString,
-				 const QString& comment);
-	    void positionSet();
+		void moveMade(const Chess::GenericMove& move, const QString& sanString, const QString& comment);
+		void moveChanged(int ply, const Chess::GenericMove& move, const QString& sanString, const QString& comment);
+		void positionSet();
 		void scoreChanged(int ply, int score);
 		void initialized(ChessGame* game = nullptr);
 		void started(ChessGame* game = nullptr);

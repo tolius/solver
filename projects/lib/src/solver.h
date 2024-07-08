@@ -171,6 +171,7 @@ protected:
 	void set_level(bool upper_level);
 	void start(pBoard start_pos, std::function<void(QString)> message, SolverMode mode, bool upper_level = true);
 	void process_move(std::vector<pMove>& tree, SolverState& info);
+	void update_existing(pMove& move);
 	void analyse_position(SolverMove& move, SolverState& info);
 	void find_solution(SolverMove& move, SolverState& info, pMove& best_move);
 	void evaluate_position(SolverMove& move, SolverState& info, pMove& best_move, pMove& solver_move);
