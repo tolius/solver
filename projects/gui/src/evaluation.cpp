@@ -535,7 +535,8 @@ void Evaluation::onEngineReady()
 			int num = str_num.toInt(&ok);
 			if (ok) {
 				engine_version = 
-				      (240226 <= num && num <= 240630) ? 3
+				      (240701 <= num && num <= 240731) ? 4
+				    : (240226 <= num && num <= 240630) ? 3
 				    : (num == 230811)                  ? 2
 				    : (num == 230803)                  ? 1
 				    : (230409 <= num && num <= 230415) ? 1

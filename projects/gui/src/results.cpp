@@ -196,8 +196,8 @@ QString Results::positionChanged()
 		}
 		buttons.push_back(btn);
 		QString score = (all_unknown || ((entry.source == EntrySource::positions || entry.source == EntrySource::watkins) && entry.info == "only move")) ? ""
-		//    : (entry.source == EntrySource::solver && entry.score() == ESOLUTION_VALUE && entry.info == "~") ? "sol"
 		    : (entry.source == EntrySource::solver && entry.info == "~") ? "~"
+		    : (entry.source == EntrySource::solver && entry.info == "sol") ? "sol" // "Replicate..." solutions
 		    : entry.getScore(entry.source == EntrySource::book || entry.source == EntrySource::solver);
 		if (entry.source == EntrySource::solver)
 		{
@@ -205,7 +205,7 @@ QString Results::positionChanged()
 				QString str_w = QString("W=%L1").arg(Watkins_nodes(entry));
 				entry.info = (entry.info.isEmpty() || entry.info == "~") ? str_w : QString("%1 %2").arg(str_w).arg(entry.info);
 			}
-			else if (entry.info == "~") {
+			else if (entry.info == "~" || entry.info == "sol") {
 				entry.info = "";
 			}
 		}

@@ -1078,7 +1078,7 @@ Solver::pMove Solver::get_engine_move(SolverMove& move, SolverState& info, bool 
 	solver_session->is_endgame = false;
 	solver_session->is_super_boost = is_super_boost;
 	solver_session->move_score = (move.isNull() || move.score() == UNKNOWN_SCORE) ? MoveEvaluation::NULL_SCORE : move.score();
-	solver_session->alt_step = (info.alt_steps == NO_ALT_STEPS) ? NO_ALT_STEPS : (max_alt_steps - info.alt_steps + 1);
+	solver_session->alt_step = info.alt_steps; // (info.alt_steps == NO_ALT_STEPS) ? NO_ALT_STEPS : (max_alt_steps - info.alt_steps + 1);
 //	best_move = Move(None);
 	int depth = min_depth;
 	int move_depth = move.isNull() ? 0 : static_cast<int>(move.depth());
@@ -1695,8 +1695,11 @@ std::list<MoveEntry> Solver::entries(Chess::Board* pos) const
 		entries.emplace_back(EntrySource::solver, san, m->pgMove, m->weight, nodes);
 		if (it_esol != esol.end())
 			esol.erase(it_esol);
-		if (m->is_solved())
+		if (m->is_solved()) {
+			if (to_copy_solution && m->weight == ESOLUTION_VALUE)
+				entries.back().info = "sol";
 			continue;
+		}
 		entries.back().info = "~"; // if not overridden
 
 		// Find transpositions

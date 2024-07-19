@@ -21,6 +21,7 @@ namespace fs = std::filesystem;
 namespace egtb
 {
 	constexpr bool     DTZ101_AS_DRAW  = true;
+	constexpr bool     ALWAYS_SAVE_DTZ = false;
 	constexpr bool     DO_EP_POSITIONS = true;
 	constexpr size_t   MAX_IDX_SIZE    = 28;
 

@@ -17,7 +17,7 @@ using namespace std::placeholders;
 namespace egtb
 {
 fs::path TB_Reader::egtb_path;
-string TB_Reader::file_extension_compressed = DTZ101_AS_DRAW ? ".an2" : ".an1";
+string TB_Reader::file_extension_compressed = DTZ101_AS_DRAW ? ".an2" : ALWAYS_SAVE_DTZ ? ".an0" : ".an1";
 map<string, shared_ptr<TB_Reader>> TB_Reader::tb_cache;
 bool TB_Reader::auto_load = true;
 
@@ -384,11 +384,11 @@ val_dtz TB_Reader::probe_ep(Position& board)
 		error("probe_ep: no moves for " + board.fen());
 	vector<int16_t> vals(moves.size(), NONE);
 	vector<uint8_t> dtzs(moves.size(), 0);
-	const ExtMove* move_i = moves.begin();
 	static const int None = numeric_limits<int>::max();
-	for (size_t i = 0; i < moves.size(); i++)
+	size_t i = 0;
+	for (const auto& move_i : moves)
 	{
-		const Move& m = move_i->move;
+		const Move& m = move_i.move;
 		bool is_capture = board.capture(m);
 		bool is_capture_or_promotion = board.capture_or_promotion(m);
 		bool is_zeroing = is_capture || type_of(board.moved_piece(m)) == PAWN;
@@ -448,6 +448,7 @@ val_dtz TB_Reader::probe_ep(Position& board)
 			error("probe_ep: score_i == None for " + board.fen());
 		if (score_i > score)
 			score = score_i;
+		i++;
 	}
 	if (score == 0)
 		return { DRAW, 0 };
@@ -455,7 +456,6 @@ val_dtz TB_Reader::probe_ep(Position& board)
 	int16_t best_val = score > 0 ? DRAW : 0;
 	uint8_t best_dtz = DTZ_NO_WIN;
 	bool is_all_checked = true;
-	move_i = moves.begin();
 	for (size_t i = 0; i < moves.size(); i++)
 	{
 		int16_t& val = vals[i];
@@ -506,7 +506,6 @@ val_dtz TB_Reader::probe_ep(Position& board)
 		error("probe_ep: wrong score for " + board.fen());
 	return { best_val, best_dtz };
 }
-
 
 bool TB_Reader::probe_EGTB(Position& board, int16_t& val, uint8_t& dtz)
 {

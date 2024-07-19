@@ -2,6 +2,8 @@
 
 Solver is a graphical user interface for solving [antichess](https://en.wikipedia.org/wiki/Antichess) openings. Priority is placed on minimising the winning length over reducing the number of nodes. Some results are available [here](https://antichess.onrender.com/). The programme was originally written in Python. This version is a conversion of existing code into C++.
 
+How to use the programme is described [here](https://github.com/tolius/solver/wiki).
+
 The following libraries/modules/components are used in the programme:
 - [Qt 5.15.2](https://download.qt.io/archive/qt/5.15/5.15.2/)
 - [Cute Chess 1.3.1](https://github.com/cutechess/cutechess/releases/tag/v1.3.1) (modified)
