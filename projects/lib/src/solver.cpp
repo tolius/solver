@@ -84,6 +84,7 @@ Solver::Solver(std::shared_ptr<Solution> solution)
 	s.multiPV_2_stop_time = int(s.std_engine_time * 0.10f);
 	s.multiPV_stop_time = int(s.std_engine_time * 0.50f); // 20
 	s.multiPV_stop_score = MATE_VALUE - 8;
+	s.multiPV_threshold_time = 15;
 	endgame5_score_limit = MATE_VALUE - limit_win; // -20  // MATE_VALUE - 0 --> to evaluate all known 5-men endgames
 	to_recheck_endgames = false;
 	rechecked_good_endgames = 0;
@@ -922,23 +923,26 @@ void Solver::evaluate_position(SolverMove& move, SolverState& info, pMove& best_
 		if (cached_move && cached_move->pgMove != best_move->pgMove && cached_move->score() >= best_move->score() && cached_move->score() > FORCED_MOVE
 			&& best_move->score() != FORCED_MOVE && best_move->depth_time() != MANUAL_VALUE && !board->isRepetition(cached_move->move(board)))
 		{
-			QString msg;
-			if (best_move->score() == cached_move->score()) {
-				msg = QString("..Transp %1->%2 %3: %4")
-				    .arg(best_move->san(board))
-				    .arg(cached_move->san(board))
-				    .arg(best_move->scoreText())
-				    .arg(get_move_stack(board));
+			if (QSettings().value("solutions/log_transpositions", true).toBool())
+			{
+				QString msg;
+				if (best_move->score() == cached_move->score()) {
+					msg = QString("..Transp %1->%2 %3: %4")
+						.arg(best_move->san(board))
+						.arg(cached_move->san(board))
+						.arg(best_move->scoreText())
+						.arg(get_move_stack(board));
+				}
+				else {
+					msg = QString("..Transp %1->%2: %3->%4 %5")
+						.arg(best_move->san(board))
+						.arg(cached_move->san(board))
+						.arg(best_move->scoreText())
+						.arg(cached_move->scoreText())
+						.arg(get_move_stack(board));
+				}
+				emit_message(msg, MessageType::std);
 			}
-			else {
-				msg = QString("..Transp %1->%2: %3->%4 %5")
-				          .arg(best_move->san(board))
-				          .arg(cached_move->san(board))
-				          .arg(best_move->scoreText())
-				          .arg(cached_move->scoreText())
-				          .arg(get_move_stack(board));
-			}
-			emit_message(msg, MessageType::std);
 			best_move = cached_move;
 		}
 	}
@@ -1024,7 +1028,9 @@ Solver::pMove Solver::get_only_move(SolverMove& move, SolverState& info)
 	if (legal_moves.size() != 1)
 		return nullptr;
 
-	only_move = make_shared<SolverMove>(legal_moves.front(), board, score, depth);
+	quint32 depth_time = move.isNull() ? 0 : move.depth_time();
+	only_move = make_shared<SolverMove>(legal_moves.front(), board, score, depth_time);
+	only_move->set_depth(depth);
 	bool to_save_only_moves = this->to_save_only_moves && !move.isNull() && move.score() != UNKNOWN_SCORE;
 	save_data(only_move, to_save_only_moves);
 	return only_move;
@@ -1086,7 +1092,9 @@ Solver::pMove Solver::get_engine_move(SolverMove& move, SolverState& info, bool 
 		depth = (move_depth <= s.max_depth * 0.6f) ? (move_depth - 1) : min(move_depth - 3, static_cast<int>(s.max_depth * 0.6f));
 	
 	/// Set multiPV boost.
-	solver_session->is_multi_boost = (depth > s.multiPV_boost_depth - 1 && (move.score() == UNKNOWN_SCORE || abs(move.score()) < s.multiPV_stop_score));
+	solver_session->is_multi_boost = (depth >= s.multiPV_boost_depth 
+	                                  && (move.isNull() || move.time() > s.multiPV_threshold_time)
+	                                  && (move.score() == UNKNOWN_SCORE || abs(move.score()) < s.multiPV_stop_score));
 	solver_session->mate = (move.score() > REAL_MATE) ? MATE_VALUE - move.score() : 0;
 
 	/// Ealuate.

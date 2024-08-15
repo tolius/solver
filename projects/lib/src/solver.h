@@ -57,6 +57,7 @@ struct LIB_EXPORT SolverSettings
 	int multiPV_2_stop_time;
 	int multiPV_boost_depth;
 	int multiPV_stop_score;
+	quint32 multiPV_threshold_time;
 	qint16 score_limit;
 };
 

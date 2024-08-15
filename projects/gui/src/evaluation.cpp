@@ -535,7 +535,7 @@ void Evaluation::onEngineReady()
 			int num = str_num.toInt(&ok);
 			if (ok) {
 				engine_version = 
-				      (240701 <= num && num <= 240731) ? 4
+				      (240701 <= num && num <= 240831) ? 4
 				    : (240226 <= num && num <= 240630) ? 3
 				    : (num == 230811)                  ? 2
 				    : (num == 230803)                  ? 1
@@ -1172,8 +1172,9 @@ void Evaluation::processEngineOutput(const MoveEvaluation& eval, const QString& 
 	bool no_progress = (best_time - t_progress > NO_PROGRESS_TIME || best_time == 0 || (solver && s && best_score >= s->multiPV_stop_score));
 	if (best_move.isEmpty())
 		emit Message(tr("!!NONE MOVE in %1").arg(get_move_stack(board_, false, 400)), MessageType::warning);
-	if (session.is_auto && no_progress && pv == 1 && is_only_move && solver && best_score < s->score_limit
-	    && (move_score == NULL_SCORE || abs(move_score) < s->score_limit - 1))
+	if (session.is_auto && pv == 1 && is_only_move && solver
+		&& (abs_score > abs(move_score)
+		    || (no_progress && s && abs_score < s->score_limit && (move_score == NULL_SCORE || abs(move_score) < s->score_limit - 1))))
 	{
 		updateProgress(100);
 		stopEngine();

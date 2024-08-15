@@ -159,6 +159,7 @@ struct SolverMove : public SolutionEntry
 	QString scoreText() const;
 
 	void set_score(qint16 score);
+	void set_depth(uint8_t depth);
 	void set_depth_time(quint32 depth_time);
 	void set_time(quint32 time);
 	void set_solved();

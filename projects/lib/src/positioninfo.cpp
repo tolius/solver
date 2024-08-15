@@ -175,6 +175,11 @@ void SolverMove::set_score(qint16 score)
 	weight = reinterpret_cast<quint16&>(score);
 }
 
+void SolverMove::set_depth(uint8_t depth)
+{
+	learn =  (learn & 0xFFFFFF00) | depth;
+}
+
 void SolverMove::set_depth_time(quint32 depth_time)
 {
 	learn = depth_time;

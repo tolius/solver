@@ -737,9 +737,6 @@
          <property name="text">
           <string>Continue to solve at the lower level after completing the solution at the upper level</string>
          </property>
-         <property name="checked">
-          <bool>true</bool>
-         </property>
         </widget>
        </item>
        <item>
@@ -769,6 +766,16 @@
         <widget class="QCheckBox" name="m_clearLogWhenAutoStarted">
          <property name="text">
           <string>Clear the log when auto mode is started</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="m_logTranspositions">
+         <property name="text">
+          <string>Log transpositions</string>
          </property>
          <property name="checked">
           <bool>true</bool>

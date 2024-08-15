@@ -239,6 +239,12 @@ SettingsDialog::SettingsDialog(QWidget* parent)
 		}
 	);
 
+	connect(ui->m_logTranspositions, &QCheckBox::toggled, this, 
+		[=](bool checked) {
+			QSettings().setValue("solutions/log_transpositions", checked);
+		}
+	);
+
 	connect(ui->m_openLastSolution, &QCheckBox::toggled,
 		this, [=](bool checked) {
 			QSettings().setValue("solutions/open_last_solution", checked);
@@ -332,6 +338,7 @@ void SettingsDialog::readSettings()
 	s.beginGroup("solutions");
 	ui->m_lowerLevel->setChecked(s.value("auto_lower_level", false).toBool());
 	ui->m_clearLogWhenAutoStarted->setChecked(s.value("clear_log_when_Auto_started", true).toBool());
+	ui->m_logTranspositions->setChecked(s.value("log_transpositions", true).toBool());
 	ui->m_openLastSolution->setChecked(s.value("open_last_solution", true).toBool());
 	s.endGroup();
 }
