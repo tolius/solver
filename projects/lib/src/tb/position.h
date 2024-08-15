@@ -20,6 +20,7 @@
 #define POSITION_H_INCLUDED
 
 #include <cassert>
+#include <cstring> // For std::memset
 #include <deque>
 #include <memory> // For std::unique_ptr
 #include <string>
@@ -73,6 +74,7 @@ struct StateInfo {
   Eval::NNUE::Accumulator accumulator;
   DirtyPiece dirtyPiece;
 #endif
+  void reset();
 };
 
 
@@ -189,6 +191,7 @@ public:
 
   // Other properties of the position
   Color side_to_move() const;
+  void set_side_to_move(const Color& color);
   int game_ply() const;
   bool is_chess960() const;
   Variant variant() const;
@@ -313,18 +316,21 @@ public:
   bool pos_is_ok() const;
   void flip();
 
+  void replace_state(StateInfo* st);
+  void reset();
+  void set_state(StateInfo* si) const;
+  void put_piece(Piece pc, Square s);
+  void remove_piece(Square s);
+
   // Used by NNUE
   StateInfo* state() const;
 
 private:
   // Initialization helpers (used while setting up a position)
   void set_castling_right(Color c, Square kfrom, Square rfrom);
-  void set_state(StateInfo* si) const;
   void set_check_info(StateInfo* si) const;
 
   // Other helpers
-  void put_piece(Piece pc, Square s);
-  void remove_piece(Square s);
   void move_piece(Square from, Square to);
   template<bool Do>
   void do_castling(Color us, Square from, Square& to, Square& rfrom, Square& rto);
@@ -372,6 +378,10 @@ extern std::ostream& operator<<(std::ostream& os, const Position& pos);
 
 inline Color Position::side_to_move() const {
   return sideToMove;
+}
+
+inline void Position::set_side_to_move(const Color& color) {
+  sideToMove = color;
 }
 
 inline Piece Position::piece_on(Square s) const {
@@ -1264,6 +1274,17 @@ inline void Position::do_move(Move m, StateInfo& newSt) {
 inline StateInfo* Position::state() const {
 
   return st;
+}
+
+inline void Position::replace_state(StateInfo* st)
+{
+  this->st = st;
+}
+
+inline void StateInfo::reset()
+{
+  std::memset(this, 0, sizeof(StateInfo));
+  epSquare = SQ_NONE;
 }
 
 #endif // #ifndef POSITION_H_INCLUDED

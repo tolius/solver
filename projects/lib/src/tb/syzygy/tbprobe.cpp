@@ -2284,8 +2284,9 @@ void Tablebases::init(Variant variant, const std::string& paths) {
                     TBTables.add(variant, {KING, p1, p2}, {KING, p3, p4});
         }
     }
-
+#ifdef UCI_INFO_OUTPUT
     sync_cout << "info string Found " << TBTables.size() << " tablebases" << sync_endl;
+#endif
 }
 
 // Probe the WDL table for a particular position.

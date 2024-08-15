@@ -2761,3 +2761,14 @@ bool Position::pos_is_ok() const {
 
   return true;
 }
+
+void Position::reset()
+{
+  auto st = this->st;
+  std::memset(this, 0, sizeof(Position));
+  std::fill_n(&pieceList[0][0], sizeof(pieceList) / sizeof(Square), SQ_NONE);
+  this->subvar = ANTI_VARIANT;
+  this->var = main_variant(ANTI_VARIANT);
+  this->st = st;
+  this->thisThread = Threads.main();
+}

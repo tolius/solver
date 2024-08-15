@@ -68,7 +68,7 @@ namespace Endgames {
   std::pair<Map<Value>, Map<ScaleFactor>> maps;
 
   void init() {
-
+	  return;
     add<CHESS_VARIANT, KPK>("KPvK");
     add<CHESS_VARIANT, KNNK>("KNNvK");
     add<CHESS_VARIANT, KBNK>("KBNvK");

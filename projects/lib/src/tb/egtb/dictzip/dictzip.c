@@ -39,6 +39,8 @@
          _a < _b ? _a : _b; })
 #endif
 
+int fileno(FILE *stream);
+
 static void xfwrite(
    const void *ptr, size_t size, size_t nmemb,
    FILE * stream)
@@ -217,7 +219,7 @@ int dict_data_zip(const char *inFilename, const char *outFilename, const char *p
 #ifdef _WIN32
 	_fstat64(fileno(inStr), &st);
 #else
-	stat(fileno(inStr), &st);
+	fstat(fileno(inStr), &st);
 #endif
 	chunks = st.st_size / chunkLength;
 	if (st.st_size % chunkLength) ++chunks;

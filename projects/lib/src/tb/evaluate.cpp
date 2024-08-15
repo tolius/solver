@@ -1617,7 +1617,7 @@ namespace {
   template<Tracing T> template<Color Us>
   Score Evaluation<T>::variant() const {
 
-    constexpr Color Them = (Us == WHITE ? BLACK : WHITE);
+    [[maybe_unused]] constexpr Color Them = (Us == WHITE ? BLACK : WHITE);
 
     Score score = SCORE_ZERO;
 

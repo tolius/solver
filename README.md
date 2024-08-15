@@ -1,10 +1,10 @@
 # Solver
 
-Solver is a graphical user interface for solving [antichess](https://en.wikipedia.org/wiki/Antichess) openings. Priority is placed on minimising the winning length over reducing the number of nodes. Some results are available [here](https://antichess.onrender.com/). The programme was originally written in Python. This version is a conversion of existing code into C++.
+Solver is a graphical user interface for solving [antichess](https://en.wikipedia.org/wiki/Antichess) openings. Priority is placed on minimising the winning length over reducing the number of nodes. Some results are available [here](https://antichess.onrender.com/). The program was originally written in Python. This version is a conversion of existing code into C++.
 
-How to use the programme is described [here](https://github.com/tolius/solver/wiki).
+How to use the program is described [here](https://github.com/tolius/solver/wiki).
 
-The following libraries/modules/components are used in the programme:
+The following libraries/modules/components are used in the program:
 - [Qt 5.15.2](https://download.qt.io/archive/qt/5.15/5.15.2/)
 - [Cute Chess 1.3.1](https://github.com/cutechess/cutechess/releases/tag/v1.3.1) (modified)
 - [Fairy-Stockfish](https://github.com/fairy-stockfish/Fairy-Stockfish/tree/104d2f40e4d064815d6b06d0c812aec3b7b01f20) (modified)
@@ -28,7 +28,7 @@ Solver requires Qt 5.15 or greater, a compiler with C++17 support, and CMake.
 
 ### Endgame tablebase files
 
-Endgame tablebase files are available on request. The 2-4-piece tablebase consists of 714 files of 500MB in size. The efficiency of the programme is greatly reduced if you do not use at least 4-piece tablebase with DTW (Depth To Win) metric. Other metrics are not supported.
+Endgame tablebase files are available on request. The 2-4-piece tablebase consists of 714 files of 500MB in size. The efficiency of the program is greatly reduced if you do not use at least 4-piece tablebase with DTW (Depth To Win) metric. Other metrics are not supported.
 
 ## License
 

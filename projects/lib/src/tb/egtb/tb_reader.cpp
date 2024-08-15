@@ -22,9 +22,9 @@ map<string, shared_ptr<TB_Reader>> TB_Reader::tb_cache;
 bool TB_Reader::auto_load = true;
 
 
-void TB_Reader::init(const string& syzygy_path, bool load_all)
+void TB_Reader::init(const string& tb_path, bool load_all)
 {
-	egtb_path = fs::path(syzygy_path).parent_path() / "EGTB";
+	egtb_path = tb_path;
 	Tablebases_init();
 	if (load_all)
 	{
@@ -50,10 +50,12 @@ void TB_Reader::init(const string& syzygy_path, bool load_all)
 				}
 			}
 		}
+#ifdef UCI_INFO_OUTPUT
 		cout << "info string Found " << tb_cache.size() << " EGTB";
 		if (tb_cache.size() != 1)
 			cout << "s";
 		cout << endl;
+#endif
 	}
 }
 
@@ -86,10 +88,10 @@ void TB_Reader::discard_tb(const string& tb_name)
 TB_Reader::TB_Reader(const string& tb_name)
 {
 	this->tb_name = tb_name;
-    /// Pawn TB?
+	/// Pawn TB?
 	this->has_pawns = (tb_name.find('P') != string::npos);
-    /// Is symmetrical
-    this->is_symmetrical = (tb_name.length() % 2 == 1);
+	/// Is symmetrical
+	this->is_symmetrical = (tb_name.length() % 2 == 1);
 	if (is_symmetrical)
 	{
 		for (size_t i = 0; i < tb_name.length() / 2; i++)
@@ -132,7 +134,9 @@ TB_Reader::TB_Reader(const string& tb_name)
 
 TB_Reader::~TB_Reader()
 {
+#ifdef UCI_INFO_OUTPUT
 	cout << "info string Discarding EGTB " << tb_name << endl;
+#endif
 	dz_close(this->dz_header);
 }
 
@@ -250,6 +254,8 @@ val_dtz TB_Reader::read_one(size_t key, bool is_compressed)
 		else if (val_12bit) {
 			char data[3];
 			int err = dz_read(dz_header, (unsigned long)(tbtable->header_size + i), num_bytes, data);
+			if (err != 0)
+				error("Can't read data from the file");
 			read_val_12bit(tb_bytes, key, data);
 		}
 		else {
@@ -272,7 +278,14 @@ val_dtz TB_Reader::load_one(const char* tb_bytes, bool is_compressed, bool val_b
 	uint8_t dtz = has_dtz ? reinterpret_cast<const uint8_t&>(tb_bytes[0]) : 0;
 	if (has_dtz)
 		tb_bytes++;
-	int16_t val = val_big ? (tb_bytes[0] << 8) | reinterpret_cast<const uint8_t&>(tb_bytes[1]) : tb_bytes[0];
+	int16_t val;
+	if (val_big) {
+		uint16_t uval = (reinterpret_cast<const uint8_t&>(tb_bytes[0]) << 8) | reinterpret_cast<const uint8_t&>(tb_bytes[1]);
+		val = reinterpret_cast<int16_t&>(uval);
+	}
+	else {
+		val = reinterpret_cast<const int8_t&>(tb_bytes[0]);
+	}
 	if (is_compressed && dtz == 0 && val == 0)
 		val = DRAW;
 	if (val == NONE || dtz > abs(val) || (is_compressed && dtz > DTZ_MAX))
@@ -288,7 +301,7 @@ val_dtz TB_Reader::probe_one(Position& board)
 
 	int16_t val;
 	uint8_t dtz;
-    if (tb_flags & EGTB_SKIP_ONLY_MOVES)
+	if (tb_flags & EGTB_SKIP_ONLY_MOVES)
 	{
 		MoveList<LEGAL> moves(board);
 		if (moves.size() == 1)

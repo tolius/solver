@@ -506,7 +506,7 @@ std::tuple<std::list<SolverMove>, uint8_t> get_endgame_moves(std::shared_ptr<Che
 			board->undoMove();
 			if ((abs(value_i) == abs(tb_val) - 1) && ((value_i > 0) != (tb_val > 0)) && (!apply_50move_rule || dtz_i < dtz || dtz_i == 100))
 			{
-				int16_t add_ply = (board->sideToMove() == Chess::Side::White) ? 1 : 0; //?? TODO: check
+				int16_t add_ply = (board->sideToMove() == Chess::Side::White) ? 0 : 1;
 				int16_t score = (value_i > 0) ? (MATE_VALUE - (value_i + add_ply) / 2) : (-MATE_VALUE - (value_i - add_ply) / 2);
 				moves.emplace_back(move, board, -score, depth_time(dtz_i));
 			}

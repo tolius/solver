@@ -47,6 +47,8 @@ int mmap_mode = 1; /* dictd uses mmap() function (the default) */
 int mmap_mode = 0;
 #endif
 
+int fileno(FILE *stream);
+
 static int dict_read_header(const char *filename,
 	dictData *header, int computeCRC)
 {

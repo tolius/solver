@@ -6,7 +6,7 @@ if(ARCH_FLAGS)
 	if (WIN32)
 		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -arch:${ARCH_FLAGS}")
 	else()
-		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+		set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=${ARCH_FLAGS}")
 	endif()
 endif()
 
@@ -52,6 +52,6 @@ else()
 	target_compile_options(${PROJECT_NAME}
 		PRIVATE "-Ofast"
 		PRIVATE "-flto"
-		PRIVATE "-march=native"
+		PRIVATE "-march=${ARCH_FLAGS}"
 	)
 endif()

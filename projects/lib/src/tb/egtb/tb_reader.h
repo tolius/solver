@@ -60,7 +60,7 @@ namespace egtb
 		static bool auto_load;
 
 	public:
-		static void init(const string& syzygy_path, bool load_all = false);
+		static void init(const string& tb_path, bool load_all = false);
 		static bool probe_EGTB(Position& board, int16_t& val, uint8_t& dtz);
 		static void print_EGTB_info();
 		static void discard_tb(const string& tb_name);

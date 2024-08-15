@@ -1,5 +1,11 @@
 cmake_minimum_required(VERSION 3.16.0)
 
+if (WIN32)
+	set(ARCH_FLAGS "AVX2")
+else()
+	set(ARCH_FLAGS "native")
+endif()
+
 add_subdirectory(projects/lib/src/tb/egtb/dictzip)
 
 project(solver)
@@ -26,7 +32,7 @@ endif()
 option(WITH_TESTS "Enable building of unit tests" OFF)
 
 if (UNIX)
-	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=${ARCH_FLAGS}")
 endif()
 
 set(CMAKE_AUTOMOC ON)
