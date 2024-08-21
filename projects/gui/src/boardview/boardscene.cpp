@@ -85,6 +85,7 @@ void BoardScene::populate()
 	Q_ASSERT(m_board != nullptr);
 
 	stopAnimation();
+	cancelUserMove();
 	clear();
 	m_history.clear();
 	m_transition.clear();
@@ -145,6 +146,7 @@ void BoardScene::setFenString(const QString& fenString)
 void BoardScene::makeMove(const Chess::Move& move)
 {
 	stopAnimation();
+	cancelUserMove();
 	delete m_moveArrows;
 	m_moveArrows = new QGraphicsItemGroup(m_squares);
 	m_moveArrows->setZValue(1);
@@ -166,6 +168,7 @@ void BoardScene::makeMove(const Chess::GenericMove& move)
 void BoardScene::undoMove()
 {
 	stopAnimation();
+	cancelUserMove();
 	delete m_moveArrows;
 	m_moveArrows = nullptr;
 
@@ -193,6 +196,7 @@ void BoardScene::cancelUserMove()
 void BoardScene::flip()
 {
 	stopAnimation();
+	cancelUserMove();
 	m_squares->setFlipped(!m_squares->isFlipped());
 
 	QParallelAnimationGroup* group = new QParallelAnimationGroup;

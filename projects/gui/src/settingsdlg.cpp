@@ -209,6 +209,13 @@ SettingsDialog::SettingsDialog(QWidget* parent)
 	s.endGroup();
 
 	/// UI
+	connect(ui->m_showBoard, &QCheckBox::toggled,
+		this, [=](bool checked) {
+			QSettings().setValue("ui/show_board", checked);
+			emit showBoardChanged(checked);
+		}
+	);
+
 	connect(ui->m_highlightLegalMovesCheck, &QCheckBox::toggled,
 		this, [=](bool checked) {
 			QSettings().setValue("ui/highlight_legal_moves", checked);
@@ -329,6 +336,7 @@ void SettingsDialog::readSettings()
 	QSettings s;
 
 	s.beginGroup("ui");
+	ui->m_showBoard->setChecked(s.value("show_board", true).toBool());
 	ui->m_highlightLegalMovesCheck->setChecked(s.value("highlight_legal_moves", true).toBool());
 	ui->m_showMoveArrowsCheck->setChecked(s.value("show_move_arrows", true).toBool());
 	ui->m_moveAnimationSpin->setValue(s.value("move_animation_duration", 300).toInt());

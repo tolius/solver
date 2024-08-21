@@ -145,6 +145,7 @@ MainWindow::MainWindow(ChessGame* game, SettingsDialog* settingsDlg)
 	connect(m_gameViewer, SIGNAL(gotoNextMoveClicked()), m_results, SLOT(nextMoveClicked()));
 	connect(m_gameViewer, SIGNAL(gotoCurrentMoveClicked()), m_evaluation, SLOT(gotoCurrentMove()));
 
+	connect(settingsDlg, SIGNAL(showBoardChanged(bool)), m_gameViewer, SLOT(showBoard(bool)));
 	connect(settingsDlg, SIGNAL(engineChanged(const QString&)), m_evaluation, SLOT(engineChanged(const QString&)));
 	connect(settingsDlg, SIGNAL(engineHashChanged(int)), m_evaluation, SLOT(engineHashChanged(int)));
 	connect(settingsDlg, SIGNAL(engineNumThreadsChanged(int)), m_evaluation, SLOT(engineNumThreadsChanged(int)));

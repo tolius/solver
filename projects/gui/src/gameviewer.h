@@ -60,6 +60,7 @@ class GameViewer : public QWidget
 
 	public slots:
 		void viewMove(int index, bool keyLeft = false);
+		void showBoard(bool show_board);
 
 	signals:
 		void moveSelected(int moveNumber);

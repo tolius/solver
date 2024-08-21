@@ -30,6 +30,7 @@ private:
 
 signals:
 	void stylesChanged(QString styles);
+	void showBoardChanged(bool show_board);
 	void fontSizeChanged(int size);
 	void engineChanged(const QString& engine_filename);
 	void engineHashChanged(int hash_size);

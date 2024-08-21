@@ -57,6 +57,7 @@ GameViewer::GameViewer(Qt::Orientation orientation,
 	m_boardScene = new BoardScene(this);
 	m_boardView = new BoardView(m_boardScene, this);
 	m_boardView->setEnabled(false);
+	m_boardView->setVisible(QSettings().value("ui/show_board", true).toBool());
 
 	m_viewFirstMoveBtn->setEnabled(false);
 	m_viewFirstMoveBtn->setAutoRaise(true);
@@ -247,6 +248,11 @@ Chess::Board* GameViewer::board() const
 BoardScene* GameViewer::boardScene() const
 {
 	return m_boardScene;
+}
+
+void GameViewer::showBoard(bool show_board)
+{
+	m_boardView->setVisible(show_board);
 }
 
 void GameViewer::undoMoves(int num)

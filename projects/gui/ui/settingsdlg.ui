@@ -23,7 +23,7 @@
    <item>
     <widget class="QTabWidget" name="tabWidget">
      <property name="currentIndex">
-      <number>2</number>
+      <number>0</number>
      </property>
      <widget class="QWidget" name="m_generalTab">
       <attribute name="title">
@@ -32,7 +32,7 @@
       <layout class="QVBoxLayout" name="verticalLayout_6">
        <item>
         <layout class="QFormLayout" name="formLayout_6">
-         <item row="0" column="0">
+         <item row="1" column="0">
           <widget class="QCheckBox" name="m_highlightLegalMovesCheck">
            <property name="text">
             <string>Highlight legal moves</string>
@@ -42,7 +42,7 @@
            </property>
           </widget>
          </item>
-         <item row="1" column="0">
+         <item row="2" column="0">
           <widget class="QCheckBox" name="m_showMoveArrowsCheck">
            <property name="text">
             <string>Show move arrows</string>
@@ -52,7 +52,7 @@
            </property>
           </widget>
          </item>
-         <item row="2" column="0">
+         <item row="3" column="0">
           <widget class="QLabel" name="m_moveAnimationLabel">
            <property name="text">
             <string>Duration of mo&amp;ve animation:</string>
@@ -62,7 +62,7 @@
            </property>
           </widget>
          </item>
-         <item row="2" column="1">
+         <item row="3" column="1">
           <widget class="QSpinBox" name="m_moveAnimationSpin">
            <property name="toolTip">
             <string>duration of a move animation (default: 300 ms)</string>
@@ -87,14 +87,14 @@
            </property>
           </widget>
          </item>
-         <item row="3" column="0">
+         <item row="4" column="0">
           <widget class="QLabel" name="m_tbPathLabel_2">
            <property name="text">
             <string>Theme:</string>
            </property>
           </widget>
          </item>
-         <item row="3" column="1">
+         <item row="4" column="1">
           <widget class="QComboBox" name="m_comboStyle">
            <property name="sizePolicy">
             <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
@@ -104,14 +104,14 @@
            </property>
           </widget>
          </item>
-         <item row="4" column="0">
+         <item row="5" column="0">
           <widget class="QLabel" name="m_tbPathLabel_3">
            <property name="text">
             <string>Scale:</string>
            </property>
           </widget>
          </item>
-         <item row="4" column="1">
+         <item row="5" column="1">
           <widget class="QComboBox" name="m_comboScale">
            <property name="sizePolicy">
             <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
@@ -166,14 +166,14 @@
            </item>
           </widget>
          </item>
-         <item row="5" column="0">
+         <item row="6" column="0">
           <widget class="QLabel" name="m_tbPathLabel_4">
            <property name="text">
             <string>Win/Loss highlighting:</string>
            </property>
           </widget>
          </item>
-         <item row="5" column="1">
+         <item row="6" column="1">
           <layout class="QHBoxLayout" name="horizontalLayout">
            <item>
             <widget class="QSlider" name="m_slider_WinLossHighlighting">
@@ -203,7 +203,7 @@
            </item>
           </layout>
          </item>
-         <item row="6" column="1">
+         <item row="7" column="1">
           <layout class="QHBoxLayout" name="horizontalLayout_2">
            <item>
             <widget class="QLabel" name="label_10">
@@ -269,14 +269,14 @@
            </item>
           </layout>
          </item>
-         <item row="7" column="0">
+         <item row="8" column="0">
           <widget class="QLabel" name="label_12">
            <property name="text">
             <string>Update board in auto mode:</string>
            </property>
           </widget>
          </item>
-         <item row="7" column="1">
+         <item row="8" column="1">
           <layout class="QHBoxLayout" name="horizontalLayout_3">
            <item>
             <widget class="QSlider" name="m_slider_BoardUpdate">
@@ -321,14 +321,14 @@
            </item>
           </layout>
          </item>
-         <item row="8" column="0">
+         <item row="9" column="0">
           <widget class="QLabel" name="label_15">
            <property name="text">
             <string>Update log in auto mode:</string>
            </property>
           </widget>
          </item>
-         <item row="8" column="1">
+         <item row="9" column="1">
           <layout class="QHBoxLayout" name="horizontalLayout_4">
            <item>
             <widget class="QSlider" name="m_slider_LogUpdate">
@@ -375,6 +375,16 @@
             </widget>
            </item>
           </layout>
+         </item>
+         <item row="0" column="0">
+          <widget class="QCheckBox" name="m_showBoard">
+           <property name="text">
+            <string>Show board</string>
+           </property>
+           <property name="checked">
+            <bool>true</bool>
+           </property>
+          </widget>
          </item>
         </layout>
        </item>
