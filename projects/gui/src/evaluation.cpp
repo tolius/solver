@@ -1027,6 +1027,9 @@ void Evaluation::onEngineEval(const MoveEvaluation& eval)
 	int pv = std::max(1, eval.pvNumber());
 	auto san_moves = process_moves(eval);
 	QString eval_best_move = san_moves.empty() ? "" : san_moves.takeFirst();
+	
+	static std::mutex prc_mtx;
+	std::lock_guard<std::mutex> prc_lock(prc_mtx);
 	processEngineOutput(eval, eval_best_move);
 	
 	std::lock_guard<std::mutex> lock(eval_data.mtx);
@@ -1109,39 +1112,47 @@ void Evaluation::processEngineOutput(const MoveEvaluation& eval, const QString& 
 {
 	int pv = std::max(1, eval.pvNumber());
 	int depth = eval.depth();
-	int delta_depth = depth - curr_depth;
-	curr_depth = depth;
+	int curr_score = eval.score();
+	constexpr static int NULL_SCORE = MoveEvaluation::NULL_SCORE;
+	bool is_good_update = (best_score == NULL_SCORE || best_score < ABOVE_EG || curr_score >= best_score);
+	int delta_depth = is_good_update ? depth - curr_depth : 0;
+	if (is_good_update)
+		curr_depth = depth;
 	quint64 nodeCount = eval.nodeCount();
 	quint64 nodes = nodeCount + eval.tbHits() * 100;
-	int curr_score = eval.score();
-	bool is_bad_move = (curr_score < -10'000);
 	const SolverSettings* s = solver ? &solver->settings() : nullptr;
-	constexpr static int NULL_SCORE = MoveEvaluation::NULL_SCORE;
+	bool is_bad_move = (curr_score < -10'000);
 	if (pv == 1)
 	{
 		quint64 curr_time = nodes / NODES_PER_S;
 		if (delta_depth > 0)
 			progress_time = (progress_time > 0) ? (progress_time + (curr_time - best_time) / delta_depth) / 2
-			    : (best_time > 0)               ? (curr_time - best_time) / delta_depth
-			                                    : 0;
-		best_time = curr_time;
-		if (best_score != NULL_SCORE && (abs(best_score - curr_score) >= 100 || (curr_score > ABOVE_EG && best_score != curr_score)))
-			t_progress = best_time;
-		best_move = str_move;
-		best_score = curr_score;
-		abs_score = is_endgame ? abs(best_score) : best_score;
-		
+				: (best_time > 0)               ? (curr_time - best_time) / delta_depth
+												: 0;
+		if (is_good_update)
+		{
+			best_time = curr_time;
+			if (best_score != NULL_SCORE && (abs(best_score - curr_score) >= 100 || (curr_score > ABOVE_EG && best_score != curr_score)))
+				t_progress = best_time;
+			best_move = str_move;
+			best_score = curr_score;
+			abs_score = is_endgame ? abs(best_score) : best_score;
 
-		if (solver && abs_score < s->min_score && board_->sideToMove() == solver->sideToWin()) {
-			auto now = steady_clock::now();
-			if (now - t_last_not_win_warning >= 5000ms) {
-				emit Message(tr("...NOT WINNING at depth=%1! %2 in %3").arg(depth).arg(str_move).arg(get_move_stack(board_)), MessageType::warning);
-				t_last_not_win_warning = now;
+			if (solver && abs_score < s->min_score && board_->sideToMove() == solver->sideToWin()) {
+				auto now = steady_clock::now();
+				if (now - t_last_not_win_warning >= 5'000ms) {
+					emit Message(tr("...NOT WINNING at depth=%1! %2 in %3").arg(depth).arg(str_move).arg(get_move_stack(board_)), MessageType::warning);
+					t_last_not_win_warning = now;
+				}
 			}
+			is_score_ok = (!solver || !s->dont_lose_winning_sequence || move_score == NULL_SCORE
+							|| abs(move_score) <= WIN_THRESHOLD || abs_score > abs(move_score));
+			depth_limit = get_max_depth(best_score, num_pieces);
 		}
-		is_score_ok = (!solver || !s->dont_lose_winning_sequence || move_score == NULL_SCORE
-					   || abs(move_score) <= WIN_THRESHOLD || abs_score > abs(move_score));
-		depth_limit = get_max_depth(best_score, num_pieces);
+		else
+		{
+			is_score_ok = false;
+		}
 		if (is_good_moves)
 			good_moves.clear();
 		if (game && !game->isFinished() && game->board() && game->board()->key() == board_->key()) {
