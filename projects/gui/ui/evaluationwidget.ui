@@ -1368,7 +1368,7 @@
      <item>
       <widget class="QLabel" name="label_Speed">
        <property name="text">
-        <string>0 kn/s</string>
+        <string>00.00 Mn/s</string>
        </property>
       </widget>
      </item>
@@ -1395,7 +1395,7 @@
      <item>
       <widget class="QLabel" name="label_EGTB">
        <property name="text">
-        <string>0 n/s</string>
+        <string>00.00 kn/s</string>
        </property>
       </widget>
      </item>

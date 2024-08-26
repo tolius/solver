@@ -385,8 +385,8 @@ void Evaluation::clearEvalLabels()
 	ui->label_Mate->clear();
 	ui->label_BestMove->clear();
 	ui->label_EngineMoves->clear();
-	ui->label_Speed->setText("   0 kn/s");
-	ui->label_EGTB->setText("   0 n/s");
+	ui->label_Speed->setText(tr("%L1 Mn/s").arg(0, 5, 'f', 2, QChar('0')));
+	ui->label_EGTB->setText(tr("%L1 kn/s").arg(0, 5, 'f', 2, QChar('0')));
 	ui->btn_Save->setText("Save move");
 	ui->progressBar->setValue(0);
 }
@@ -1093,15 +1093,15 @@ void Evaluation::onUpdateEval()
 		ui->btn_Save->setText("Save " + eval_data.best_move);
 		ui->label_EngineMoves->setText(eval_data.move_sequence);
 	}
-	ui->label_Speed->setText(tr("%L1 kn/s").arg(eval_data.nps / 1000, 4, 10, QChar(' ')));
+	ui->label_Speed->setText(tr("%L1 Mn/s").arg(static_cast<double>(eval_data.nps) / 1'000'000, 5, 'f', 2, QChar('0')));
 	if (eval_data.time_ms == 0)
 	{
-		ui->label_EGTB->setText("   0 n/s");
+		ui->label_EGTB->setText(tr("%L1 kn/s").arg(0, 5, 'f', 2, QChar('0')));
 	}
 	else
 	{
-		int64_t speed_egtb = static_cast<int64_t>(eval_data.tb_hits) * 1000 / eval_data.time_ms;
-		ui->label_EGTB->setText(tr("%L1 n/s").arg(speed_egtb, 4, 10, QChar(' ')));
+		double speed_egtb = static_cast<double>(eval_data.tb_hits) / eval_data.time_ms;
+		ui->label_EGTB->setText(tr("%L1 kn/s").arg(speed_egtb, 5, 'f', 2, QChar('0')));
 	}
 
 	eval_data.update_labels(move_labels);
