@@ -1343,6 +1343,9 @@
        <property name="text">
         <string>0 s</string>
        </property>
+       <property name="textFormat">
+        <enum>Qt::PlainText</enum>
+       </property>
       </widget>
      </item>
      <item>
@@ -1370,6 +1373,9 @@
        <property name="text">
         <string>00.00 Mn/s</string>
        </property>
+       <property name="textFormat">
+        <enum>Qt::PlainText</enum>
+       </property>
       </widget>
      </item>
      <item>
@@ -1396,6 +1402,9 @@
       <widget class="QLabel" name="label_EGTB">
        <property name="text">
         <string>00.00 kn/s</string>
+       </property>
+       <property name="textFormat">
+        <enum>Qt::PlainText</enum>
        </property>
       </widget>
      </item>

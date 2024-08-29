@@ -29,6 +29,7 @@ public:
 
 private:
 	void updateButtons();
+	void updateWatkinsError();
 
 private slots:
 	void on_OpeningChanged();

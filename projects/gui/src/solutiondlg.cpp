@@ -146,6 +146,7 @@ SolutionDialog::SolutionDialog(QWidget* parent, std::shared_ptr<SolutionData> da
 	//ui->btn_AddBranchToSkip->setEnabled(false);
 	ui->line_Watkins->setText(data->Watkins);
 	ui->label_WatkinsOpening->setVisible(false);
+	ui->label_WatkinsError->setVisible(false);
 
 	connect(ui->btn_setCurrent, &QPushButton::clicked, this, [this]() { ui->line_Branch->setText(board_position); });
 
@@ -191,6 +192,19 @@ void SolutionDialog::updateButtons()
 		ui->btn_OK->setEnabled(true);
 		ui->label_Info->setText(info);
 	}
+	updateWatkinsError();
+}
+
+void SolutionDialog::updateWatkinsError()
+{
+	bool is_ok = (WatkinsStartingPly < 0);
+	if (!is_ok)
+	{
+		size_t num_plies_opening = data->opening.size();
+		is_ok = (WatkinsStartingPly == 0) ? num_plies_opening % 2 == 0 : (num_plies_opening % 2 != WatkinsStartingPly % 2);
+	}
+	ui->label_WatkinsError->setVisible(!is_ok);
+	ui->label_WatkinsError->setText(is_ok ? "" : "The side to move is inconsistent with the opening!");
 }
 
 void SolutionDialog::on_OpeningChanged()
@@ -345,6 +359,8 @@ void SolutionDialog::on_BrowseWatkinsClicked()
 		ui->line_Watkins->setText("");
 		ui->label_WatkinsOpening->setText("");
 		ui->label_WatkinsOpening->setVisible(false);
+		ui->label_WatkinsError->setText("");
+		ui->label_WatkinsError->setVisible(false);
 		return;
 	}
 	QFileInfo fi_selected(file_Watkins);
@@ -365,6 +381,8 @@ void SolutionDialog::on_WatkinsSolutionChanged()
 	{
 		ui->label_WatkinsOpening->setText("");
 		ui->label_WatkinsOpening->setVisible(false);
+		ui->label_WatkinsError->setText("");
+		ui->label_WatkinsError->setVisible(false);
 		WatkinsStartingPly = -1;
 	};
 	QString filename = ui->line_Watkins->text();
@@ -403,6 +421,7 @@ void SolutionDialog::on_WatkinsSolutionChanged()
 	QString opening = san_moves.join(' ');
 	ui->label_WatkinsOpening->setText(opening);
 	ui->label_WatkinsOpening->setVisible(!opening.isEmpty());
+	updateWatkinsError();
 }
 
 void SolutionDialog::on_OKClicked()

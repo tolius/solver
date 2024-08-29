@@ -116,7 +116,26 @@ QString Results::positionChanged()
 	std::list<MoveEntry> solution_entries;
 	if ((data_source == EntrySource::none || data_source == EntrySource::solver) && solver)
 		solution_entries = solver->entries(board);
-	if (solution_entries.empty() && data_source != EntrySource::solver)
+	if (data_source == EntrySource::none && !solution_entries.empty())
+	{
+		std::list<MoveEntry> book_entries = (board->sideToMove() == solution->winSide()) ? solution->entries(board) : solution->nextEntries(board);
+		if (!book_entries.empty())
+		{
+			for (auto& entry : solution_entries)
+			{
+				if (entry.info != "~")
+					continue;
+				for (auto it_book_entry = book_entries.begin(); it_book_entry != book_entries.end(); ++it_book_entry) {
+					if (it_book_entry->pgMove == entry.pgMove) {
+						entry.info = QString("~%1 %2").arg(it_book_entry->getScore(true)).arg(it_book_entry->getNodes());
+						book_entries.erase(it_book_entry);
+						break;
+					}
+				}
+			}
+		}
+	}
+	else if (solution_entries.empty() && data_source != EntrySource::solver)
 	{
 		if (board->sideToMove() == solution->winSide())
 		{
@@ -196,16 +215,16 @@ QString Results::positionChanged()
 		}
 		buttons.push_back(btn);
 		QString score = (all_unknown || ((entry.source == EntrySource::positions || entry.source == EntrySource::watkins) && entry.info == "only move")) ? ""
-		    : (entry.source == EntrySource::solver && entry.info == "~") ? "~"
+		    : (entry.source == EntrySource::solver && entry.info.startsWith('~')) ? entry.info
 		    : (entry.source == EntrySource::solver && entry.info == "sol") ? "sol" // "Replicate..." solutions
 		    : entry.getScore(entry.source == EntrySource::book || entry.source == EntrySource::solver);
 		if (entry.source == EntrySource::solver)
 		{
 			if (entry.nodes()) {
 				QString str_w = QString("W=%L1").arg(Watkins_nodes(entry));
-				entry.info = (entry.info.isEmpty() || entry.info == "~") ? str_w : QString("%1 %2").arg(str_w).arg(entry.info);
+				entry.info = (entry.info.isEmpty() || entry.info.startsWith('~')) ? str_w : QString("%1 %2").arg(str_w).arg(entry.info);
 			}
-			else if (entry.info == "~" || entry.info == "sol") {
+			else if (entry.info.startsWith('~') || entry.info == "sol") {
 				entry.info = "";
 			}
 		}
