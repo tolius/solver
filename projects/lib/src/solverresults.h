@@ -28,6 +28,7 @@ private:
 	std::tuple<bool, qint16, quint32> verify_move(bool is_our_turn);
 	void shorten_move();
 	std::shared_ptr<SolutionEntry> get_engine_data();
+	std::shared_ptr<SolutionEntry> get_alt_data();
 
 private:
 	// Verifier

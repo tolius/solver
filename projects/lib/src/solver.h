@@ -194,7 +194,7 @@ protected:
 	std::tuple<quint32, qint16, MapT, MapT> prepare_moves(pMove& move);
 	void correct_score(qint16& score, qint16 sub_score, bool is_their_turn, pMove& m);
 	void expand_positions(MapT& saved_positions, MapT& transpositions);
-	void emit_message(const QString& message, MessageType type = MessageType::std, bool force = false);
+	void emit_message(const QString& message, MessageType type = MessageType::std, bool force_no_warning = false, bool force_gui_update = false);
 	std::chrono::seconds log_update_time() const;
 	void update_gui(bool force = false);
 
@@ -261,6 +261,7 @@ private:
 	size_t num_evaluated_endgames;
 	bool is_solver_path;
 	size_t num_new_moves;
+	size_t num_warnings;
 
 protected:
 	// Settings

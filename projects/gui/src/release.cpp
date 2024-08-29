@@ -134,7 +134,7 @@ void Release::updateData()
 	ui->chk_Low_AllBranches->setChecked(state_lower_level & (int)SolutionInfoState::all_branches);
 	ui->chk_Low_Improved->setChecked(state_lower_level & (int)SolutionInfoState::improved);
 	ui->chk_Low_Verified->setChecked(state_lower_level & (int)SolutionInfoState::verified);
-	ui->chk_Low_Shortened->setChecked(state_lower_level & (int)SolutionInfoState::shortened);
+	ui->chk_Low_Shortened->setChecked((state_lower_level & (int)SolutionInfoState::shortened) && solver->solution()->fileExists(FileType_book_short));
 
 	ui->btn_Verify->setEnabled(book_type != NO_BOOK && solver && !solver->isBusy());
 	ui->btn_Shorten->setEnabled(book_type == FileType_book && solver && !solver->isBusy());

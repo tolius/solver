@@ -75,7 +75,7 @@ void SolverResults::merge_books(std::list<QString> books, const std::string& fil
 
 	/// Check duplicates
 	if (num_duplicates)
-		emit_message(QString("Merge books: Found %1 duplicate%2, including %3 null-move%4")
+		emit_message(QString("Merge books: Found %L1 duplicate%2, including %L3 null-move%4")
 		                 .arg(num_duplicates)
 		                 .arg(num_duplicates == 1 ? "" : "s")
 		                 .arg(num_null_duplicates)
@@ -153,9 +153,9 @@ void SolverResults::verify(FileType book_type)
 				if (is_ok)
 				{
 					emit Message(QString("Verified %1").arg(sol->nameToShow()), MessageType::success);
-					emit Message(QString("#Nodes: %1").arg(v_num_analysed));
-					emit Message(QString("#TBs: %1").arg(v_num_TBs));
-					emit Message(QString("#Overridden TBs: %1").arg(v_num_overridden_TBs));
+					emit Message(QString("#Nodes: %L1").arg(v_num_analysed));
+					emit Message(QString("#TBs: %L1").arg(v_num_TBs));
+					emit Message(QString("#Overridden TBs: %L1").arg(v_num_overridden_TBs));
 					if (v_min_stop_score < MATE_VALUE)
 						emit Message(QString("Maximum not solved win: #%1").arg(MATE_VALUE - v_min_stop_score));
 					if (v_min_stop_TB_score < MATE_VALUE)
@@ -348,7 +348,7 @@ std::tuple<bool, qint16, quint32> SolverResults::verify_move(bool is_our_turn)
 					board->undoMove();
 				}
 				if (num_nodes < next_num_nodes && num_nodes > 1) {
-					emit Message(QString("Incorrect num nodes: %1 < %2 %3").arg(num_nodes).arg(next_num_nodes).arg(get_move_stack(board)));
+					emit Message(QString("Incorrect num nodes: %L1 < %L2 %3").arg(num_nodes).arg(next_num_nodes).arg(get_move_stack(board)));
 					return { false, 0, 0 };
 				}
 			}
@@ -520,7 +520,25 @@ void SolverResults::shorten()
 			bool is_ok = s_book->read(path_book);
 			if (is_ok)
 			{
-				shorten_move();
+				QSettings s(sol->path(FileType_spec), QSettings::IniFormat);
+				s.beginGroup("info");
+				const static QString state_param = "state_lower_level";
+				int state_value = s.value(state_param, (int)SolutionInfoState::unknown).toInt();
+				constexpr static int state_shortened = static_cast<int>(SolutionInfoState::shortened);
+				try
+				{
+					shorten_move();
+				}
+				catch (...)
+				{
+					state_value &= ~state_shortened;
+					s.setValue(state_param, state_value);
+					s.endGroup();
+					throw;
+				}
+				state_value |= state_shortened;
+				s.setValue(state_param, state_value);
+				s.endGroup();
 				emit Message(QString("Success for %1: %L2").arg(sol->nameToShow()).arg(all_entries.size()), MessageType::success);
 				emit Message(QString("Dtw: #%1..%2  max EG: #%3").arg(s_min_dtw).arg(s_max_dtw).arg(s_max_endgame_dtw));
 				emit Message(QString("Stop due to Score/T-value:    %L1").arg(s_stop_t_score));
@@ -593,6 +611,17 @@ std::shared_ptr<SolutionEntry> SolverResults::get_engine_data()
 	return nullptr;
 }
 
+std::shared_ptr<SolutionEntry> SolverResults::get_alt_data()
+{
+	auto alt_entry = sol->bookEntry(board, FileType_alts_lower);
+	if (alt_entry)
+		return alt_entry;
+	alt_entry = sol->bookEntry(board, FileType_alts_upper);
+	if (alt_entry)
+		return alt_entry;
+	return nullptr;
+}
+
 void SolverResults::shorten_move()
 {
 	constexpr static quint32 NO_TIME = numeric_limits<uint32_t>::max();
@@ -645,7 +674,13 @@ void SolverResults::shorten_move()
 					qint32 time = engine_entry ? engine_entry->time() : NO_TIME;
 					bool is_endgame_to_copy = (num_pieces == s_endgame_depth_to_just_copy_moves);
 					if (!is_endgame_to_copy && !engine_entry)
-						throw runtime_error("No engine score");
+					{
+						auto alt_entry = get_alt_data();
+						if (!alt_entry)
+							throw runtime_error("No engine score");
+						engine_entry = alt_entry;
+						engine_entry->weight = reinterpret_cast<const quint16&>(UNKNOWN_SCORE);
+					}
 					if (is_endgame_to_copy
 						|| score < s_score_limit
 						|| (time != NO_TIME && time > s_engine_t_limit)
@@ -709,7 +744,7 @@ void SolverResults::shorten_move()
 	}
 	s_num_processed++;
 	if (s_num_processed % 1000 == 0)
-		emit_message(QString("%1: {move_stack}").arg(s_num_processed).arg(get_move_stack(board)));
+		emit_message(QString("%1: %2").arg(s_num_processed).arg(get_move_stack(board)));
 	// Add a transposition
 	s_positions_processed.insert(board->key());
 }

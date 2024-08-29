@@ -100,6 +100,7 @@ Solver::Solver(std::shared_ptr<Solution> solution)
 	num_processed = 0;
 	num_moves_from_solver = 0;
 	num_evaluated_endgames = 0;
+	num_warnings = 0;
 	is_solver_path = true;  // if false  --> see start()
 
 	//tree = None
@@ -263,6 +264,7 @@ void Solver::start(pBoard start_pos, std::function<void(QString)> message, Solve
 	num_processed = 0;
 	num_moves_from_solver = 0;
 	num_evaluated_endgames = 0;
+	num_warnings = 0;
 	is_solver_path = true;
 	num_new_moves = 0;
 	bool is_ok = sol->mergeAllFiles();
@@ -410,9 +412,10 @@ void Solver::start(pBoard start_pos, std::function<void(QString)> message, Solve
 	qint16 mate_score = MATE_VALUE - t->score() - 1;
 	int num_opening_moves = (sol->opening.size() + sol->branch.size() + num_line_plies + 1) / 2;
 	emit Message(QString("Mate score %1 = %2 + %3").arg(num_opening_moves + mate_score).arg(num_opening_moves).arg(mate_score));
-	emit Message(QString("Number of transpositions: %1").arg(trans.size()));
-	emit Message(QString("Number of solution moves: %1").arg(num_moves_from_solver));
-	emit Message(QString("Number of evaluated endgames: %1").arg(num_evaluated_endgames));
+	emit Message(QString("Number of transpositions: %L1").arg(trans.size()));
+	emit Message(QString("Number of solution moves: %L1").arg(num_moves_from_solver));
+	emit Message(QString("Number of evaluated endgames: %L1").arg(num_evaluated_endgames));
+	emit Message(QString("Number of warnings: %L1").arg(num_warnings));
 
 	bool is_created = create_book(t, num_opening_moves);
 	bool is_merged = sol->mergeAllFiles();
@@ -1172,7 +1175,8 @@ void Solver::update_max_move(int16_t score, QString move_sequence)
 	if (mate_in <= WIN_THRESHOLD) {
 		if (new_num_moves > max_num_moves)
 			onLogUpdate();
-		emit_message(QString("MAX #%1: %2%3").arg(new_num_moves).arg(move_stack).arg(move_sequence), new_num_moves > max_num_moves ? MessageType::info : MessageType::std);
+		emit_message(QString("MAX #%1: %2%3").arg(new_num_moves).arg(move_stack).arg(move_sequence), 
+			new_num_moves > max_num_moves ? MessageType::info : MessageType::std, true);
 	}
 	else {
 		emit_message(QString("..WRONG win_in=%1: %2 %3").arg(mate_in).arg(move_stack).arg(move_sequence), MessageType::warning);
@@ -1251,19 +1255,25 @@ Solver::pMove Solver::get_saved() const
 	}
 	auto alts1 = only_upper_level ? FileType_alts_upper : FileType_alts_lower;
 	auto alts2 = only_upper_level ? FileType_alts_lower : FileType_alts_upper;
-	auto entry = sol->bookEntry(board, alts1);
-	if (!entry)
-		entry = sol->bookEntry(board, alts2);
-	if (entry && entry->is_overridden())
-		return make_shared<SolverMove>(entry);
+	auto alt_entry = sol->bookEntry(board, alts1);
+	if (!alt_entry)
+		alt_entry = sol->bookEntry(board, alts2);
+
 	auto pos1 = only_upper_level ? FileType_positions_upper : FileType_positions_lower;
 	auto pos2 = only_upper_level ? FileType_positions_lower : FileType_positions_upper;
-	entry = sol->bookEntry(board, pos1);
-	if (!entry)
-		entry = sol->bookEntry(board, pos2);
-	if (!entry)
+	auto pos_entry = sol->bookEntry(board, pos1);
+	if (!pos_entry)
+		pos_entry = sol->bookEntry(board, pos2);
+	
+	if (alt_entry && alt_entry->is_overridden()) {
+		if (pos_entry && alt_entry->score() < pos_entry->score())
+			alt_entry->weight = pos_entry->weight;
+		return make_shared<SolverMove>(alt_entry);
+	}
+
+	if (!pos_entry)
 		return nullptr;
-	return make_shared<SolverMove>(entry);
+	return make_shared<SolverMove>(pos_entry);
 }
 
 Solver::pMove Solver::find_cached_move() const
@@ -1326,7 +1336,7 @@ void Solver::add_existing(const SolverMove& move, bool is_stop_move)
 			max_num_moves = new_num_moves;
 			onLogUpdate();
 			auto move_stack = get_move_stack(board, false);
-			emit_message(QString("MAX #%1: %2").arg(max_num_moves).arg(move_stack), MessageType::info);
+			emit_message(QString("MAX #%1: %2").arg(max_num_moves).arg(move_stack), MessageType::info, true);
 		}
 		return;
 	}
@@ -1340,7 +1350,7 @@ void Solver::add_existing(const SolverMove& move, bool is_stop_move)
 			if (is_stop_move) {
 				onLogUpdate();
 				auto move_stack = get_move_stack(board, false);
-				emit_message(QString("MAX #%1: %2").arg(max_num_moves).arg(move_stack), MessageType::info);
+				emit_message(QString("MAX #%1: %2").arg(max_num_moves).arg(move_stack), MessageType::info, true);
 			}
 		}
 		else if (to_print_all_max && new_num_moves == max_num_moves && is_stop_move) {
@@ -1402,7 +1412,7 @@ bool Solver::create_book(pMove tree_front, int num_opening_moves)
 	bool is_their_turn = (board->sideToMove() != our_color);
 	qint16 tree_score = UNKNOWN_SCORE;
 	correct_score(tree_score, score, is_their_turn, tree_front);
-	emit Message(QString("Number of nodes: %1").arg(num_nodes));
+	emit Message(QString("Number of nodes: %L1").arg(num_nodes));
 	qint16 mate_score = MATE_VALUE - tree_front->score();
 	bool is_mate_fake = (MATE_VALUE - FAKE_MATE_VALUE < mate_score && mate_score <= MATE_VALUE - FAKE_DRAW_SCORE);
 	if (is_mate_fake)
@@ -1449,17 +1459,22 @@ bool Solver::create_book(pMove tree_front, int num_opening_moves)
 	prepared_transpositions.clear();
 	all_entries.clear();
 
-	fi.refresh();
-	QSettings s(sol->path(FileType_spec), QSettings::IniFormat);
-	s.beginGroup("info");
-	QString state_param = only_upper_level ? "state_upper_level" : "state_lower_level";
-	bool is_full = is_renamed && skip_branches.empty() && fi.exists();
-	int state_value = is_full ? (int)SolutionInfoState::all_branches : (int)SolutionInfoState::unknown;
-	s.setValue(state_param, state_value);
-	QString timestamp_param = only_upper_level ? "timestamp_upper_level" : "timestamp_lower_level";
-	int timestamp = is_full ? static_cast<int>(fi.lastModified().toSecsSinceEpoch()) : 0;
-	s.setValue(timestamp_param, timestamp);
-	s.endGroup();
+	if (is_ok)
+	{
+		fi.refresh();
+		QSettings s(sol->path(FileType_spec), QSettings::IniFormat);
+		s.beginGroup("info");
+		QString state_param = only_upper_level ? "state_upper_level" : "state_lower_level";
+		bool is_full = is_renamed && skip_branches.empty() && fi.exists();
+		int state_value = is_full ? (int)SolutionInfoState::all_branches : (int)SolutionInfoState::unknown;
+		if (num_warnings == 0)
+			state_value |= (int)SolutionInfoState::improved;
+		s.setValue(state_param, state_value);
+		QString timestamp_param = only_upper_level ? "timestamp_upper_level" : "timestamp_lower_level";
+		int timestamp = is_full ? static_cast<int>(fi.lastModified().toSecsSinceEpoch()) : 0;
+		s.setValue(timestamp_param, timestamp);
+		s.endGroup();
+	}
 
 	sol->updateInfo();
 	sol->loadBook();
@@ -1634,7 +1649,7 @@ void Solver::onLogUpdate()
 	t_log_update = steady_clock::now();
 	if (line_to_log.empty())
 		return;
-	emit_message(line_to_log.text, MessageType::std, true);
+	emit_message(line_to_log.text, MessageType::std, true, true);
 	line_to_log.clear();
 }
 
@@ -1771,10 +1786,12 @@ std::chrono::seconds Solver::log_update_time() const
 	                                                              : 60s;
 }
 
-void Solver::emit_message(const QString& message, MessageType type, bool force)
+void Solver::emit_message(const QString& message, MessageType type, bool force_no_warning, bool force_gui_update)
 {
+	if (!force_no_warning && type != MessageType::std && type != MessageType::success)
+		num_warnings++;
 	emit Message(message, type);
-	update_gui(force);
+	update_gui(force_gui_update);
 }
 
 void Solver::update_gui(bool force)
