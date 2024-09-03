@@ -374,7 +374,9 @@ tuple<bool, int16_t, uint8_t> TB_Reader::probe_tb(Position& board)
 		return { true, 0, 0 };
 	try
 	{
-		auto [val, dtz] = is_ep ? p_tb->probe_ep(board) : p_tb->probe_one(board);
+		if (is_ep)
+			return p_tb->probe_ep(board);
+		auto [val, dtz] = p_tb->probe_one(board);
 		return { false, val, dtz };
 	}
 	catch (const exception&)
@@ -384,7 +386,7 @@ tuple<bool, int16_t, uint8_t> TB_Reader::probe_tb(Position& board)
 	}
 }
 
-val_dtz TB_Reader::probe_ep(Position& board)
+tuple<bool, int16_t, uint8_t> TB_Reader::probe_ep(Position& board)
 {
 	if (is_anti_end(board))
 		error("probe_ep: is_anti_end for " + board.fen());
@@ -433,6 +435,8 @@ val_dtz TB_Reader::probe_ep(Position& board)
 			{
 				bool is_error;
 				tie(is_error, val, dtz) = probe_tb(board);
+				if (is_error)
+					return { true, 0, 0 };
 				dtz = 1;
 			}
 			else
@@ -464,7 +468,7 @@ val_dtz TB_Reader::probe_ep(Position& board)
 		i++;
 	}
 	if (score == 0)
-		return { DRAW, 0 };
+		return { false, DRAW, 0 };
 
 	int16_t best_val = score > 0 ? DRAW : 0;
 	uint8_t best_dtz = DTZ_NO_WIN;
@@ -517,7 +521,7 @@ val_dtz TB_Reader::probe_ep(Position& board)
 	/// If it's a loss (=> we checked opponent's all moves), then we can save. Otherwise, if it's a win, we must check all previous plies
 	if ((score >= 0 || !is_all_checked) && (score <= 0))
 		error("probe_ep: wrong score for " + board.fen());
-	return { best_val, best_dtz };
+	return { false, best_val, best_dtz };
 }
 
 bool TB_Reader::probe_EGTB(Position& board, int16_t& val, uint8_t& dtz)

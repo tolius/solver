@@ -82,7 +82,7 @@ namespace egtb
 		val_dtz load_one(const char* tb_bytes, bool is_compressed, bool val_big) const;
 
 		val_dtz probe_one(Position& board);
-		val_dtz probe_ep(Position& board);
+		tuple<bool, int16_t, uint8_t> probe_ep(Position& board);
 		static tuple<bool, int16_t, uint8_t> probe_tb(Position& board);
 
 	protected:
