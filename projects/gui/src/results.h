@@ -30,6 +30,7 @@ class FlowLayout;
 class QHBoxLayout;
 class QPushButton;
 class QTimer;
+class QToolButton;
 
 namespace Ui {
 	class ResultsWidget;
@@ -56,7 +57,8 @@ signals:
 private slots:
 	void onMoveMade(const Chess::GenericMove& move = Chess::GenericMove(), const QString& sanString = "", const QString& comment = "");
 private:
-	void onDataSourceChanged(EntrySource source);
+	void onDataSourceChanged(QToolButton* btn, EntrySource source);
+	void onDataSourceUpdate(QToolButton* btn);
 
 private:
 	Ui::ResultsWidget* ui;

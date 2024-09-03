@@ -36,11 +36,19 @@ Results::Results(QWidget* parent)
 	ui->label_Info->setVisible(false);
 	ui->btn_SourceAuto->setChecked(true);
 
-	connect(ui->btn_SourceAuto,    &QToolButton::toggled, this, [this]() { onDataSourceChanged(EntrySource::none);      });
-	connect(ui->btn_SourceSolver,  &QToolButton::toggled, this, [this]() { onDataSourceChanged(EntrySource::solver);    });
-	connect(ui->btn_SourceBook,    &QToolButton::toggled, this, [this]() { onDataSourceChanged(EntrySource::book);      });
-	connect(ui->btn_SourceEval,    &QToolButton::toggled, this, [this]() { onDataSourceChanged(EntrySource::positions); });
-	connect(ui->btn_SourceWatkins, &QToolButton::toggled, this, [this]() { onDataSourceChanged(EntrySource::watkins);   });
+	using BtnSource = std::tuple<QToolButton*, EntrySource>;
+	std::list<BtnSource> btns = {
+		{ ui->btn_SourceAuto, EntrySource::none       },
+		{ ui->btn_SourceSolver, EntrySource::solver   },
+		{ ui->btn_SourceBook, EntrySource::book       },
+		{ ui->btn_SourceEval, EntrySource::positions  },
+		{ ui->btn_SourceWatkins, EntrySource::watkins },
+	};
+	for (auto& [btn, source] : btns)
+	{
+		connect(btn, &QToolButton::toggled, this, [=]() { onDataSourceChanged(btn, source); });
+		connect(btn, &QToolButton::clicked, this, [=]() { onDataSourceUpdate(btn); });
+	}
 }
 
 void Results::setSolution(std::shared_ptr<Solution> solution)
@@ -81,19 +89,19 @@ void Results::onMoveMade(const Chess::GenericMove& move, const QString& sanStrin
 	}
 }
 
-void Results::onDataSourceChanged(EntrySource source)
+void Results::onDataSourceChanged(QToolButton* btn, EntrySource source)
 {
-	auto btn = source == EntrySource::solver    ? ui->btn_SourceSolver
-	         : source == EntrySource::book      ? ui->btn_SourceBook
-	         : source == EntrySource::positions ? ui->btn_SourceEval
-	         : source == EntrySource::watkins   ? ui->btn_SourceWatkins
-	                                            : ui->btn_SourceAuto;
-	if (btn->isChecked())
-		return;
 	data_source = source;
 	btn->blockSignals(true);
 	btn->setChecked(true);
 	btn->blockSignals(false);
+	positionChanged();
+}
+
+void Results::onDataSourceUpdate(QToolButton* btn)
+{
+	if (!btn->isChecked())
+		return; // should be captured by toggled()
 	positionChanged();
 }
 

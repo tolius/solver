@@ -535,10 +535,11 @@ void Evaluation::onEngineReady()
 			int num = str_num.toInt(&ok);
 			if (ok) {
 				engine_version = 
-				      (240701 <= num && num <= 240831) ? 4
-				    : (240226 <= num && num <= 240630) ? 3
-				    : (num == 230811)                  ? 2
-				    : (num == 230803)                  ? 1
+				      (240903 <= num && num <= 240910) ? 5 // fix static eval overflow
+				    : (240701 <= num && num <= 240831) ? 4 // fix en passant in endgames
+				    : (240226 <= num && num <= 240630) ? 3 // use F-SF depths, use new EGTB
+				    : (num == 230811)                  ? 2 // increase depth when fast mate and lots of pieces
+				    : (num == 230803)                  ? 1 // add go ... mate xx
 				    : (230409 <= num && num <= 230415) ? 1
 				    : (230301 <= num && num <= 230401) ? 0
 				                                       : UNKNOWN_ENGINE_VERSION;
