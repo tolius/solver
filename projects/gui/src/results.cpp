@@ -27,6 +27,7 @@ Results::Results(QWidget* parent)
 	, data_source(EntrySource::none)
 	, game(nullptr)
 	, def_button(nullptr)
+	, curr_key(0)
 {
 	ui->setupUi(this);
 
@@ -73,6 +74,7 @@ void Results::setGame(ChessGame* game)
 		connect(game, SIGNAL(moveMade(Chess::GenericMove, QString, QString)), this, SLOT(onMoveMade(Chess::GenericMove, QString, QString)));
 		connect(game, SIGNAL(positionSet()), this, SLOT(onMoveMade()));
 	}
+	connect(ui->btn_Update, SIGNAL(clicked()), this, SLOT(positionChanged()));
 }
 
 void Results::onMoveMade(const Chess::GenericMove& move, const QString& sanString, const QString& comment)
@@ -120,23 +122,37 @@ QString Results::positionChanged()
 	auto board = game->board();
 	if (!board)
 		return best_score;
+	curr_key = board->key();
+	bool our_turn = board->sideToMove() == solution->winSide();
 	// Find entries in the book
 	std::list<MoveEntry> solution_entries;
 	if ((data_source == EntrySource::none || data_source == EntrySource::solver) && solver)
 		solution_entries = solver->entries(board);
 	if (data_source == EntrySource::none && !solution_entries.empty())
 	{
-		std::list<MoveEntry> book_entries = (board->sideToMove() == solution->winSide()) ? solution->entries(board) : solution->nextEntries(board);
-		if (!book_entries.empty())
+		std::list<MoveEntry> book_entries = our_turn ? solution->entries(board) : solution->nextEntries(board);
+		std::list<MoveEntry> pos_entries = our_turn ? solution->positionEntries(board) : solution->nextPositionEntries(board);
+		if (!book_entries.empty() || !pos_entries.empty())
 		{
 			for (auto& entry : solution_entries)
 			{
 				if (entry.info != "~")
 					continue;
+				bool is_in_book = false;
 				for (auto it_book_entry = book_entries.begin(); it_book_entry != book_entries.end(); ++it_book_entry) {
 					if (it_book_entry->pgMove == entry.pgMove) {
 						entry.info = QString("~%1 %2").arg(it_book_entry->getScore(true)).arg(it_book_entry->getNodes());
 						book_entries.erase(it_book_entry);
+						is_in_book = true;
+						break;
+					}
+				}
+				if (is_in_book)
+					continue;
+				for (auto it_pos_entry = pos_entries.begin(); it_pos_entry != pos_entries.end(); ++it_pos_entry) {
+					if (it_pos_entry->pgMove == entry.pgMove) {
+						entry.info = QString("~ %1 eval").arg(it_pos_entry->getScore(false));
+						pos_entries.erase(it_pos_entry);
 						break;
 					}
 				}
@@ -145,7 +161,7 @@ QString Results::positionChanged()
 	}
 	else if (solution_entries.empty() && data_source != EntrySource::solver)
 	{
-		if (board->sideToMove() == solution->winSide())
+		if (our_turn)
 		{
 			if (data_source == EntrySource::none || data_source == EntrySource::book)
 				solution_entries = solution->entries(board);
@@ -217,22 +233,31 @@ QString Results::positionChanged()
 		//btn->setSizePolicy(QSizePolicy(QSizePolicy::Minimum, QSizePolicy::Minimum));
 		//btn->setMaximumWidth(50);
 		if (btn && entry.score() != UNKNOWN_SCORE && entry.source == EntrySource::book) {
-			quint32 nodes_threshold = (board->sideToMove() == solution->winSide()) ? 1 : 0;
+			quint32 nodes_threshold = our_turn ? 1 : 0;
 			if (entry.nodes() <= nodes_threshold)
 				btn->setEnabled(false);
 		}
 		buttons.push_back(btn);
 		QString score = (all_unknown || ((entry.source == EntrySource::positions || entry.source == EntrySource::watkins) && entry.info == "only move")) ? ""
+		    : (entry.source == EntrySource::solver && entry.info.startsWith("~->")) ? QString("%1 %2").arg(entry.info).arg(entry.getScore(true))
 		    : (entry.source == EntrySource::solver && entry.info.startsWith('~')) ? entry.info
 		    : (entry.source == EntrySource::solver && entry.info == "sol") ? "sol" // "Replicate..." solutions
 		    : entry.getScore(entry.source == EntrySource::book || entry.source == EntrySource::solver);
+		bool is_to_be_solved = entry.source == EntrySource::solver && (entry.info.startsWith('~') || entry.info == "sol");
+		bool is_trasposition = is_to_be_solved && entry.info.startsWith("~->");
 		if (entry.source == EntrySource::solver)
 		{
+			if (!score.isEmpty() && entry.info.startsWith("S=")) {
+				score = QString("%1 %2").arg(score).arg(entry.info);
+				entry.info = "";
+			}
+			else if (entry.info.startsWith('~'))
+				entry.info = "";
 			if (entry.nodes()) {
 				QString str_w = QString("W=%L1").arg(Watkins_nodes(entry));
-				entry.info = (entry.info.isEmpty() || entry.info.startsWith('~')) ? str_w : QString("%1 %2").arg(str_w).arg(entry.info);
+				entry.info = entry.info.isEmpty() ? str_w : QString("%1 %2").arg(str_w).arg(entry.info);
 			}
-			else if (entry.info.startsWith('~') || entry.info == "sol") {
+			else if (entry.info == "sol") {
 				entry.info = "";
 			}
 		}
@@ -260,6 +285,18 @@ QString Results::positionChanged()
 			QColor bkg = ui->widget_Solution->palette().color(QWidget::backgroundRole());
 			bkg.setRed(bkg.red() + 20);
 			bkg.setGreen(bkg.green() + 15);
+			btn->setStyleSheet(QString("background-color: rgba(%1, %2, %3, %4);").arg(bkg.red()).arg(bkg.green()).arg(bkg.blue()).arg(bkg.alpha()));
+		}
+		else if (is_to_be_solved) {
+			QColor bkg = ui->widget_Solution->palette().color(QWidget::backgroundRole());
+			if (is_trasposition) {
+				bkg.setBlue(bkg.blue() + 10);
+				bkg.setRed(bkg.red() + 15);
+			}
+			else {
+				bkg.setBlue(bkg.blue() + 20);
+				bkg.setGreen(bkg.green() + 15);
+			}
 			btn->setStyleSheet(QString("background-color: rgba(%1, %2, %3, %4);").arg(bkg.red()).arg(bkg.green()).arg(bkg.blue()).arg(bkg.alpha()));
 		}
 		auto label_nodes = new QLabel(entry.info, ui->widget_Solution);
@@ -324,6 +361,15 @@ QString Results::positionChanged()
 
 	// Return best score
 	return best_score;
+}
+
+void Results::dataUpdated(quint64 key)
+{
+	if (curr_key != key)
+		return;
+	if (!game || !solution || !game->board())
+		return;
+	positionChanged();
 }
 
 void Results::nextMoveClicked()

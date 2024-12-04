@@ -49,6 +49,7 @@ public:
 
 public slots:
 	QString positionChanged();
+	void dataUpdated(quint64);
 	void nextMoveClicked();
 
 signals:
@@ -69,6 +70,7 @@ private:
 	EntrySource data_source;
 	ChessGame* game;
 	QPushButton* def_button;
+	quint64 curr_key;
 };
 
 #endif // RESULTS_H

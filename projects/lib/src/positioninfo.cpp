@@ -148,6 +148,7 @@ void SolverMove::clearData()
 	weight = reinterpret_cast<const quint16&>(UNKNOWN_SCORE);
 	learn = 0;
 	moves.clear();
+	size = 0;
 }
 
 qint16 SolverMove::score() const
@@ -580,16 +581,20 @@ bool is_branch(std::shared_ptr<Chess::Board> main_pos, std::shared_ptr<Chess::Bo
 
 bool is_branch(Chess::Board* main_pos, Chess::Board* branch)
 {
-	auto& board_history = main_pos->MoveHistory();
-	auto& new_pos_history = branch->MoveHistory();
-	if (new_pos_history.size() < board_history.size())
+	auto& main_history = main_pos->MoveHistory();
+	auto& branch_history = branch->MoveHistory();
+	auto branch_history_size = branch_history.size();
+	auto main_history_size = main_history.size();
+	if (branch_history_size < main_history_size)
 		return false;
-	for (int i = 0; i < board_history.size(); i++)
+	for (int i = 0; i < main_history_size; i++)
 	{
-		if (board_history[i].key != new_pos_history[i].key)
+		if (main_history[i].key != branch_history[i].key)
 			return false;
 	}
-	return true;
+	if (branch_history_size > main_history_size)
+		return branch_history[main_history_size].key == main_pos->key();
+	return branch->key() == main_pos->key();
 }
 
 bool is_branch(Chess::Board* pos, const Line& opening, const Line& branch)

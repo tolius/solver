@@ -1193,12 +1193,14 @@ void MainWindow::openSolution(QModelIndex index, SolutionItem* item)
 		QSettings().setValue("solutions/last_solution", m_solution->nameToShow(true));
 		if (m_solver) {
 			disconnect(m_solver.get(), nullptr, this,           nullptr);
+			disconnect(m_solver.get(), nullptr, m_results,      nullptr);
 			disconnect(m_settingsDlg,  nullptr, m_solver.get(), nullptr);
 		}
 		m_solver = std::make_shared<SolverResults>(m_solution);
 		connect(m_solver.get(), SIGNAL(Message(const QString&, MessageType)), this, SLOT(logMessage(const QString&, MessageType)));
 		connect(m_solver.get(), SIGNAL(clearLog()), this, SLOT(clearLog()));
 		connect(m_solver.get(), SIGNAL(updateCurrentSolution()), this, SLOT(updateCurrentSolution()));
+		connect(m_solver.get(), SIGNAL(newDataEvaluated(quint64)), m_results, SLOT(dataUpdated(quint64)));
 		connect(m_settingsDlg, SIGNAL(logUpdateFrequencyChanged(UpdateFrequency)), m_solver.get(), SLOT(onLogUpdateFrequencyChanged(UpdateFrequency)));
 		connect(m_settingsDlg, SIGNAL(solverMoveOrderChanged(SolverMoveOrder)), m_solver.get(), SLOT(onSolverMoveOrderChanged(SolverMoveOrder)));
 	}

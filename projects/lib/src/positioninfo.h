@@ -168,6 +168,7 @@ struct SolverMove : public SolutionEntry
 	static std::shared_ptr<SolverMove> fromBytes(quint64 bytes);
 
 	std::vector<std::shared_ptr<SolverMove>> moves;
+	quint32 size = 0;
 };
 
 

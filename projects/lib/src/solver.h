@@ -160,6 +160,7 @@ signals:
 	void evaluatePosition();
 	void updateCurrentSolution();
 	void solvingStatusChanged();
+	void newDataEvaluated(quint64 key);
 
 public slots:
 	void onLogUpdate();
@@ -221,6 +222,7 @@ protected:
 	std::chrono::steady_clock::time_point t_log_update;
 	std::chrono::steady_clock::time_point t_gui_update;
 	LineToLog line_to_log;
+	quint64 last_engine_key;
 
 private:
 	bool to_copy_solution;

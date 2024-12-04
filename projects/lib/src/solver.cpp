@@ -102,6 +102,7 @@ Solver::Solver(std::shared_ptr<Solution> solution)
 	num_evaluated_endgames = 0;
 	num_warnings = 0;
 	is_solver_path = true;  // if false  --> see start()
+	last_engine_key = 0;
 
 	//tree = None
 	num_new_moves = 0;
@@ -469,6 +470,17 @@ bool Solver::save(pBoard pos, Chess::Move move, std::shared_ptr<SolutionEntry> d
 
 	auto type = is_multi_pos ? (only_upper_level ? FileType_multi_upper : FileType_multi_lower)
 	                         : (only_upper_level ? FileType_positions_upper : FileType_positions_lower);
+	if (!is_multi_pos) {
+		auto old_entry = sol->bookEntry(pos, type);
+		if (old_entry && old_entry->version() != 0) {
+			quint32 t = max(old_entry->time(), data->time());
+			data->learn = (data->learn & 0x0000FFFF) | (t << 16);
+			if (old_entry->depth() <= REAL_DEPTH_LIMIT && old_entry->pgMove == data->pgMove) {
+				quint32 d = max(old_entry->depth(), data->depth());
+				data->learn = (data->learn & 0xFFFFFF00) | d;
+			}
+		}
+	}
 	sol->addToBook(pos, *data, type);
 	return false;
 }
@@ -528,6 +540,16 @@ void Solver::process_move(std::vector<pMove>& tree, SolverState& info)
 	if (!move)
 		throw runtime_error("Error: null move while processing.");
 
+	quint64 prev_key = last_engine_key;
+	auto signal_new_data = [this, &prev_key](quint64 board_key) -> quint64 {
+		if (prev_key != last_engine_key) {
+			prev_key = last_engine_key;
+			emit newDataEvaluated(board_key);
+			return board_key;
+		}
+		return 0;
+	};
+
 	bool is_their_turn = (board->sideToMove() != our_color);
 	if (is_their_turn)
 	{
@@ -578,19 +600,31 @@ void Solver::process_move(std::vector<pMove>& tree, SolverState& info)
 					move->moves[i] = make_shared<SolverMove>(legal_moves[i], board, move->score(), move->depth_time());
 			}
 		}
+		move->size = 0;
+		quint64 signal_key = 0;
 		for (auto& m : move->moves) {
 			if (!m->is_solved()) {
 				tree.push_back(m);
 				board->makeMove(m->move(board));
+				if (signal_key) {
+					emit newDataEvaluated(signal_key);
+					signal_key = 0;
+				}
 				process_move(tree, info);
 				board->undoMove();
 				tree.pop_back();
 				m->set_solved();
+				signal_key = signal_new_data(board->key());
 			}
+			move->size += m->size;
 			if (m->score() < worst_score)
 				worst_score = m->score();
 			if (info.is_alt() && info.alt_steps < 0)
 				break;
+		}
+		if (signal_key) {
+			emit newDataEvaluated(signal_key);
+			signal_key = 0;
 		}
 		//assert(move->score() <= worst_score);
 		if (move->score() != UNKNOWN_SCORE && move->score() > ABOVE_EG && move->score() > worst_score 
@@ -620,10 +654,17 @@ void Solver::process_move(std::vector<pMove>& tree, SolverState& info)
 			}
 			bool prev_is_solver_path = is_solver_path;
 			assert(move->moves.size() <= 1);
-			if (move->moves.empty())
+			bool is_signal = false;
+			if (move->moves.empty()) {
 				analyse_position(*move, info);
+				is_signal = signal_new_data(board->key());
+				emit newDataEvaluated(board->key());
+				if (!board->MoveHistory().empty())
+					emit newDataEvaluated(board->MoveHistory().back().key);
+			}
 			if (move->moves.size() > 1)
 				emit_message(QString("...TOO MANY MOVES: %1 in %2").arg(move->moves.size()).arg(get_move_stack(board, false, 400)), MessageType::warning);
+			move->size = 1;
 			for (auto& m : move->moves) {
 				if (!is_stop_move(*m, info) && (!info.is_alt() || (info.alt_steps < max_alt_steps 
 						&& (move->score() == UNKNOWN_SCORE || move->score() - info.alt_steps < info.score_to_skip)))) {
@@ -635,7 +676,10 @@ void Solver::process_move(std::vector<pMove>& tree, SolverState& info)
 					if (!info.is_alt())
 						update_existing(m);
 				}
+				move->size += m->size;
 				m->set_solved();
+				if (is_signal)
+					emit newDataEvaluated(board->key());
 				//assert (move->score() <= ABOVE_EG || move->score() <= m->score() - 1);
 				if (move->score() != UNKNOWN_SCORE 
 						&& move->score() > ABOVE_EG 
@@ -1122,21 +1166,29 @@ Solver::pMove Solver::get_engine_move(SolverMove& move, SolverState& info, bool 
 	if (eval_result.empty())
 		throw stopProcessing();
 	best_move = make_shared<SolverMove>(eval_result.data);
+	last_engine_key = board->key();
 
 	/// Update cache.
 	bool is_score_better = !old_best_move || (best_move->score() > ABOVE_EG && best_move->score() > old_best_move->score());
-	if (old_best_move 
-		&& old_best_move_depth != ESOLUTION_VALUE 
-		&& old_best_move_depth > depth 
-		&& !is_score_better
-	    && old_best_move->time() <= max_search_time 
-		&& best_move->time() > max_search_time)
+	if (old_best_move)
 	{
-		best_move->pgMove = old_best_move->pgMove;
-		best_move->set_score(old_best_move->score());
-		quint32 time = best_move->time();
-		best_move->set_depth_time(old_best_move->depth_time());
-		best_move->set_time(time);
+		if (!is_score_better
+			&& old_best_move_depth != ESOLUTION_VALUE
+		//	&& old_best_move_depth > depth
+		//	&& old_best_move->time() <= max_search_time
+		//	&& best_move->time() > max_search_time)
+			&& !old_best_move->is_old_version())
+		{
+			best_move->pgMove = old_best_move->pgMove;
+			best_move->set_score(old_best_move->score());
+			quint32 time = best_move->time();
+			best_move->set_depth_time(old_best_move->depth_time());
+			best_move->set_time(max(time, old_best_move->time()));
+		}
+		else
+		{
+			best_move->set_time(max(best_move->time(), old_best_move->time()));
+		}
 	}
 	if (!old_best_move 
 		|| depth >= old_best_move_depth 
@@ -1200,7 +1252,7 @@ bool Solver::is_stop_move(const SolverMove& best_move, const SolverState& info) 
 		return false;
 	if (best_move_depth <= get_max_depth(best_move.score(), board->numPieces()))
 		return false;
-	return (best_move_depth < REAL_DEPTH_LIMIT);
+	return (best_move_depth <= REAL_DEPTH_LIMIT);
 }
 
 Solver::pMove Solver::get_existing(pBoard board) const
@@ -1700,7 +1752,7 @@ std::list<MoveEntry> Solver::entries(Chess::Board* pos) const
 		auto legal_moves_vector = temp_board->legalMoves();
 		legal_moves = make_shared<set<Chess::Move>>(legal_moves_vector.begin(), legal_moves_vector.end());
 	}
-	bool skip_transp = (board->MoveHistory().size() <= sol->opening.size()) || is_branch(temp_board, board);
+	bool skip_transp = (history.size() <= sol->opening.size()); // || is_branch(temp_board, board));
 
 	auto esol_entries = sol->eSolutionEntries(temp_board);
 	map<quint32, SolutionEntry> esol;
@@ -1721,6 +1773,8 @@ std::list<MoveEntry> Solver::entries(Chess::Board* pos) const
 		if (m->is_solved()) {
 			if (to_copy_solution && m->weight == ESOLUTION_VALUE)
 				entries.back().info = "sol";
+			else if (m->size)
+				entries.back().info = QString("S=%L1").arg(m->size);
 			continue;
 		}
 		entries.back().info = "~"; // if not overridden
@@ -1760,7 +1814,7 @@ std::list<MoveEntry> Solver::entries(Chess::Board* pos) const
 		if (score_i != UNKNOWN_SCORE) {
 			qint16 score_i_1 = (score_i >= MATE_THRESHOLD) ? (score_i - 1) : score_i;
 			entries.back().weight = reinterpret_cast<const quint16&>(score_i_1);
-			entries.back().info = QString("Tr=%1").arg(san_i);
+			entries.back().info = QString("~->%1").arg(san_i);
 		}
 	}
 	if (legal_moves) {
@@ -1768,7 +1822,7 @@ std::list<MoveEntry> Solver::entries(Chess::Board* pos) const
 		for (auto& m : *legal_moves) {
 			auto pgMove = OpeningBook::moveToBits(temp_board->genericMove(m));
 			QString san = temp_board->moveString(m, Board::StandardAlgebraic);
-			auto it_esol = esol.find(OpeningBook::moveToBits(board->genericMove(m)));
+			auto it_esol = esol.find(pgMove);
 			quint32 nodes = (it_esol == esol.end()) ? 0 : it_esol->second.nodes();
 			entries.emplace(it_start, EntrySource::none, san, pgMove, reinterpret_cast<const quint16&>(UNKNOWN_SCORE), nodes);
 			if (it_esol != esol.end())
