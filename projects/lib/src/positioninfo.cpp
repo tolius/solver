@@ -260,6 +260,21 @@ QString get_san_sequence(int ply, const QStringList& moves)
 	return san_moves.join(' ');
 }
 
+QString highlight_difference(const QString& ref_pgn_line, const QString& pgn_line)
+{
+	int i = 0;
+	for (; i < std::min(pgn_line.length(), ref_pgn_line.length()); i++) {
+		if (pgn_line[i] != ref_pgn_line[i])
+			break;
+	}
+	if (i == pgn_line.length())
+		return pgn_line;
+	int pos = pgn_line.lastIndexOf(' ', i - pgn_line.length());
+	if (pos < 0)
+		pos = 0;
+	return QString("%1<b>%2</b>").arg(pgn_line.leftRef(pos), pgn_line.midRef(pos));
+}
+
 QString line_to_string(const Line& line, std::shared_ptr<Chess::Board> start_pos, QChar separator, bool add_move_numbers)
 {
 	QStringList san_moves;

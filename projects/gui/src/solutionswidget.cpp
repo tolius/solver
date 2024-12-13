@@ -193,6 +193,8 @@ bool SolutionsWidget::editSolution(SolutionItem* item)
 
 void SolutionsWidget::on_editSolution()
 {
+	if (!ui->btn_Edit->isEnabled())
+		return;
 	for (auto& idx : ui->treeView->selectionModel()->selectedIndexes())
 	{
 		if (!idx.isValid() || idx.column() != 0)
@@ -221,7 +223,8 @@ void SolutionsWidget::on_itemSelected(QModelIndex index)
 	if (!item)
 		return;
 	if (item->highlight()) {
-		editSolution(item);
+		if (ui->btn_Edit->isEnabled())
+			editSolution(item);
 		return;
 	}
 	emit solutionSelected(index);

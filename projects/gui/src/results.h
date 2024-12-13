@@ -71,6 +71,7 @@ private:
 	ChessGame* game;
 	QPushButton* def_button;
 	quint64 curr_key;
+	bool is_current;
 };
 
 #endif // RESULTS_H

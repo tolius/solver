@@ -130,11 +130,13 @@ Evaluation::Evaluation(GameViewer* game_viewer, QWidget* parent)
 	, is_position_update(false)
 	, is_restart(false)
 	, to_keep_solving(false)
+	, curr_game_key(0)
 {
 	ui->setupUi(this);
 
 	board_.reset(Chess::BoardFactory::create("antichess"));
 	board_->setFenString(board_->defaultFenString());
+	ui->label_CurrentLine->setVisible(QSettings().value("ui/show_current_line", false).toBool());
 
 	session.reset();
 	timer_engine.setInterval(1s);
@@ -242,6 +244,16 @@ Evaluation::Evaluation(GameViewer* game_viewer, QWidget* parent)
 	setEngine();
 }
 
+void Evaluation::updatePGNline()
+{
+	if (ui->label_CurrentLine->isVisible()) {
+		curr_game_key = game->board()->key();
+		auto& ref_line = game_viewer->currentPGNline();
+		QString line = highlight_difference(ref_line, curr_pgn_line);
+		ui->label_CurrentLine->setText(line);
+	}
+}
+
 void Evaluation::updateBoard(Chess::Board* board)
 {
 	if (!board)
@@ -254,6 +266,12 @@ void Evaluation::updateBoard(Chess::Board* board)
 	//ui->btn_Save->setText("Save move");
 	ui->btn_Override->setChecked(false);
 	board_.reset(board->copy());
+	if (ui->label_CurrentLine->isVisible())
+	{
+		curr_pgn_line = get_move_stack(board_, false, 499);
+		updatePGNline();
+		emit currentLineChanged(curr_pgn_line);
+	}
 	updateSync();
 }
 
@@ -535,7 +553,7 @@ void Evaluation::onEngineReady()
 			int num = str_num.toInt(&ok);
 			if (ok) {
 				engine_version = 
-				      (240903 <= num && num <= 240910) ? 5 // fix static eval overflow
+				      (240903 <= num && num <= 240910) ? LATEST_ENGINE_VERSION // 5 // fix static eval overflow
 				    : (240701 <= num && num <= 240831) ? 4 // fix en passant in endgames
 				    : (240226 <= num && num <= 240630) ? 3 // use F-SF depths, use new EGTB
 				    : (num == 230811)                  ? 2 // increase depth when fast mate and lots of pieces
@@ -1460,4 +1478,29 @@ void Evaluation::fontSizeChanged(int size)
 void Evaluation::boardUpdateFrequencyChanged(UpdateFrequency frequency)
 {
 	frequency_sync = frequency;
+}
+
+void Evaluation::showCurrentLine(bool show_curr_line)
+{
+	ui->label_CurrentLine->setVisible(show_curr_line);
+	if (!show_curr_line) {
+		curr_pgn_line = "";
+		ui->label_CurrentLine->setText("");
+	}
+	else if (board_) {
+		curr_pgn_line = get_move_stack(board_, false, 499);
+		ui->label_CurrentLine->setText(curr_pgn_line);
+	}
+	emit currentLineChanged(curr_pgn_line);
+}
+
+const QString& Evaluation::currentPGNline() const
+{
+	return curr_pgn_line;
+}
+
+void Evaluation::gameLineChanged()
+{
+	if (game && game->board() && curr_game_key != game->board()->key())
+		updatePGNline();
 }

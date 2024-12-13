@@ -34,7 +34,6 @@
 #include <QToolButton>
 #include <QSlider>
 #include <QLabel>
-#include <QLineEdit>
 #include <QMessageBox>
 #include <QSettings>
 
@@ -105,22 +104,19 @@ GameViewer::GameViewer(Qt::Orientation orientation,
 	layout->setContentsMargins(0, 0, 0, 0);
 
 	QHBoxLayout* clockLayout = new QHBoxLayout();
-	//auto labelTitle = new QLabel();
-	//labelTitle->setText("<h3>Title here</h3>");
-	//labelTitle->setTextFormat(Qt::RichText);
-	//labelTitle->setAlignment(Qt::AlignHCenter);
 	m_titleWidget = new TitleWidget(this);
 	clockLayout->addWidget(m_titleWidget);
 
 	clockLayout->insertSpacing(1, 20);
 	layout->addLayout(clockLayout);
-
+	
+	layout->addSpacerItem(new QSpacerItem(20, 20, QSizePolicy::Minimum, QSizePolicy::Expanding));
 	layout->addWidget(m_boardView);
+	layout->addSpacerItem(new QSpacerItem(20, 20, QSizePolicy::Minimum, QSizePolicy::Expanding));
 
-	m_currLine = new QLineEdit(this);
-	m_currLine->setReadOnly(true);
-	m_currLine->setEnabled(false);
-	m_currLine->setStyleSheet("background-color: transparent; border: none;");
+	m_currLine = new QLabel(this);
+	m_currLine->setWordWrap(true);
+	m_currLine->setVisible(QSettings().value("ui/show_current_line", false).toBool());
 	layout->addWidget(m_currLine);
 
 	if (orientation == Qt::Horizontal)
@@ -147,8 +143,12 @@ TitleWidget* GameViewer::titleBar() const
 
 void GameViewer::updateCurrentLine()
 {
-	QString curr_line = get_move_stack(m_game->board(), false, 499);
-	m_currLine->setText(curr_line);
+	if (m_currLine->isVisible()) {
+		m_curr_pgn_line = get_move_stack(m_game->board(), false, 499);
+		QString line = highlight_difference(m_eval_pgn_line, m_curr_pgn_line);
+		m_currLine->setText(line);
+		emit currentLineUpdated();
+	}
 }
 
 void GameViewer::autoFlip()
@@ -176,7 +176,7 @@ void GameViewer::setGame(ChessGame* game)
 	}
 
 	connect(m_game, SIGNAL(finished(ChessGame*, Chess::Result)), m_boardScene, SLOT(onGameFinished(ChessGame*, Chess::Result)));
-	connect(m_game, SIGNAL(finished_for_animation(ChessGame*, Chess::Result)), m_boardScene, SLOT(onGameFinished(ChessGame*, Chess::Result))); //!! workaround
+	connect(m_game, SIGNAL(finished_for_animation(ChessGame*, Chess::Result)), this, SLOT(finished_for_animation(ChessGame*, Chess::Result)));
 	m_boardView->setEnabled(/*!m_game->isFinished() &&*/ m_game->playerToMove()->isHuman());
 	m_humanGame = !m_game.isNull() && m_game->playerToMove()->isHuman() && m_game->playerToWait()->isHuman();
 
@@ -250,9 +250,36 @@ BoardScene* GameViewer::boardScene() const
 	return m_boardScene;
 }
 
+void GameViewer::finished_for_animation(ChessGame* game, Chess::Result result)
+{
+	m_boardScene->onGameFinished(game, result); //!! workaround
+	updateCurrentLine();
+}
+
 void GameViewer::showBoard(bool show_board)
 {
 	m_boardView->setVisible(show_board);
+}
+
+void GameViewer::showCurrentLine(bool show_curr_line)
+{
+	m_currLine->setVisible(show_curr_line);
+	if (show_curr_line && m_game && m_game->board()) {
+		m_curr_pgn_line = get_move_stack(m_game->board(), false, 499);
+		QString line = highlight_difference(m_eval_pgn_line, m_curr_pgn_line);
+		m_currLine->setText(line);
+	}
+	else {
+		m_curr_pgn_line = "";
+		m_currLine->setText("");
+	}
+}
+
+void GameViewer::updatePGNline(const QString& ref_line)
+{
+	m_eval_pgn_line = ref_line;
+	QString line = highlight_difference(m_eval_pgn_line, m_curr_pgn_line);
+	m_currLine->setText(line);
 }
 
 void GameViewer::undoMoves(int num)
@@ -430,6 +457,7 @@ void GameViewer::onFenChanged(const QString& fen)
 	m_moveNumberSlider->setMaximum(0);
 
 	m_boardScene->setFenString(fen);
+	updateCurrentLine();
 }
 
 void GameViewer::onMoveMade(const Chess::GenericMove& move)
@@ -471,4 +499,9 @@ void GameViewer::onPositionSet()
 std::mutex& GameViewer::mutex()
 {
 	return m_update_mutex;
+}
+
+const QString& GameViewer::currentPGNline() const
+{
+	return m_curr_pgn_line;
 }

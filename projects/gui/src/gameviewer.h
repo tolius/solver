@@ -31,7 +31,7 @@
 
 class QToolButton;
 class QSlider;
-class QLineEdit;
+class QLabel;
 class ChessGame;
 class PgnGame;
 class BoardScene;
@@ -40,6 +40,7 @@ class TitleWidget;
 namespace Chess
 {
 	class Board;
+	class Result;
 }
 
 class GameViewer : public QWidget
@@ -57,19 +58,24 @@ class GameViewer : public QWidget
 		BoardScene* boardScene() const;
 		TitleWidget* titleBar() const;
 		std::mutex& mutex();
+		const QString& currentPGNline() const;
 
 	public slots:
 		void viewMove(int index, bool keyLeft = false);
 		void showBoard(bool show_board);
+		void showCurrentLine(bool show_curr_line);
+		void updatePGNline(const QString&);
 
 	signals:
 		void moveSelected(int moveNumber);
 		void gotoCurrentMoveClicked();
 		void gotoNextMoveClicked();
+		void currentLineUpdated();
 
 	public slots: //!! workaround
 		void gotoFirstMove();
 		void gotoPreviousMove(int num);
+		void finished_for_animation(ChessGame*, Chess::Result);
 	private slots:
 		void viewFirstMoveClicked();
 		void viewPreviousMoveClicked();
@@ -96,7 +102,7 @@ class GameViewer : public QWidget
 		BoardView* m_boardView;
 		QSlider* m_moveNumberSlider;
 		TitleWidget* m_titleWidget;
-		QLineEdit* m_currLine;
+		QLabel* m_currLine;
 
 		QToolButton* m_viewFirstMoveBtn;
 		QToolButton* m_viewPreviousMoveBtn;
@@ -108,6 +114,8 @@ class GameViewer : public QWidget
 		int m_moveIndex;
 		bool m_humanGame;
 		std::mutex m_update_mutex;
+		QString m_curr_pgn_line;
+		QString m_eval_pgn_line;
 };
 
 #endif // GAMEVIEWER_H

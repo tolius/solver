@@ -28,6 +28,8 @@ constexpr static qint16 ESOLUTION_VALUE = 0xDD;
 constexpr static quint32 OVERRIDE_MASK = 0xFF00;
 constexpr static quint32 REAL_DEPTH_LIMIT = 200;
 
+constexpr static uint8_t LATEST_ENGINE_VERSION = 5;
+
 constexpr static QChar SEP_MOVES = '_';
 
 namespace Chess
@@ -178,6 +180,7 @@ using EntryRow = std::array<char, 16>;
 QString get_move_stack(std::shared_ptr<Chess::Board> game_board, bool add_fen = false, int move_limit = 999);
 QString get_move_stack(Chess::Board* game_board, bool add_fen = false, int move_limit = 999);
 QString get_san_sequence(int ply, const QStringList& moves);
+QString highlight_difference(const QString& ref_pgn_line, const QString& pgn_line);
 
 QString line_to_string(const Line& line, std::shared_ptr<Chess::Board> start_pos = nullptr, QChar separator = SEP_MOVES, bool add_move_numbers = false);
 std::tuple<QString, std::shared_ptr<Chess::Board>> compose_string(const Line& line, QChar separator = SEP_MOVES, bool add_move_numbers = false);

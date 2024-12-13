@@ -132,6 +132,7 @@ MainWindow::MainWindow(ChessGame* game, SettingsDialog* settingsDlg)
 	connect(m_evaluation, SIGNAL(tintChanged(QColor, bool)), this, SLOT(setTint(QColor, bool)));
 	connect(m_evaluation, SIGNAL(reportGoodMoves(const std::set<QString>&)), m_moveList, SLOT(goodMovesReported(const std::set<QString>&)));
 	connect(m_evaluation, SIGNAL(reportBadMove(const QString&)), m_moveList, SLOT(badMoveReported(const QString&)));
+	connect(m_evaluation, SIGNAL(currentLineChanged(const QString&)), m_gameViewer, SLOT(updatePGNline(const QString&)));
 	connect(m_results, &Results::addComment, this, 
 		[&](int ply, const QString& score)
 		{ 
@@ -144,12 +145,15 @@ MainWindow::MainWindow(ChessGame* game, SettingsDialog* settingsDlg)
 	connect(m_gameViewer, SIGNAL(moveSelected(int)), m_results, SLOT(positionChanged()));
 	connect(m_gameViewer, SIGNAL(gotoNextMoveClicked()), m_results, SLOT(nextMoveClicked()));
 	connect(m_gameViewer, SIGNAL(gotoCurrentMoveClicked()), m_evaluation, SLOT(gotoCurrentMove()));
+	connect(m_gameViewer, SIGNAL(currentLineUpdated()), m_evaluation, SLOT(gameLineChanged()));
 
 	connect(settingsDlg, SIGNAL(showBoardChanged(bool)), m_gameViewer, SLOT(showBoard(bool)));
+	connect(settingsDlg, SIGNAL(showCurrentLineChanged(bool)), m_gameViewer, SLOT(showCurrentLine(bool)));
 	connect(settingsDlg, SIGNAL(engineChanged(const QString&)), m_evaluation, SLOT(engineChanged(const QString&)));
 	connect(settingsDlg, SIGNAL(engineHashChanged(int)), m_evaluation, SLOT(engineHashChanged(int)));
 	connect(settingsDlg, SIGNAL(engineNumThreadsChanged(int)), m_evaluation, SLOT(engineNumThreadsChanged(int)));
 	connect(settingsDlg, SIGNAL(boardUpdateFrequencyChanged(UpdateFrequency)), m_evaluation, SLOT(boardUpdateFrequencyChanged(UpdateFrequency)));
+	connect(settingsDlg, SIGNAL(showCurrentLineChanged(bool)), m_evaluation, SLOT(showCurrentLine(bool)));
 
 	connect(CuteChessApplication::instance()->gameManager(), SIGNAL(finished()), this, SLOT(onGameManagerFinished()), Qt::QueuedConnection);
 
@@ -423,7 +427,6 @@ void MainWindow::createDockWindows()
 			cursor.movePosition(QTextCursor::End);
 			if (!cursor.atStart() && (msg == "-" || msg == "+" || msg == "="))
 			{
-				QTextCursor cursor = m_log->textCursor();
 				QString last_line = cursor.selectedText();
 				if (!last_line.isEmpty() && !last_line.endsWith("-") && !last_line.endsWith("+") && !last_line.endsWith("=")) {
 					cursor.insertBlock();

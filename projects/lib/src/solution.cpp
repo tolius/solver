@@ -528,6 +528,7 @@ std::list<MoveEntry> Solution::positionEntries(Chess::Board* board, bool use_eso
 		position_entries.emplace_back(EntrySource::positions, entry->san(board), *entry);
 		auto& e = position_entries.back();
 		e.is_best = true;
+		bool is_alt = (bool)alt_entry;
 		if (alt_entry && alt_entry->pgMove == entry->pgMove) {
 			e.info = alt_entry->is_overridden() ? "Overridden" : "Alt";
 			alt_entry = nullptr;
@@ -536,6 +537,18 @@ std::list<MoveEntry> Solution::positionEntries(Chess::Board* board, bool use_eso
 			e.info = e.info.isEmpty() ? w() : QString("%1 %2").arg(w()).arg(e.info);
 			sol_entry = nullptr;
 		}
+		QString engine_info;
+		if (!entry->is_overridden() && entry->depth() != MANUAL_VALUE) {
+			engine_info = QString("d=%1").arg(entry->depth());
+			if (!is_alt) {
+				quint32 v = entry->version();
+				if (v == LATEST_ENGINE_VERSION)
+					engine_info = QString("%1 t=%2").arg(engine_info).arg(entry->time());
+				else
+					engine_info = QString("%1 t=%2 v=%3").arg(engine_info).arg(entry->time()).arg(v);
+			}
+		}
+		e.info = e.info.isEmpty() ? engine_info : QString("%1 %2").arg(engine_info).arg(e.info);
 	}
 	if (alt_entry) {
 		position_entries.emplace_back(EntrySource::positions, alt_entry->san(board), *alt_entry);
@@ -693,8 +706,13 @@ QString Solution::positionInfo(std::shared_ptr<Chess::Board> board)
 		}
 		else {
 			info = QString("<b>%1 %2</b>&nbsp; d=%3").arg(san).arg(str_score).arg(entry->depth());
-			if (!alt_entry)
-				info = QString("%1&nbsp; t=%2&nbsp; v=%3").arg(info).arg(entry->time()).arg(entry->version());
+			if (!alt_entry) {
+				quint32 v = entry->version();
+				if (v == LATEST_ENGINE_VERSION)
+					info = QString("%1&nbsp; t=%2").arg(info).arg(entry->time());
+				else
+					info = QString("%1&nbsp; t=%2&nbsp; v=%3").arg(info).arg(entry->time()).arg(v);
+			}
 		}
 	}
 	if (alt_entry) {

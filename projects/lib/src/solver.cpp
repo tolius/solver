@@ -1170,8 +1170,12 @@ Solver::pMove Solver::get_engine_move(SolverMove& move, SolverState& info, bool 
 
 	/// Update cache.
 	bool is_score_better = !old_best_move || (best_move->score() > ABOVE_EG && best_move->score() > old_best_move->score());
+	bool is_more_time = false;
 	if (old_best_move)
 	{
+		quint32 time = best_move->time();
+		if (eval_result.is_only_move)
+			best_move->set_time(max(max(999U, static_cast<quint32>(max_search_time) + 1), time));
 		if (!is_score_better
 			&& old_best_move_depth != ESOLUTION_VALUE
 		//	&& old_best_move_depth > depth
@@ -1181,32 +1185,38 @@ Solver::pMove Solver::get_engine_move(SolverMove& move, SolverState& info, bool 
 		{
 			best_move->pgMove = old_best_move->pgMove;
 			best_move->set_score(old_best_move->score());
-			quint32 time = best_move->time();
+			quint32 old_time = old_best_move->time();
 			best_move->set_depth_time(old_best_move->depth_time());
-			best_move->set_time(max(time, old_best_move->time()));
+			if (time > old_time) {
+				is_more_time = true;
+				best_move->set_time(time);
+			}
 		}
 		else
 		{
 			best_move->set_time(max(best_move->time(), old_best_move->time()));
 		}
 	}
-	if (!old_best_move 
-		|| depth >= old_best_move_depth 
-		|| old_best_move_depth == ESOLUTION_VALUE 
-		|| is_score_better 
-		|| old_best_move->is_old_version())
-	{
-		save_data(best_move, !best_move->is_overridden());
-		//if (multi_mode == 1) save_multi(board, best_move, zbytes);
-	}
 
-	/// Return the result.
 	if (eval_result.is_only_move)
 	{
 		qint16 score = (move.score() && move.score() > ABOVE_EG) ? (move.score() + 1) : move.score();
 		if (best_move->score() < score)
 			best_move->set_score(score);
 	}
+
+	if (!old_best_move
+		|| depth >= old_best_move_depth
+		|| is_more_time
+		|| eval_result.is_only_move
+		|| old_best_move_depth == ESOLUTION_VALUE
+		|| is_score_better
+		|| old_best_move->is_old_version())
+	{
+		save_data(best_move, !best_move->is_overridden());
+		//if (multi_mode == 1) save_multi(board, best_move, zbytes);
+	}
+
 	eval_result.clear();
 	return best_move;
 }
@@ -1814,7 +1824,7 @@ std::list<MoveEntry> Solver::entries(Chess::Board* pos) const
 		if (score_i != UNKNOWN_SCORE) {
 			qint16 score_i_1 = (score_i >= MATE_THRESHOLD) ? (score_i - 1) : score_i;
 			entries.back().weight = reinterpret_cast<const quint16&>(score_i_1);
-			entries.back().info = QString("~->%1").arg(san_i);
+			entries.back().info = QString("~->%1 %2").arg(san_i).arg(entries.back().getScore(true));
 		}
 	}
 	if (legal_moves) {

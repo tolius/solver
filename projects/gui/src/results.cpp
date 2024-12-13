@@ -28,6 +28,7 @@ Results::Results(QWidget* parent)
 	, game(nullptr)
 	, def_button(nullptr)
 	, curr_key(0)
+	, is_current(false)
 {
 	ui->setupUi(this);
 
@@ -136,22 +137,23 @@ QString Results::positionChanged()
 		{
 			for (auto& entry : solution_entries)
 			{
-				if (entry.info != "~")
-					continue;
 				bool is_in_book = false;
 				for (auto it_book_entry = book_entries.begin(); it_book_entry != book_entries.end(); ++it_book_entry) {
 					if (it_book_entry->pgMove == entry.pgMove) {
-						entry.info = QString("~%1 %2").arg(it_book_entry->getScore(true)).arg(it_book_entry->getNodes());
+						if (entry.info == "~")
+							entry.info = QString("~%1 %2").arg(it_book_entry->getScore(true)).arg(it_book_entry->getNodes());
+						else
+							entry.info = QString("%1 book:%2 %3").arg(entry.info).arg(it_book_entry->getScore(true)).arg(it_book_entry->getNodes());
 						book_entries.erase(it_book_entry);
 						is_in_book = true;
 						break;
 					}
 				}
-				if (is_in_book)
+				if (is_in_book || !entry.info.startsWith("~"))
 					continue;
 				for (auto it_pos_entry = pos_entries.begin(); it_pos_entry != pos_entries.end(); ++it_pos_entry) {
 					if (it_pos_entry->pgMove == entry.pgMove) {
-						entry.info = QString("~ %1 eval").arg(it_pos_entry->getScore(false));
+						entry.info = QString("%1 eval:%2 %3").arg(entry.info).arg(it_pos_entry->getScore(false)).arg(it_pos_entry->info);
 						pos_entries.erase(it_pos_entry);
 						break;
 					}
@@ -239,7 +241,6 @@ QString Results::positionChanged()
 		}
 		buttons.push_back(btn);
 		QString score = (all_unknown || ((entry.source == EntrySource::positions || entry.source == EntrySource::watkins) && entry.info == "only move")) ? ""
-		    : (entry.source == EntrySource::solver && entry.info.startsWith("~->")) ? QString("%1 %2").arg(entry.info).arg(entry.getScore(true))
 		    : (entry.source == EntrySource::solver && entry.info.startsWith('~')) ? entry.info
 		    : (entry.source == EntrySource::solver && entry.info == "sol") ? "sol" // "Replicate..." solutions
 		    : entry.getScore(entry.source == EntrySource::book || entry.source == EntrySource::solver);
@@ -267,7 +268,7 @@ QString Results::positionChanged()
 				if (entry.source == EntrySource::book && entry.nodes())
 					entry.info = entry.getNodes();
 				else if (entry.source == EntrySource::positions && (entry.score() < MATE_VALUE - MANUAL_VALUE - 1 || entry.score() > WIN_THRESHOLD))
-					entry.info = "eval";
+					entry.info += " eval";
 			}
 		}
 		auto label_score = new QLabel(score, ui->widget_Solution);
@@ -365,7 +366,11 @@ QString Results::positionChanged()
 
 void Results::dataUpdated(quint64 key)
 {
-	if (curr_key != key)
+	if (curr_key == key)
+		is_current = true;
+	else if (is_current)
+		is_current = false;
+	else
 		return;
 	if (!game || !solution || !game->board())
 		return;

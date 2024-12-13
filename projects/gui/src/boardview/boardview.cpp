@@ -31,6 +31,7 @@ BoardView::BoardView(QGraphicsScene* scene, QWidget* parent)
 	setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 	setRenderHint(QPainter::Antialiasing);
 	setMouseTracking(true);
+	setStyleSheet("border: none;");
 
 	QSizePolicy sp(sizePolicy());
 	sp.setHeightForWidth(true);

@@ -112,6 +112,7 @@ public:
 	void setSolver(std::shared_ptr<Solver> solver);
 	void setEngine(const QString* filename = nullptr);
 	void setGame(ChessGame* game);
+	const QString& currentPGNline() const;
 
 private:
 	enum class WinStatus
@@ -141,6 +142,8 @@ public slots:
 	void engineNumThreadsChanged(int num_threads);
 	void fontSizeChanged(int size);
 	void boardUpdateFrequencyChanged(UpdateFrequency frequency);
+	void showCurrentLine(bool show_curr_line);
+	void gameLineChanged();
 
 signals:
 	void tintChanged(QColor tint, bool to_color_move_buttons = false);
@@ -149,6 +152,7 @@ signals:
 	void reportGoodMoves(const std::set<QString>& good_moves);
 	void reportBadMove(const QString& bad_move);
 	//void startSolver(std::shared_ptr<Chess::Board> board, std::function<void(QString)> message);
+	void currentLineChanged(const QString& curr_line);
 
 private slots:
 	void onEngineReady();
@@ -173,6 +177,7 @@ private:
 	void onEngineToggled(bool flag);
 
 private:
+	void updatePGNline();
 	void updateBoard(Chess::Board* board);
 	void updateSync();
 	void updateOverride();
@@ -211,6 +216,8 @@ private:
 	uint8_t engine_version;
 	ChessGame* game;
 	std::shared_ptr<Chess::Board> board_;
+	QString curr_pgn_line;
+	quint64 curr_game_key;
 	size_t num_pieces;
 	HumanPlayer* opponent;
 	QList<EngineOption*> options;

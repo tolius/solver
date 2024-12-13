@@ -228,6 +228,13 @@ SettingsDialog::SettingsDialog(QWidget* parent)
 		}
 	);
 
+	connect(ui->m_showCurrentLineCheck, &QCheckBox::toggled, this, 
+		[=](bool checked) {
+			QSettings().setValue("ui/show_current_line", checked);
+			emit showCurrentLineChanged(checked);
+		}
+	);
+
 	connect(ui->m_showWatkinsForOpponent, &QCheckBox::toggled, this, 
 		[=](bool checked) {
 			QSettings().setValue("ui/show_Watkins_for_opponent", checked);
@@ -339,6 +346,7 @@ void SettingsDialog::readSettings()
 	ui->m_showBoard->setChecked(s.value("show_board", true).toBool());
 	ui->m_highlightLegalMovesCheck->setChecked(s.value("highlight_legal_moves", true).toBool());
 	ui->m_showMoveArrowsCheck->setChecked(s.value("show_move_arrows", true).toBool());
+	ui->m_showCurrentLineCheck->setChecked(s.value("show_current_line", false).toBool());
 	ui->m_moveAnimationSpin->setValue(s.value("move_animation_duration", 300).toInt());
 	ui->m_showWatkinsForOpponent->setChecked(s.value("show_Watkins_for_opponent", true).toBool());
 	s.endGroup();
