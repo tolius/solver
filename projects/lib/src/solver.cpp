@@ -602,6 +602,7 @@ void Solver::process_move(std::vector<pMove>& tree, SolverState& info)
 		}
 		move->size = 0;
 		quint64 signal_key = 0;
+		uint8_t num_winning_moves = info.num_winning_moves;
 		for (auto& m : move->moves) {
 			if (!m->is_solved()) {
 				tree.push_back(m);
@@ -614,6 +615,7 @@ void Solver::process_move(std::vector<pMove>& tree, SolverState& info)
 				board->undoMove();
 				tree.pop_back();
 				m->set_solved();
+				info.num_winning_moves = num_winning_moves;
 				signal_key = signal_new_data(board->key());
 			}
 			move->size += m->size;
@@ -903,9 +905,14 @@ void Solver::find_solution(SolverMove& move, SolverState& info, pMove& best_move
 			evaluate_position(move, info, best_move, solver_move);
 		}
 		is_solver_path = (solver_move && solver_move->pgMove == best_move->pgMove) || (is_solver_Watkins && (board->plyCount() < sol->WatkinsStartingPly));
-		if (!info.is_alt()) {
-			if (best_move->score() > ABOVE_EG)
-				info.num_winning_moves++;
+		if (!info.is_alt())
+		{
+			if (best_move->score() > ABOVE_EG) {
+				if (info.num_winning_moves < numeric_limits<uint8_t>::max())
+					info.num_winning_moves++;
+				else
+					emit_message(QString("Winning depth overflow %1").arg(get_move_stack(board)), MessageType::warning);
+			}
 			bool is_stop = is_stop_move(*best_move, info);
 			add_existing(*best_move, is_stop);
 		}

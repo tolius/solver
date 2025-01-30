@@ -154,6 +154,7 @@ QString Results::positionChanged()
 				for (auto it_pos_entry = pos_entries.begin(); it_pos_entry != pos_entries.end(); ++it_pos_entry) {
 					if (it_pos_entry->pgMove == entry.pgMove) {
 						entry.info = QString("%1 eval:%2 %3").arg(entry.info).arg(it_pos_entry->getScore(false)).arg(it_pos_entry->info);
+						entry.learn = 0;
 						pos_entries.erase(it_pos_entry);
 						break;
 					}
