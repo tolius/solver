@@ -6,7 +6,7 @@ else()
 	set(ARCH_FLAGS "native")
 endif()
 
-add_subdirectory(projects/lib/src/tb/egtb/dictzip)
+add_subdirectory(projects/lib/src/tb)
 
 project(solver)
 set(CMAKE_CXX_STANDARD 17)
@@ -56,62 +56,6 @@ include(GNUInstallDirs)
 
 message(STATUS "Setting up build for Solver version ${SOLVER_VERSION}")
 
-
-set(ENG_SRC 
-	projects/lib/src/tb/benchmark.cpp
-	projects/lib/src/tb/bitbase.cpp
-	projects/lib/src/tb/bitboard.cpp
-	projects/lib/src/tb/bitboard.h
-	projects/lib/src/tb/endgame.cpp
-	projects/lib/src/tb/endgame.h
-	projects/lib/src/tb/evaluate.cpp
-	projects/lib/src/tb/evaluate.h
-	projects/lib/src/tb/material.cpp
-	projects/lib/src/tb/material.h
-	projects/lib/src/tb/misc.cpp
-	projects/lib/src/tb/misc.h
-	projects/lib/src/tb/movegen.cpp
-	projects/lib/src/tb/movegen.h
-	projects/lib/src/tb/movepick.cpp
-	projects/lib/src/tb/movepick.h
-	projects/lib/src/tb/pawns.cpp
-	projects/lib/src/tb/pawns.h
-	projects/lib/src/tb/psqt.cpp
-	projects/lib/src/tb/position.cpp
-	projects/lib/src/tb/position.h
-	projects/lib/src/tb/search.cpp
-	projects/lib/src/tb/search.h
-	projects/lib/src/tb/thread.cpp
-	projects/lib/src/tb/thread.h
-	projects/lib/src/tb/thread_win32_osx.h
-	projects/lib/src/tb/timeman.cpp
-	projects/lib/src/tb/timeman.h
-	projects/lib/src/tb/tt.cpp
-	projects/lib/src/tb/tt.h
-	projects/lib/src/tb/tune.cpp
-	projects/lib/src/tb/tune.h
-	projects/lib/src/tb/types.h
-	projects/lib/src/tb/uci.cpp
-	projects/lib/src/tb/uci.h
-	projects/lib/src/tb/ucioption.cpp
-	#
-	projects/lib/src/tb/syzygy/tbprobe.cpp
-	projects/lib/src/tb/syzygy/tbprobe.h
-	#
-	projects/lib/src/tb/incbin/incbin.h
-)
-SOURCE_GROUP ("src" FILES ${ENG_SRC})
-
-set(EGTB_SRC 
-	projects/lib/src/tb/egtb/elements.cpp
-	projects/lib/src/tb/egtb/elements.h
-	projects/lib/src/tb/egtb/tb_reader.cpp
-	projects/lib/src/tb/egtb/tb_reader.h
-	projects/lib/src/tb/egtb/tb_idx.cpp
-	projects/lib/src/tb/egtb/tb_idx.h
-)
-SOURCE_GROUP ("EGTB" FILES ${EGTB_SRC})
-
 set(WATKINS_SRC
 	projects/lib/src/watkins/watkinssolution.h
 	projects/lib/src/watkins/watkinssolution.cpp
@@ -119,8 +63,6 @@ set(WATKINS_SRC
 SOURCE_GROUP ("Watkins" FILES ${WATKINS_SRC})
 
 add_library(lib STATIC
-	${ENG_SRC}
-	${EGTB_SRC}
 	${WATKINS_SRC}
 	projects/lib/src/board/boardfactory.cpp
 	projects/lib/src/board/twokingseachboard.cpp
@@ -266,7 +208,7 @@ target_compile_definitions(lib
 )
 
 target_link_libraries(lib
-	$<TARGET_OBJECTS:dictzip>
+	egtb
 )
 
 target_compile_definitions(lib PUBLIC LIB_EXPORT=)
