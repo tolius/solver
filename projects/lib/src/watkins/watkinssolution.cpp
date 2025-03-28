@@ -1,5 +1,4 @@
 #include "watkinssolution.h"
-#include "positioninfo.h"
 
 #include <assert.h>
 #include <sstream>
@@ -455,32 +454,6 @@ bool WatkinsTree::is_open() const
 	return tree_size != 0;
 }
 
-
-uint16_t wMove_to_pgMove(move_t wMove)
-{
-	uint16_t pgMove = wMove;
-	uint16_t promotion = pgMove & uint16_t(0x7000);
-	assert(promotion == 0 || (promotion >= 0x2000 && promotion <= 0x6000));
-	if (promotion >= 0x1000 && promotion <= 0x6000)
-	{
-		pgMove &= ~uint16_t(0x7000);
-		pgMove |= promotion - uint16_t(0x1000);
-	}
-	return pgMove;
-}
-
-move_t pgMove_to_wMove(uint16_t pgMove)
-{
-	move_t wMove = pgMove;
-	uint16_t promotion = wMove & uint16_t(0x7000);
-	assert(promotion <= 0x5000);
-	if (promotion >= 0x1000 && promotion <= 0x5000)
-	{
-		wMove &= ~uint16_t(0x7000);
-		wMove |= promotion + uint16_t(0x1000);
-	}
-	return wMove;
-}
 
 std::vector<SolutionEntry> WatkinsTree::get_solution(const std::vector<uint16_t>& moves, bool calc_num_nodes)
 {

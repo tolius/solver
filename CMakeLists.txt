@@ -7,6 +7,7 @@ else()
 endif()
 
 add_subdirectory(projects/lib/src/tb)
+add_subdirectory(projects/lib/src/losingloeser)
 
 project(solver)
 set(CMAKE_CXX_STANDARD 17)
@@ -209,6 +210,7 @@ target_compile_definitions(lib
 
 target_link_libraries(lib
 	egtb
+	losingloeser
 )
 
 target_compile_definitions(lib PUBLIC LIB_EXPORT=)

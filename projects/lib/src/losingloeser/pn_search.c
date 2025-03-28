@@ -53,7 +53,7 @@ static void new_hash(uint32 node,typePOS *POS)
 
 uint32 expand_node(typePOS *POS,PN_NODE *tree,uint32 node,uint32 next)
 {uint16 ml[256],mm[256]; int i,v,u=GenMoves(POS,ml); uint32 k; uint8 va;
-#if 1 // joint rules
+#if 0 // joint rules
  if (!u) // stalemate, combines FICS and International rules,
          // only a White win if POS->wtm and wc<bc
  {int wc=POPCNT(wBitboardOcc),bc=POPCNT(bBitboardOcc);
@@ -95,16 +95,16 @@ uint32 expand_node(typePOS *POS,PN_NODE *tree,uint32 node,uint32 next)
   {if (((!(bBitboardB&BLACK_SQUARES) && wBitboardB&BLACK_SQUARES)) || 
        ((!(bBitboardB&WHITE_SQUARES) && wBitboardB&WHITE_SQUARES)))
    {if (POS->wtm) tree[next+i].bad=MY_INFoo; else tree[next+i].good=MY_INFoo;}}
-#if 1 // combined rules
+#if 0 // combined rules
   if (!v) // FICS + International
   {int wc=POPCNT(wBitboardOcc),bc=POPCNT(bBitboardOcc);
    if (POS->wtm && wc<bc) {tree[next+i].bad=0; tree[next+i].good=MY_INFoo;}
    if (POS->wtm && wc>=bc) {tree[next+i].good=0; tree[next+i].bad=MY_INFoo;}
    if (!POS->wtm) {tree[next+i].bad=0; tree[next+i].good=MY_INFoo;}}
-  UnmakeMove(POS,ml[i],TRUE); // after oppB check
 #else // International only
   if (!v) {tree[next+i].good=MY_INFoo; tree[next+i].bad=0;}
 #endif
+  UnmakeMove(POS,ml[i],TRUE); // after oppB check
  SIBLINGS:
   if (WHITE_MUST_WIN)
   {if (!POS->wtm && tree[next+i].bad==MY_INFoo) tree[next+i].good=0;
@@ -112,7 +112,7 @@ uint32 expand_node(typePOS *POS,PN_NODE *tree,uint32 node,uint32 next)
   if (i!=(u-1)) tree[next+i].sibling=next+i+1; else tree[next+i].sibling=0;}
  BACK_TRACK: backtrack_loop(tree,node,FALSE); //size_backtrack(tree,node,u);
  while (node) {tree[node].size+=u; node=tree[node].parent;} return u;}
-
+/*
 static void info_node (PN_NODE *tree,uint32 n,boolean verbose)
 {uint32 k=tree[n].child; char A[8];
  printf("value "); spit(tree+n); printf(" size %x\n",tree[n].size);
@@ -125,13 +125,13 @@ static void path_node (PN_NODE *tree,uint32 n)
 {uint16 M[256]; int k=0; char N[64];
  while (tree[n].parent) {M[k++]=tree[n].move; n=tree[n].parent;}
  while (k>0) printf("%s ", Notate(N,M[--k]));}
-
-static uint32 walk_tree (typePOS *POS,PN_NODE *tree)
+*/
+/*static*/ uint32 walk_tree (typePOS *POS,PN_NODE *tree)
 {uint32 n=1; // char A[8];
  while (tree[n].child) // MakeMove could fail?
  {n=tree[n].child; if (!MakeMove(POS,tree[n].move)) return 0; n=tree[n].trans;}
  return n;}
-
+/*
 static uint32 large_child(PN_NODE *tree,uint32 n,uint32 sz)
 {uint32 k=tree[n].child; if (!k) return 0; if (tree[k].size>sz) return k;
  while (tree[k].sibling) {k=tree[k].sibling; if (tree[k].size>sz) return k;}
@@ -147,7 +147,8 @@ void pn_search(PN_NODE *tree,typePOS *POS,uint32 max_nodes,boolean SILENT)
  NEXT_NODE++; if (!tree[1].good) {tree[1].good=MY_INFoo; tree[1].bad=0;}
  uint64 tb_hits=0; POS->tb_hits=0; tree[0].killer=tree[1].killer=0;
  while (NEXT_NODE<max_nodes && tree[1].size<BILLION
-	&& Now()-start_time<TIME_LIMIT && tree[1].bad && tree[1].good
+	//&& Now()-start_time<TIME_LIMIT
+	&& tree[1].bad && tree[1].good
 	&& (tree[1].bad!=MY_INFoo || tree[1].good!=MY_INFoo))
  {memcpy(POS,ROOT,sizeof(typePOS)); memcpy(POS->DYN,DYN,sizeof(typeDYNAMIC));
   node=walk_tree(POS,tree); if (!node) break;
@@ -163,4 +164,4 @@ void pn_search(PN_NODE *tree,typePOS *POS,uint32 max_nodes,boolean SILENT)
   while (w) {w=large_child(tree,n,tree[n].size*BUMP_RATIO); if (w) n=w;}
   if (n) {printf ("* "); path_node(tree,n); printf("\n");}}
  tree[0].size=NEXT_NODE; if (b) free(tree);}
-
+ */

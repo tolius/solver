@@ -207,5 +207,9 @@ EntryRow entry_to_bytes(quint64 key, const SolutionEntry& entry);
 
 std::map<uint64_t, uint64_t> read_book(const std::string& filepath, qint64 filesize = -1);
 
+using move_t = uint16_t;
+uint16_t wMove_to_pgMove(move_t wMove);
+move_t pgMove_to_wMove(uint16_t pgMove);
+
 
 #endif // POSITIONINFO_H

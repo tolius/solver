@@ -258,7 +258,7 @@ void magic_mult_init ()
   int sq, ATT[64], i, j, cnt, b;
   uint64 T;
   if (INIT) return; INIT=TRUE; // needs to have same Zobrist
-  REV_LIMIT=95; // change this to deter long reversible lines
+  REV_LIMIT=50; // change this to deter long reversible lines
   MakeArrays (); MakeNandK (); MakeZobrist ();
   BI[A1] = RI[A1] = 0;
   for (sq = A1; sq < H8; sq++)

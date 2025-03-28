@@ -2,6 +2,7 @@
 #define WATKINSSOLUTION_H_
 
 #include "solutionbook.h"
+#include "positioninfo.h"
 
 #include <cstdint>
 #include <vector>
@@ -10,8 +11,6 @@
 #include <memory>
 #include <filesystem>
 
-
-using move_t = uint16_t;
 
 #pragma pack(push, 1)
 struct node_t

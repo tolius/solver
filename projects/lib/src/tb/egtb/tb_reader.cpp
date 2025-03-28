@@ -11,6 +11,7 @@ extern "C" {
 #include <iostream>
 #include <fstream>
 
+using namespace std;
 using namespace std::placeholders;
 
 

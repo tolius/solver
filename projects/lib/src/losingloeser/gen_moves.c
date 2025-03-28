@@ -21,9 +21,9 @@ boolean MakeMoveCheck(typePOS *POSITION,uint16 mv,boolean CHECK)
   if (POSITION->DYN - POSITION->DYN_ROOT > MAX_DEPTH
       || POSITION->DYN->rev > REV_LIMIT) // idiot check
   {return FALSE; // should immediately return normally, else for debugging
-   printf("MAX_DEPTH or REV!! DP:%d REV:%d/%d\n",
+   /*printf("MAX_DEPTH or REV!! DP:%d REV:%d/%d\n",
 	  (int) (POSITION->DYN-POSITION->DYN_ROOT),
-	  POSITION->DYN->rev,REV_LIMIT); dump_path(POS); exit(-1);}
+	  POSITION->DYN->rev,REV_LIMIT); dump_path(POS); exit(-1);*/}
   if (mv==0xfedc) return MakeNullMove(POSITION);
   memcpy(POSITION->DYN + 1,POSITION->DYN,16); POSITION->DYN++;
   POSITION->DYN->rev++; POSITION->DYN->mv=mv; POSITION->DYN->HASH^=ZobristWTM;
@@ -205,6 +205,9 @@ int GenMoves (typePOS *POS, uint16 *ml)
 ////////////////////////////////////////////////////////////////////////
 
 // #include <signal.h>
+#ifndef SIGTRAP
+#define SIGTRAP 5
+#endif
 void Validate (typePOS *POS)
 { int sq, pi;  uint64 O, Z = 0, T; boolean BAD=FALSE;
   for (sq = A1; sq <= H8; sq++)
@@ -236,8 +239,8 @@ void Validate (typePOS *POS)
   O=0; for (pi=1;pi<=6;pi++) O|=POSITION->bitboard[pi+7];
   if (O!=bBitboardOcc) {BAD=TRUE;printf("Ob:%llx %llx\n", O, bBitboardOcc);}
   if (BAD)
-  {typeDYNAMIC *D = POS->DYN_ROOT + 1; char N[64];
-   while (D!=POS->DYN) {printf("%s ", Notate(N, (D+1)->mv)); D++;}
-   printf("\n"); fflush(stdout);
+  {typeDYNAMIC *D = POS->DYN_ROOT + 1; //char N[64];
+   //while (D!=POS->DYN) {printf("%s ", Notate(N, (D+1)->mv)); D++;}
+   //printf("\n"); fflush(stdout);
    raise(SIGTRAP);
 }}

@@ -1,14 +1,22 @@
+#ifndef _LOSING_H_
+#define _LOSING_H_
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h> // excessive
 
+#if defined(_MSC_VER) || defined(__INTEL_COMPILER)
+#include <nmmintrin.h> // Intel and Microsoft header for _mm_popcnt_u64()
+#endif
+
 #define MAX_PLY 4096
 #define TRUE 1
 #define FALSE 0
 #define MY_INFoo (1 << 30)
+#ifndef boolean
 #define boolean uint8
+#endif
 #define sint8 signed char
 #define sint16 signed short int
 #define sint32 int
@@ -34,40 +42,53 @@
 #define CALLOC(n,sz) malloc((n)*(sz))
 #define MALLOC(n,sz) malloc((n)*(sz))
 
-#ifdef WIN32_BUILD
-static inline int BSF (uint64 w)
+#if defined(_MSC_VER)
+static inline int BSF (uint64 b)
 {
-  int x1, x2;
-  asm ("bsf %0,%0\n" "jnz 1f\n" "bsf %1,%0\n" "jz 1f\n" "addl $32,%0\n" "1:":
-       "=&q" (x1), "=&q" (x2):
-       "1" ((int) (w >> 32)), "0" ((int) w));
-  return x1;
+    unsigned long ret = 0;
+    _BitScanForward64(&ret, b);
+    return (int)ret;
 }
 #else
 static inline int BSF (uint64 w)
-{uint64 x; asm ("bsfq %1,%0\n": "=&r" (x):"r" (w)); return x;}
+{uint64 x; asm ("bsfq %1,%0\n": "=&r" (x):"r" (w)); return (int)x;}
 #endif
 
+#ifdef _MSC_VER
+static inline int BSR(uint64 w)
+{unsigned long x; _BitScanReverse64(&x, w); return (int)x;}
+
+static inline int BSR32(uint64 w)
+{uint32 x; _BitScanReverse(&x, w); return (int)x;}
+#else
 static inline int BSR (uint64 w)
-{uint64 x; asm ("bsrq %1,%0\n": "=&r" (x):"r" (w)); return x;}
+{uint64 x; asm ("bsrq %1,%0\n": "=&r" (x):"r" (w)); return (int)x;}
 
 static inline int BSR32 (uint32 w)
-{uint32 x; asm ("bsr %1,%0\n": "=&r" (x):"r" (w)); return x;}
+{uint32 x; asm ("bsr %1,%0\n": "=&r" (x):"r" (w)); return (int)x;}
+#endif
 
 #ifdef HAS_POPCNT
+#ifdef _MSC_VER
+static inline int POPCNT(uint64 w)
+{
+	return (int)_mm_popcnt_u64(w);
+}
+#else
 static inline int POPCNT (uint64 w)
 {
   uint64 x;
   asm ("popcntq %1,%0\n": "=&r" (x):"r" (w));
-  return x;
+  return (int)x;
 }
+#endif
 #else
 static inline int POPCNT (uint64 w)
 {
   w = w - ((w >> 1) & 0x5555555555555555ull);
   w = (w & 0x3333333333333333ull) + ((w >> 2) & 0x3333333333333333ull);
   w = (w + (w >> 4)) & 0x0f0f0f0f0f0f0f0full;
-  return (w * 0x0101010101010101ull) >> 56;
+  return (int)((w * 0x0101010101010101ull) >> 56);
 }
 #endif /* HAS_POPCNT */
 
@@ -99,9 +120,9 @@ typedef enum { FA, FB, FC, FD, FE, FF, FG, FH } EnumFiles;
 #define bBitboardOcc POSITION->bitboard[bEnumOcc]
 
 #define Zobrist(pi,sq) ZOBRIST[pi][sq]
-uint64 ZOBRIST[14][64];
+extern uint64 ZOBRIST[14][64];
 #define ZobristWTM 0x57a43306bd7913afULL
-uint64 ZobristEP[8];
+extern uint64 ZobristEP[8];
 
 typedef struct { uint64 mask, mult, shift; uint64* index; } type_MM;
 #define AttRocc(sq, OCC) ROOK_MM[sq].index\
@@ -112,9 +133,10 @@ typedef struct { uint64 mask, mult, shift; uint64* index; } type_MM;
 #define AttR(sq) AttRocc (sq, POSITION->OCCUPIED)
 #define AttQ(fr) (AttR(fr) | AttB(fr))
 
-type_MM ROOK_MM[64], BISHOP_MM[64];
-uint64 MM_ORTHO[102400], MM_DIAG[5248];
-uint64 AttN[64], AttK[64], SqSet[64];
+extern type_MM ROOK_MM[64], BISHOP_MM[64];
+extern uint64 MM_ORTHO[102400], MM_DIAG[5248];
+extern uint64 AttN[64], AttK[64], SqSet[64];
+
 #define POSITION POS
 
 typedef struct
@@ -129,8 +151,8 @@ typedef struct
 #define BUMP_RATIO 0.666666666
 #define BILLION 1000000000
 
-double TIME_LIMIT; // should make a local arg to pn_search()
-int HASH_MASK; // sort of a place holder with SEARCH_SIZE ?
+//extern double TIME_LIMIT; // should make a local arg to pn_search()
+extern int HASH_MASK; // sort of a place holder with SEARCH_SIZE ?
 
 typedef struct {uint64 key; uint32 node;} HASH;
 
@@ -146,7 +168,7 @@ typedef struct
 // 64 is not currently used, 1 can also be used by other protocols (TB6)
 // could add a flag for user-specified result - flaky if the node has a child
 
-int REV_LIMIT; // 95 normally, 125 in expand and verify, set in magic_mult_init
+extern int REV_LIMIT; // 95 normally, 125 in expand and verify, set in magic_mult_init
 void magic_mult_init (); // magic_mult.c
 // gen_moves.c
 boolean MakeMove (typePOS *POSITION, uint16 mv); // whether causes rep
@@ -180,7 +202,7 @@ double Now ();
 void dump_path(typePOS *POS); // used by verify and winspit
 void spit(PN_NODE *N);
 boolean parse_moves (typePOS* POS, char* I);
-void init_position (typePOS* POS, char* I);
+//void init_position(typePOS* POS), char* I);
 char* Notate (char *M, uint16 move);
 uint16 get_move(typePOS *POS,char *I);
 void SaveWinTree(WIN_NODE *WIN,uint16 *ML,int w,char *filename);
@@ -193,11 +215,13 @@ typedef struct
   uint64 Blocked,Occupied; uint64 index,reflect;} type_PiSq;
 boolean Get_TB_Score(typePOS *POS,uint8 *va,boolean flat);
 boolean TB_PiSq_score(type_PiSq *PiSq,uint8 *v);
-void init_tb_stuff();
-void load_tbs();
+//void init_tb_stuff();
+//void load_tbs();
 
 // cluster_known.c
 uint64 known_find(uint64 Z);
 void init_known(boolean WRITEABLE);
 WIN_STRUCT* WintreeKnown(uint64 Z);
 void new_known(uint64 Z,uint8 *data,uint64 nb);
+
+#endif
