@@ -211,5 +211,7 @@ using move_t = uint16_t;
 uint16_t wMove_to_pgMove(move_t wMove);
 move_t pgMove_to_wMove(uint16_t pgMove);
 
+size_t get_total_memory();
+size_t get_avail_memory();
 
 #endif // POSITIONINFO_H

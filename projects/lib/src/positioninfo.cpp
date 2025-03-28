@@ -14,6 +14,54 @@
 #include <fstream>
 #include <filesystem>
 
+
+#ifdef WIN32
+#define NOMINMAX
+#include <windows.h>
+size_t get_total_memory()
+{
+	MEMORYSTATUSEX memory_status;
+	ZeroMemory(&memory_status, sizeof(MEMORYSTATUSEX));
+	memory_status.dwLength = sizeof(MEMORYSTATUSEX);
+	if (GlobalMemoryStatusEx(&memory_status))
+		return memory_status.ullTotalPhys;
+	return 0;
+}
+size_t get_avail_memory()
+{
+	MEMORYSTATUSEX memory_status;
+	ZeroMemory(&memory_status, sizeof(MEMORYSTATUSEX));
+	memory_status.dwLength = sizeof(MEMORYSTATUSEX);
+	if (GlobalMemoryStatusEx(&memory_status))
+		return memory_status.ullAvailPhys;
+	return 0;
+}
+#elif defined(unix) || defined(__unix) || defined(__unix__) || defined(__linux__)
+#include <unistd.h>
+size_t get_total_memory()
+{
+	size_t pages = sysconf(_SC_PHYS_PAGES);
+    size_t page_size = sysconf(_SC_PAGE_SIZE);
+    return pages * page_size;
+}
+size_t get_avail_memory()
+{
+	size_t pages = sysconf(_SC_AVPHYS_PAGES);
+    size_t page_size = sysconf(_SC_PAGE_SIZE);
+    return pages * page_size;
+}
+#else
+size_t get_total_memory()
+{
+	return 0;
+}
+size_t get_avail_memory()
+{
+	return 0;
+}
+#endif
+
+
 using namespace std;
 
 

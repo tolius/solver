@@ -1,7 +1,8 @@
 #include "settingsdlg.h"
 #include "ui_settingsdlg.h"
 
-#include <gamemanager.h>
+#include "positioninfo.h"
+#include "gamemanager.h"
 #include "cutechessapp.h"
 
 #include <QShowEvent>
@@ -15,35 +16,7 @@
 #include <cmath>
 #include <map>
 
-
 namespace fs = std::filesystem;
-
-#ifdef WIN32
-#define NOMINMAX
-#include <windows.h>
-size_t get_total_memory()
-{
-	MEMORYSTATUSEX memory_status;
-	ZeroMemory(&memory_status, sizeof(MEMORYSTATUSEX));
-	memory_status.dwLength = sizeof(MEMORYSTATUSEX);
-	if (GlobalMemoryStatusEx(&memory_status))
-		return memory_status.ullTotalPhys;
-	return 0;
-}
-#elif defined(unix) || defined(__unix) || defined(__unix__) || defined(__linux__)
-#include <unistd.h>
-size_t get_total_memory()
-{
-	size_t pages = sysconf(_SC_PHYS_PAGES);
-    size_t page_size = sysconf(_SC_PAGE_SIZE);
-    return pages * page_size;
-}
-#else
-size_t get_system_total_memory()
-{
-	return 0;
-}
-#endif
 
 
 SettingsDialog::SettingsDialog(QWidget* parent)
