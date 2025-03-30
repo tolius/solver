@@ -60,6 +60,8 @@ message(STATUS "Setting up build for Solver version ${SOLVER_VERSION}")
 set(WATKINS_SRC
 	projects/lib/src/watkins/watkinssolution.h
 	projects/lib/src/watkins/watkinssolution.cpp
+	projects/lib/src/watkins/losingloeser.h
+	projects/lib/src/watkins/losingloeser.cpp
 )
 SOURCE_GROUP ("Watkins" FILES ${WATKINS_SRC})
 

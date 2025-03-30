@@ -283,6 +283,7 @@ void Solver::start(pBoard start_pos, std::function<void(QString)> message, Solve
 	t_log_update = steady_clock::now();
 	t_gui_update = t_log_update;
 	pMove t = tree.front();
+	pMove last_parent;
 	try
 	{
 		QStringList san_moves;
@@ -296,6 +297,7 @@ void Solver::start(pBoard start_pos, std::function<void(QString)> message, Solve
 						san_moves.push_back(QString("%1.%2").arg(1 + board->plyCount() / 2).arg(san));
 					else
 						san_moves.push_back(san);
+					last_parent = t;
 					t = m;
 					board->makeMove(move);
 					return;
@@ -355,7 +357,7 @@ void Solver::start(pBoard start_pos, std::function<void(QString)> message, Solve
 					if (pos->sideToMove() != our_color)
 						continue;
 					if (sol->bookEntry(pos, FileType_positions_lower) || sol->bookEntry(pos, FileType_alts_lower)) {
-						set_level(false); // evaluate_endgames will also be updates
+						set_level(false); // evaluate_endgames will also be updated
 						break;
 					}
 					if (sol->bookEntry(pos, FileType_positions_upper) || sol->bookEntry(pos, FileType_alts_upper))
@@ -373,7 +375,19 @@ void Solver::start(pBoard start_pos, std::function<void(QString)> message, Solve
 		qApp->processEvents();
 		tree_state = SolverState(false);
 		vector<pMove> tree_to_solve;
-		t->clearData();
+		if (start_pos && start_pos->sideToMove() != our_color) {
+			if (!last_parent || board->MoveHistory().empty()) {
+				QString msg = "Error: Failed to start from opponent's move.\n\nSolving aborted.";
+				message(msg);
+				throw runtime_error(msg.toStdString());
+			}
+			board->undoMove();
+			t = last_parent;
+			t->clearData(false);
+		}
+		else {
+			t->clearData(true);
+		}
 		tree_to_solve.push_back(t);
 		process_move(tree_to_solve, tree_state);
 	}

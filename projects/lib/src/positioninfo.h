@@ -152,7 +152,7 @@ struct SolverMove : public SolutionEntry
 	SolverMove(std::shared_ptr<SolutionEntry> entry);
 	SolverMove(quint64 bytes);
 
-	void clearData();
+	void clearData(bool clear_moves = true);
 
 	qint16 score() const;
 	const quint32& depth_time() const;

@@ -41,14 +41,14 @@ size_t get_avail_memory()
 size_t get_total_memory()
 {
 	size_t pages = sysconf(_SC_PHYS_PAGES);
-    size_t page_size = sysconf(_SC_PAGE_SIZE);
-    return pages * page_size;
+	size_t page_size = sysconf(_SC_PAGE_SIZE);
+	return pages * page_size;
 }
 size_t get_avail_memory()
 {
 	size_t pages = sysconf(_SC_AVPHYS_PAGES);
-    size_t page_size = sysconf(_SC_PAGE_SIZE);
-    return pages * page_size;
+	size_t page_size = sysconf(_SC_PAGE_SIZE);
+	return pages * page_size;
 }
 #else
 size_t get_total_memory()
@@ -68,7 +68,7 @@ using namespace std;
 namespace
 {
 	static set<string> special_endgames;
-    static uint32_t EGTB_VERSION = 0;
+	static uint32_t EGTB_VERSION = 0;
 }
 
 constexpr static uint8_t SOLVED_MOVE = 0xFD;
@@ -191,12 +191,13 @@ SolverMove::SolverMove(quint64 bytes)
 	: SolutionEntry(bytes)
 {}
 
-void SolverMove::clearData()
+void SolverMove::clearData(bool clear_moves)
 {
 	weight = reinterpret_cast<const quint16&>(UNKNOWN_SCORE);
 	learn = 0;
-	moves.clear();
 	size = 0;
+	if (clear_moves)
+		moves.clear();
 }
 
 qint16 SolverMove::score() const

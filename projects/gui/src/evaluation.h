@@ -7,6 +7,7 @@
 #include "board/move.h"
 #include "moveevaluation.h"
 #include "positioninfo.h"
+#include "watkins/losingloeser.h"
 
 #include <QWidget>
 #include <QPointer>
@@ -54,6 +55,7 @@ namespace Ui {
 	class EvaluationWidget;
 }
 
+
 struct EngineSession
 {
 	std::chrono::steady_clock::time_point start_time;
@@ -68,6 +70,7 @@ struct EngineSession
 
 	void reset();
 };
+
 
 struct EvalUpdate
 {
@@ -101,6 +104,7 @@ struct EvalUpdate
 
 	static constexpr size_t WINDOW = 20;
 };
+
 
 class Evaluation : public QWidget
 {
@@ -153,6 +157,7 @@ signals:
 	void reportBadMove(const QString& bad_move);
 	//void startSolver(std::shared_ptr<Chess::Board> board, std::function<void(QString)> message);
 	void currentLineChanged(const QString& curr_line);
+	void runLL();
 
 private slots:
 	void onEngineReady();
@@ -169,10 +174,14 @@ private slots:
 	void onReplicateWatkinsOverrideTriggered();
 	void onReplicateWatkinsEGTriggered();
 	void onSyncToggled(bool flag);
+	void onAnalysingEngineChanged(int);
 	void onMultiPVClicked(int multiPV);
 	void onEvaluatePosition();
 	void onSolvingStatusChanged();
 	void onUpdateEval();
+	void onLLnodesChanged(int);
+	void onLLprogress(const LLdata&);
+	void onLLfinished();
 private:
 	void onEngineToggled(bool flag);
 
@@ -180,6 +189,7 @@ private:
 	void updatePGNline();
 	void updateBoard(Chess::Board* board);
 	void updateSync();
+	void updateAuto();
 	void updateOverride();
 	void updateSave(bool check_curr_pos);
 	void setMode(SolverStatus new_status);
@@ -195,6 +205,9 @@ private:
 	void updateBadMove(const QString& san);
 	void checkProgress(quint64 nodes, bool no_progress, int depth);
 	void updateProgress(int val);
+	void reportStatusInfo(char ch);
+	void updateTime(int64_t time_s);
+	void startLL();
 
 private:
 	Ui::EvaluationWidget* ui;
@@ -213,6 +226,7 @@ private:
 	SolverStatus solver_status;
 	std::shared_ptr<Solver> solver;
 	UciEngine* engine;
+	QString engine_name;
 	uint8_t engine_version;
 	ChessGame* game;
 	std::shared_ptr<Chess::Board> board_;
@@ -253,6 +267,8 @@ private:
 	std::chrono::steady_clock::time_point t_last_sync;
 	QTimer timer_eval;
 	EvalUpdate eval_data;
+
+	LosingLoeser ll;
 };
 
 #endif // EVALUATION_H

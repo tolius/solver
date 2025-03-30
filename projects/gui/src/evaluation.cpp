@@ -34,6 +34,7 @@
 #include <QStyleOptionButton>
 
 #include <list>
+#include <math.h>
 
 using namespace std::chrono;
 
@@ -43,6 +44,8 @@ constexpr static int NO_PROGRESS_TIME = 12; // [s]
 constexpr static int EG_WIN_THRESHOLD = 15200;
 constexpr static int START_DEPTH = 10;
 constexpr static uint8_t UNKNOWN_ENGINE_VERSION = 0xFE;
+
+constexpr static int LL_INDEX = 1;
 
 QString score_to_text(int score)
 {
@@ -137,6 +140,9 @@ Evaluation::Evaluation(GameViewer* game_viewer, QWidget* parent)
 	board_.reset(Chess::BoardFactory::create("antichess"));
 	board_->setFenString(board_->defaultFenString());
 	ui->label_CurrentLine->setVisible(QSettings().value("ui/show_current_line", false).toBool());
+	ui->label_CurrentStatusInfo->setVisible(false);
+	ui->widget_NumBestMoves->setVisible(true);
+	ui->widget_LosingLoeser->setVisible(false);
 
 	session.reset();
 	timer_engine.setInterval(1s);
@@ -177,6 +183,7 @@ Evaluation::Evaluation(GameViewer* game_viewer, QWidget* parent)
 	ui->btn_Manual->setEnabled(false);
 	ui->btn_Auto->setChecked(false);
 	ui->btn_Manual->setChecked(true);
+	ui->btn_AutoHere->setEnabled(false);
 	ui->btn_Save->setEnabled(false);
 	ui->btn_Override->setEnabled(false);
 	ui->btn_Override->setChecked(false);
@@ -212,6 +219,18 @@ Evaluation::Evaluation(GameViewer* game_viewer, QWidget* parent)
 	syncMenu->setToolTipsVisible(true);
 	ui->btn_Sync->setMenu(syncMenu);
 
+	int64_t ram = static_cast<int64_t>(get_total_memory()) - 1'000'000'000;
+	int64_t required_for_100M = static_cast<int64_t>(ll.requiredRAM(100));
+	int max_val = static_cast<int>(100 * ram / required_for_100M) / 50 * 50;
+	max_val = std::max(50, max_val);
+	ui->spin_LLnodes->setMaximum(max_val);
+	int def_total_nodes = QSettings().value("ll/total_nodes", 1'000'000).toInt() / 1'000'000;
+	def_total_nodes = std::max(1, def_total_nodes);
+	size_t avail_ram = get_avail_memory();
+	def_total_nodes = std::min(def_total_nodes, static_cast<int>(100 * avail_ram / required_for_100M));
+	ui->spin_LLnodes->setValue(std::max(1, std::min(max_val, def_total_nodes)));
+	onLLnodesChanged(ui->spin_LLnodes->value());
+
 	std::array<QToolButton*, 8> buttons = { ui->btn_MultiPV_Auto, ui->btn_MultiPV_1, ui->btn_MultiPV_2,  ui->btn_MultiPV_3,
 		                                    ui->btn_MultiPV_4,    ui->btn_MultiPV_6, ui->btn_MultiPV_12, ui->btn_MultiPV_18 };
 
@@ -227,8 +246,9 @@ Evaluation::Evaluation(GameViewer* game_viewer, QWidget* parent)
 	fontSizeChanged(font_size);
 	connect(CuteChessApplication::instance(), SIGNAL(fontSizeChanged(int)), this, SLOT(fontSizeChanged(int)));
 
-	connect(ui->btn_Auto, &QPushButton::toggled, this, [this](bool flag) { setMode(flag ? SolverStatus::Auto : SolverStatus::Manual); });
+	connect(ui->btn_Auto, &QToolButton::toggled, this, [this](bool flag) { setMode(flag ? SolverStatus::Auto : SolverStatus::Manual); });
 	connect(ui->btn_Manual, &QPushButton::toggled, this, [this](bool flag) { setMode(flag ? SolverStatus::Manual : SolverStatus::Auto); });
+	connect(ui->btn_AutoHere, &QPushButton::clicked, this, [this]() { setMode(SolverStatus::AutoFromHere); });
 	connect(ui->btn_Save, SIGNAL(clicked()), this, SLOT(onSaveClicked()));
 	connect(ui->btn_Override, SIGNAL(toggled(bool)), this, SLOT(onOverrideToggled(bool)));
 	connect(ui->btn_Start, &QPushButton::clicked, this, [this]() { onEngineToggled(true); });
@@ -240,6 +260,16 @@ Evaluation::Evaluation(GameViewer* game_viewer, QWidget* parent)
 	connect(action_replicate_Watkins, SIGNAL(triggered()), this, SLOT(onReplicateWatkinsTriggered()));
 	connect(action_replicate_Watkins_EG, SIGNAL(triggered()), this, SLOT(onReplicateWatkinsEGTriggered()));
 	connect(action_replicate_Watkins_Override, SIGNAL(triggered()), this, SLOT(onReplicateWatkinsOverrideTriggered()));
+	connect(ui->spin_LLnodes, SIGNAL(valueChanged(int)), this, SLOT(onLLnodesChanged(int)));
+	connect(ui->combo_Engine, SIGNAL(currentIndexChanged(int)), this, SLOT(onAnalysingEngineChanged(int)));
+
+	QThread* thread = new QThread;
+	ll.moveToThread(thread);
+	connect(&ll, SIGNAL(Message(const QString&, MessageType)), this, SIGNAL(Message(const QString&, MessageType)));
+	connect(&ll, SIGNAL(Progress(const LLdata&)), this, SLOT(onLLprogress(const LLdata&)));
+	connect(&ll, SIGNAL(Finished()), this, SLOT(onLLfinished()));
+	connect(this, SIGNAL(runLL()), &ll, SLOT(Run()));
+	thread->start();
 
 	setEngine();
 }
@@ -295,6 +325,22 @@ void Evaluation::updateSync()
 	ui->widget_Engine->setStyleSheet(bkg_color_style(bkg));
 }
 
+void Evaluation::updateAuto()
+{
+	bool is_auto_enabled = solver 
+	                    && engine 
+	                    && solver_status == SolverStatus::Manual 
+	                    && engine->isReady() 
+	                    && engine->state() != ChessPlayer::State::Thinking;
+	ui->btn_Auto->setEnabled(is_auto_enabled);
+	bool is_auto_here_enabled = is_auto_enabled
+	                         && game
+	                         && game->board()
+	                         && solver->isCurrentBranch(game->board());
+	action_auto_from_here->setEnabled(is_auto_here_enabled);
+	ui->btn_AutoHere->setEnabled(is_auto_here_enabled);
+}
+
 void Evaluation::updateOverride()
 {
 	ui->btn_Override->setEnabled(solver 
@@ -329,24 +375,19 @@ void Evaluation::setMode(SolverStatus new_status)
 	ui->btn_Auto->blockSignals(true);
 	action_auto_from_here->blockSignals(true);
 	ui->btn_Manual->blockSignals(true);
+	ui->btn_AutoHere->blockSignals(true);
 	ui->btn_Auto->setChecked(new_status != SolverStatus::Manual);
 	ui->btn_Manual->setChecked(new_status == SolverStatus::Manual);
 	ui->btn_Auto->blockSignals(false);
 	action_auto_from_here->blockSignals(false);
 	ui->btn_Manual->blockSignals(false);
-	bool is_auto_enabled = solver 
-		                && engine 
-		                && new_status == SolverStatus::Manual 
-		                && engine->isReady() 
-		                && engine->state() != ChessPlayer::State::Thinking;
-	ui->btn_Auto->setEnabled(is_auto_enabled);
-	action_auto_from_here->setEnabled(is_auto_enabled && game && game->board() && game->board()->sideToMove() == solver->sideToWin()
-	                                  && solver->isCurrentBranch(game->board()));
+	ui->btn_AutoHere->blockSignals(false);
+	updateAuto();
 	ui->btn_Manual->setEnabled(solver && engine && new_status != SolverStatus::Manual && engine->isReady());
 	updateStartStop();
-	ui->widget_NumBestMoves->setVisible(engine && new_status == SolverStatus::Manual && engine->isReady());
+	ui->widget_EngineSettings->setVisible(engine && new_status == SolverStatus::Manual && engine->isReady());
 	ui->label_LoadingEngine->setVisible(!engine || !engine->isReady());
-	// if (ui->btn_Auto->isChecked() || ui->btn_AutoFromHere->isChecked())
+	// if (ui->btn_Auto->isChecked() || ui->btn_AutoHere->isChecked())
 	//	ui->btn_MultiPV_Auto->setChecked(true);
 
 	if (solver && is_changed)
@@ -371,11 +412,9 @@ void Evaluation::updateStartStop()
 {
 	bool is_ok = engine && engine->isReady();
 	using s = ChessPlayer::State;
-	ui->btn_Start->setEnabled(is_ok && solver_status == SolverStatus::Manual && ((engine->state() == s::Observing) || (engine->state() == s::Idle)));
-	ui->btn_Stop->setEnabled(is_ok && (engine->state() == ChessPlayer::State::Thinking || solver_status != SolverStatus::Manual));
-	bool is_auto_enabled = solver && is_ok && solver_status == SolverStatus::Manual && engine->state() != ChessPlayer::State::Thinking;
-	ui->btn_Auto->setEnabled(is_auto_enabled);
-	action_auto_from_here->setEnabled(is_auto_enabled && game && game->board() && game->board()->sideToMove() == solver->sideToWin() && solver->isCurrentBranch(game->board()));
+	ui->btn_Start->setEnabled(is_ok && solver_status == SolverStatus::Manual && !ll.isBusy() && ((engine->state() == s::Observing) || (engine->state() == s::Idle)));
+	ui->btn_Stop->setEnabled(is_ok && (ll.isBusy() || engine->state() == ChessPlayer::State::Thinking || solver_status != SolverStatus::Manual));
+	updateAuto();
 }
 
 void Evaluation::clearEvals()
@@ -539,12 +578,12 @@ void Evaluation::onEngineReady()
 
 	engine->newGame(Chess::Side::NoSide, opponent, board_.get());
 	//?? waiting here?
-	QString name = engine->name();
-	ui->label_Engine->setText(name);
-	int i = name.lastIndexOf(' ');
+	engine_name = engine->name();
+	ui->label_Engine->setText(engine_name);
+	int i = engine_name.lastIndexOf(' ');
 	if (i > 0)
 	{
-		auto version = name.midRef(i + 1);
+		auto version = engine_name.midRef(i + 1);
 		engine_version = UNKNOWN_ENGINE_VERSION;
 		if (version.length() == 6)
 		{
@@ -561,7 +600,8 @@ void Evaluation::onEngineReady()
 				    : (230409 <= num && num <= 230415) ? 1
 				    : (230301 <= num && num <= 230401) ? 0
 				                                       : UNKNOWN_ENGINE_VERSION;
-				ui->label_Engine->setText(name.left(i + 1) + str_num);
+				engine_name = engine_name.left(i + 1) + str_num;
+				ui->label_Engine->setText(engine_name);
 			}
 		}
 		if (engine_version == UNKNOWN_ENGINE_VERSION) {
@@ -721,7 +761,7 @@ void Evaluation::positionChanged()
 	ui->widget_SolutionInfo->setVisible(false);
 	updateBoard(new_board); // updateSync() is called here
 	updateOverride();
-	action_auto_from_here->setEnabled(ui->btn_Auto->isEnabled() && solver && game->board() && game->board()->sideToMove() == solver->sideToWin() && solver->isCurrentBranch(game->board()));
+	updateAuto();
 	if (!board_)
 		return;
 	engine->write(tr("position fen %1").arg(board_->fenString()));
@@ -777,28 +817,28 @@ void Evaluation::engineNumThreadsChanged(int num_threads)
 
 void Evaluation::onAutoTriggered()
 {
-	if (!ui->btn_Auto->isEnabled() || ui->btn_Auto->isChecked() || action_auto_from_here->isChecked())
+	if (!ui->btn_Auto->isEnabled() || ui->btn_Auto->isChecked())// || action_auto_from_here->isChecked())
 		return;
 	this->setMode(SolverStatus::Auto);
 }
 
 void Evaluation::onReplicateWatkinsTriggered()
 {
-	if (!ui->btn_Auto->isEnabled() || ui->btn_Auto->isChecked() || action_auto_from_here->isChecked())
+	if (!ui->btn_Auto->isEnabled() || ui->btn_Auto->isChecked())// || action_auto_from_here->isChecked())
 		return;
 	this->setMode(SolverStatus::CopyWatkins);
 }
 
 void Evaluation::onReplicateWatkinsOverrideTriggered()
 {
-	if (!ui->btn_Auto->isEnabled() || ui->btn_Auto->isChecked() || action_auto_from_here->isChecked())
+	if (!ui->btn_Auto->isEnabled() || ui->btn_Auto->isChecked())// || action_auto_from_here->isChecked())
 		return;
 	this->setMode(SolverStatus::CopyWatkinsOverride);
 }
 
 void Evaluation::onReplicateWatkinsEGTriggered()
 {
-	if (!ui->btn_Auto->isEnabled() || ui->btn_Auto->isChecked() || action_auto_from_here->isChecked())
+	if (!ui->btn_Auto->isEnabled() || ui->btn_Auto->isChecked())// || action_auto_from_here->isChecked())
 		return;
 	this->setMode(SolverStatus::CopyWatkinsEG);
 }
@@ -809,6 +849,69 @@ void Evaluation::onSyncToggled(bool flag)
 		onSyncPositions(board_);
 	else
 		timer_sync.stop();
+}
+
+void Evaluation::onAnalysingEngineChanged(int curr_index)
+{
+	ui->widget_NumBestMoves->setVisible(curr_index != LL_INDEX);
+	ui->widget_LosingLoeser->setVisible(curr_index == LL_INDEX);
+	if (curr_index == LL_INDEX)
+	{
+		if (engine && engine->state() == ChessPlayer::State::Thinking) {
+			to_keep_solving = false;
+			stopEngine();
+		}
+		ui->btn_Start->setText("Start LL");
+	}
+	else
+	{
+		ll.stop();
+		ui->btn_Start->setText("Start");
+	}
+}
+
+void Evaluation::onLLnodesChanged(int Mnodes)
+{
+	size_t required_ram = ll.requiredRAM(Mnodes);
+	double size = std::max(0.1, required_ram / 1'000'000'000.0);
+	size_t avail_ram = get_avail_memory();
+	QString prefix = (avail_ram <= required_ram) ? "<b><span style=\"color:#e59d56;\">" : "<b>";
+	QString postfix = (avail_ram <= required_ram) ? "</span></b>" : "</b>";
+	int prec = size > 9.995 ? 1 : 2;
+	QString memory = tr(" *requires additional %1%L2 GB%3 RAM").arg(prefix).arg(size, 3, 'f', prec).arg(postfix);
+	ui->label_Memory->setText(memory);
+}
+
+void Evaluation::onLLprogress(const LLdata& res)
+{
+	if (res.empty())
+	{
+		clearEvalLabels();
+		ui->progressBar->setValue(0);
+		return;
+	}
+	ui->label_Speed->setText(tr("%L1 Mn/s").arg(res.speed_ll_Mns, 5, 'f', 2, QChar('0')));
+	ui->label_EGTB->setText(tr("%L1 kn/s").arg(res.speed_egtb_kns, 5, 'f', 2, QChar('0')));
+	updateTime(static_cast<int64_t>(roundf(res.time_us / 1'000'000.0f)));
+	ui->label_Depth->setText(tr("%L1M:").arg(res.size / 1'000'000.0f, 4, 'f', 1));
+	ui->label_Mate->setText(res.best_eval);
+	ui->label_BestMove->setText(res.best_move);
+	for (size_t i = 0; i < res.moves.size(); i++)
+	{
+		move_labels[i][0]->setText(res.moves[i].depth);
+		move_labels[i][1]->setText(res.moves[i].eval);
+		move_labels[i][2]->setText(res.moves[i].san);
+	}
+	ui->label_EngineMoves->setText(res.main_line);
+	ui->progressBar->setValue(res.progress);
+	if (res.progress >= 100)
+		QSettings().setValue("ll/total_nodes", static_cast<int>(res.total_nodes));
+}
+
+void Evaluation::onLLfinished()
+{
+	updateStartStop();
+	//ui->progressBar->setValue(100);
 }
 
 void Evaluation::onSyncPositions(std::shared_ptr<Chess::Board> ref_board)
@@ -963,14 +1066,47 @@ void Evaluation::onEngineToggled(bool flag)
 		return;
 
 	if (flag) {
-		startEngine();
+		if (ui->combo_Engine->currentIndex() == LL_INDEX) {
+			startLL();
+			ui->label_Engine->setText("LosingLoeser");
+			ui->label_EngineVersion->setText("(analysis mode)");
+		}
+		else {
+			startEngine();
+			ui->label_Engine->setText(engine_name);
+			QString ver = engine_version == UNKNOWN_ENGINE_VERSION ? "(unknown version)" : tr("v.%1").arg(engine_version);
+			ui->label_EngineVersion->setText(ver);
+		}
 	}
 	else {
-		to_keep_solving = false;
-		stopEngine();
+		ll.stop();
+		if (engine && engine->state() == ChessPlayer::State::Thinking) {
+			to_keep_solving = false;
+			stopEngine();
+		}
 	//	if (solver_status != SolverStatus::Manual)
 	//		setMode(SolverStatus::Manual);
 	}
+}
+
+void Evaluation::startLL()
+{
+	if (ll.isBusy())
+		return;
+
+	clearEvalLabels();
+	ui->btn_Save->setEnabled(false);
+	ui->progressBar->setValue(0);
+	if (!game)
+		return;
+	auto board = game->board();
+	if (!board)
+		return;
+
+	uint32_t total_nodes = ui->spin_LLnodes->value() * 1'000'000;
+	ll.start(board, total_nodes, move_labels.size());
+	updateStartStop();
+	emit runLL();
 }
 
 void Evaluation::reportWinStatus(WinStatus status)
@@ -1268,16 +1404,16 @@ void Evaluation::checkProgress(quint64 nodes, bool no_progress, int depth)
 				{
 					if (progress_time < s.add_engine_time) {
 						ti -= s.add_engine_time;
-						emit ShortMessage("=");
+						reportStatusInfo('=');
 					}
 					else {
-						emit ShortMessage("-");
+						reportStatusInfo('-');
 					}
 				}
 				else
 				{
 					ti -= s.add_engine_time_to_ensure_winning_sequence;
-					emit ShortMessage("+");
+					reportStatusInfo('.');
 				}
 			}
 		}
@@ -1351,6 +1487,17 @@ void Evaluation::updateProgress(int val)
 		timer_eval.start(eval_data.interval());
 }
 
+void Evaluation::reportStatusInfo(char ch)
+{
+	static const QString logn_eval = "Restoring win";
+	ui->label_CurrentStatusInfo->setVisible(true);
+	int len = ui->label_CurrentStatusInfo->text().length();
+	if (len < logn_eval.length() || len >= logn_eval.length() + 20)
+		ui->label_CurrentStatusInfo->setText(logn_eval + ch);
+	else
+		ui->label_CurrentStatusInfo->setText(ui->label_CurrentStatusInfo->text() + ch);
+}
+
 void Evaluation::onEngineStopped()
 {
 	auto& eval = engine->evaluation();
@@ -1388,11 +1535,11 @@ void Evaluation::onEngineFinished()
 		}
 	}
 	updateStartStop();
+	ui->label_CurrentStatusInfo->setVisible(false);
 }
 
-void Evaluation::onTimerEngine()
+void Evaluation::updateTime(int64_t time_s)
 {
-	auto time_s = duration_cast<seconds>(steady_clock::now() - session.start_time).count();
 	if (time_s < 5 * 60) // 5 min
 		ui->label_Time->setText(tr("%L1 s").arg(time_s));
 	else if (time_s < 5 * 60 * 60) // 5 h
@@ -1401,6 +1548,12 @@ void Evaluation::onTimerEngine()
 		ui->label_Time->setText(tr("%L1 h").arg(time_s / 60 / 60));
 	else
 		ui->label_Time->setText(tr("%L1 days").arg(time_s / 24 / 60 / 60));
+}
+
+void Evaluation::onTimerEngine()
+{
+	auto time_s = duration_cast<seconds>(steady_clock::now() - session.start_time).count();
+	updateTime(time_s);
 }
 
 void Evaluation::onMultiPVClicked(int multiPV)

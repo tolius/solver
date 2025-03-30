@@ -165,7 +165,7 @@ unsigned long long ll_required_ram(unsigned int total_nodes)
 	return size_tree + size_hash + size_other;
 }
 
-int ll_init_search(unsigned int total_nodes, unsigned int step_nodes, unsigned short* moves, unsigned int num_moves) //, char* ml) // ml has nodelim token
+int ll_init_search(unsigned int total_nodes, unsigned int step_nodes, unsigned short* moves, unsigned int num_moves)
 {
 	if (!llInitialized)
 		ll_init();
@@ -249,7 +249,7 @@ uint32 expand_node(typePOS* POS, PN_NODE* tree, uint32 node, uint32 next);
 void ll_do_search(unsigned int* len_moves, MoveRes* move_res, unsigned long long int* tb_hits,
                   unsigned int* len_main_line, unsigned short* main_line)
 {
-	// Info about the parent note is added to move_res[*len_moves]
+	// Info about the parent node is added to move_res[*len_moves]
 	PN_NODE* tree = searchTree;
 	typePOS* POS = RPOS;
 	uint32 node;
