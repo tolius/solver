@@ -4,6 +4,7 @@
 #include "gameviewer.h"
 #include "flowlayout/flowlayout.h"
 #include "chessgame.h"
+#include "watkins/losingloeser.h"
 #include "solution.h"
 #include "solver.h"
 #include "solutionbook.h"
@@ -12,7 +13,6 @@
 #include "engineoption.h"
 #include "uciengine.h"
 #include "chessplayer.h"
-#include "chessgame.h"
 #include "humanplayer.h"
 #include "enginebuilder.h"
 #include "board/board.h"
@@ -130,6 +130,7 @@ Evaluation::Evaluation(GameViewer* game_viewer, QWidget* parent)
 	, game(nullptr)
 	, opponent(new HumanPlayer(nullptr))
 	, solver_status(SolverStatus::Manual)
+	, ll(LosingLoeser::instance())
 	, is_position_update(false)
 	, is_restart(false)
 	, to_keep_solving(false)
@@ -141,8 +142,8 @@ Evaluation::Evaluation(GameViewer* game_viewer, QWidget* parent)
 	board_->setFenString(board_->defaultFenString());
 	ui->label_CurrentLine->setVisible(QSettings().value("ui/show_current_line", false).toBool());
 	ui->label_CurrentStatusInfo->setVisible(false);
-	ui->widget_NumBestMoves->setVisible(true);
 	ui->widget_LosingLoeser->setVisible(false);
+	ui->widget_NumBestMoves->setVisible(true);
 
 	session.reset();
 	timer_engine.setInterval(1s);
@@ -220,7 +221,7 @@ Evaluation::Evaluation(GameViewer* game_viewer, QWidget* parent)
 	ui->btn_Sync->setMenu(syncMenu);
 
 	int64_t ram = static_cast<int64_t>(get_total_memory()) - 1'000'000'000;
-	int64_t required_for_100M = static_cast<int64_t>(ll.requiredRAM(100));
+	int64_t required_for_100M = static_cast<int64_t>(ll->requiredRAM(100));
 	int max_val = static_cast<int>(100 * ram / required_for_100M) / 50 * 50;
 	max_val = std::max(50, max_val);
 	ui->spin_LLnodes->setMaximum(max_val);
@@ -264,11 +265,11 @@ Evaluation::Evaluation(GameViewer* game_viewer, QWidget* parent)
 	connect(ui->combo_Engine, SIGNAL(currentIndexChanged(int)), this, SLOT(onAnalysingEngineChanged(int)));
 
 	QThread* thread = new QThread;
-	ll.moveToThread(thread);
-	connect(&ll, SIGNAL(Message(const QString&, MessageType)), this, SIGNAL(Message(const QString&, MessageType)));
-	connect(&ll, SIGNAL(Progress(const LLdata&)), this, SLOT(onLLprogress(const LLdata&)));
-	connect(&ll, SIGNAL(Finished()), this, SLOT(onLLfinished()));
-	connect(this, SIGNAL(runLL()), &ll, SLOT(Run()));
+	ll->moveToThread(thread);
+	connect(ll.get(), SIGNAL(Message(const QString&, MessageType)), this, SIGNAL(Message(const QString&, MessageType)));
+	connect(ll.get(), SIGNAL(Progress(const LLdata&)), this, SLOT(onLLprogress(const LLdata&)));
+	connect(ll.get(), SIGNAL(Finished()), this, SLOT(onLLfinished()));
+	connect(this, SIGNAL(runLL()), ll.get(), SLOT(Run()));
 	thread->start();
 
 	setEngine();
@@ -412,8 +413,14 @@ void Evaluation::updateStartStop()
 {
 	bool is_ok = engine && engine->isReady();
 	using s = ChessPlayer::State;
-	ui->btn_Start->setEnabled(is_ok && solver_status == SolverStatus::Manual && !ll.isBusy() && ((engine->state() == s::Observing) || (engine->state() == s::Idle)));
-	ui->btn_Stop->setEnabled(is_ok && (ll.isBusy() || engine->state() == ChessPlayer::State::Thinking || solver_status != SolverStatus::Manual));
+	ui->btn_Start->setEnabled(is_ok
+		&& solver_status == SolverStatus::Manual
+		&& !ll->isBusy()
+		&& ((engine->state() == s::Observing) || (engine->state() == s::Idle)));
+	ui->btn_Stop->setEnabled(is_ok
+		&& (ll->isBusy()
+			|| engine->state() == ChessPlayer::State::Thinking
+			|| solver_status != SolverStatus::Manual));
 	updateAuto();
 }
 
@@ -853,10 +860,10 @@ void Evaluation::onSyncToggled(bool flag)
 
 void Evaluation::onAnalysingEngineChanged(int curr_index)
 {
-	ui->widget_NumBestMoves->setVisible(curr_index != LL_INDEX);
-	ui->widget_LosingLoeser->setVisible(curr_index == LL_INDEX);
 	if (curr_index == LL_INDEX)
 	{
+		ui->widget_NumBestMoves->setVisible(false);
+		ui->widget_LosingLoeser->setVisible(true);
 		if (engine && engine->state() == ChessPlayer::State::Thinking) {
 			to_keep_solving = false;
 			stopEngine();
@@ -865,14 +872,16 @@ void Evaluation::onAnalysingEngineChanged(int curr_index)
 	}
 	else
 	{
-		ll.stop();
+		ui->widget_LosingLoeser->setVisible(false);
+		ui->widget_NumBestMoves->setVisible(true);
+		ll->stop();
 		ui->btn_Start->setText("Start");
 	}
 }
 
 void Evaluation::onLLnodesChanged(int Mnodes)
 {
-	size_t required_ram = ll.requiredRAM(Mnodes);
+	size_t required_ram = ll->requiredRAM(Mnodes);
 	double size = std::max(0.1, required_ram / 1'000'000'000.0);
 	size_t avail_ram = get_avail_memory();
 	QString prefix = (avail_ram <= required_ram) ? "<b><span style=\"color:#e59d56;\">" : "<b>";
@@ -898,7 +907,8 @@ void Evaluation::onLLprogress(const LLdata& res)
 	ui->label_BestMove->setText(res.best_move);
 	for (size_t i = 0; i < res.moves.size(); i++)
 	{
-		move_labels[i][0]->setText(res.moves[i].depth);
+		QString depth = tr("%L1M:").arg(res.moves[i].size / 1'000'000.0f, 4, 'f', 1);
+		move_labels[i][0]->setText(depth);
 		move_labels[i][1]->setText(res.moves[i].eval);
 		move_labels[i][2]->setText(res.moves[i].san);
 	}
@@ -1079,7 +1089,7 @@ void Evaluation::onEngineToggled(bool flag)
 		}
 	}
 	else {
-		ll.stop();
+		ll->stop();
 		if (engine && engine->state() == ChessPlayer::State::Thinking) {
 			to_keep_solving = false;
 			stopEngine();
@@ -1091,7 +1101,7 @@ void Evaluation::onEngineToggled(bool flag)
 
 void Evaluation::startLL()
 {
-	if (ll.isBusy())
+	if (ll->isBusy())
 		return;
 
 	clearEvalLabels();
@@ -1104,7 +1114,7 @@ void Evaluation::startLL()
 		return;
 
 	uint32_t total_nodes = ui->spin_LLnodes->value() * 1'000'000;
-	ll.start(board, total_nodes, move_labels.size());
+	ll->start(board, total_nodes, move_labels.size());
 	updateStartStop();
 	emit runLL();
 }

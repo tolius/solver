@@ -32,3 +32,19 @@ target_compile_definitions(${PROJECT_NAME}
 target_link_libraries(${PROJECT_NAME}
 	egtb
 )
+
+if (WIN32)
+	target_compile_options(${PROJECT_NAME}
+		PRIVATE "/Ox"
+		PRIVATE "/GL"
+	)
+else()
+	target_compile_definitions(${PROJECT_NAME}
+		PRIVATE NDEBUG
+	)
+	target_compile_options(${PROJECT_NAME}
+		PRIVATE "-Ofast"
+		PRIVATE "-flto"
+		PRIVATE "-march=${ARCH_FLAGS}"
+	)
+endif()

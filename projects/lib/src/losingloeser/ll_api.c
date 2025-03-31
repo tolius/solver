@@ -1,4 +1,3 @@
-#define _CRT_SECURE_NO_WARNINGS
 #include "ll_api.h"
 #include "losing.h"
 #include "tb.h"
@@ -6,6 +5,9 @@
 #include <math.h>
 
 
+#define WON_VALUE ((short)32767)
+#define LOST_VALUE -WON_VALUE
+#define INF_VALUE ((short)32000)
 #define FlagEP (1 << 15)
 
 uint64 ZOBRIST[14][64];
@@ -21,7 +23,6 @@ static boolean llInitialized = FALSE;
 static uint64 randkey = 1;
 static PN_NODE* searchTree = NULL;
 static boolean searchInitialized = FALSE;
-static uint32 MAX_LEN_MOVES = 30;
 static uint32 search_nodes = 10000000;
 static uint32 search_step = 1000000;
 static uint32 max_nodes;
@@ -105,7 +106,7 @@ static void init_position(typePOS* POS)
 	Validate(POS);
 }
 
-void ll_init()
+static void init_ll()
 {
 	magic_mult_init();
 	RPOS->DYN_ROOT = CALLOC(MAX_PLY, sizeof(typeDYNAMIC));
@@ -129,7 +130,12 @@ static uint64 GET_RAND()
 	return (((uint64)RAND16()) << 48) | (((uint64)RAND16()) << 32) | (((uint64)RAND16()) << 16) | (((uint64)RAND16()) << 0);
 }
 
-int set_moves(typePOS* POS, unsigned short* mv, unsigned int num_moves)
+static inline boolean are_moves_identical(unsigned short mv1, unsigned short mv2)
+{
+	return (mv1 & ~FlagEP) == (mv2 & ~FlagEP); //!! for some reason, ep capture sets the ep flag here
+}
+
+int set_moves(typePOS* POS, const unsigned short* mv, unsigned int num_moves)
 {
 	uint16 moves[256];
 	unsigned int i;
@@ -145,7 +151,7 @@ int set_moves(typePOS* POS, unsigned short* mv, unsigned int num_moves)
 			continue;
 		}
 		for (j = 0; moves[j]; j++) {
-			if ((mv[i] & ~FlagEP) == (moves[j] & ~FlagEP)) { //!! for some reason, ep capture sets the ep flag here
+			if (are_moves_identical(mv[i], moves[j])) {
 				if (!MakeMoveCheck(POS, moves[j], 0)) // should never Rep now
 					return -2;
 				break;
@@ -159,17 +165,18 @@ int set_moves(typePOS* POS, unsigned short* mv, unsigned int num_moves)
 
 unsigned long long ll_required_ram(unsigned int total_nodes)
 {
-	uint64 size_tree = (2 * MAX_PLY + total_nodes) * sizeof(PN_NODE);
+	uint64 size_tree = (2ULL * MAX_PLY + total_nodes) * sizeof(PN_NODE);
 	uint64 size_hash = (2ULL << BSR(total_nodes)) * sizeof(HASH);
-	uint64 size_other = MAX_PLY * sizeof(typeDYNAMIC);
+	uint64 size_other = MAX_PLY * sizeof(typeDYNAMIC) + 256 * sizeof(uint16);
 	return size_tree + size_hash + size_other;
 }
 
-int ll_init_search(unsigned int total_nodes, unsigned int step_nodes, unsigned short* moves, unsigned int num_moves)
+int ll_init_search(unsigned int total_nodes, unsigned int step_nodes, const unsigned short* moves, unsigned int num_moves)
 {
 	if (!llInitialized)
-		ll_init();
+		init_ll();
 	searchInitialized = FALSE;
+	ll_clear_data();
 	init_position(RPOS);
 	search_nodes = total_nodes;
 	search_step = step_nodes;
@@ -178,8 +185,6 @@ int ll_init_search(unsigned int total_nodes, unsigned int step_nodes, unsigned s
 		return ec;
 	searchTree = MALLOC((2 * MAX_PLY + search_nodes), sizeof(PN_NODE)); // HASH_MASK is excessive
 	HASH_MASK = (2 << BSR(search_nodes)) - 1;
-	if (RPOS->ZTAB)
-		free(RPOS->ZTAB);
 	RPOS->ZTAB = CALLOC((HASH_MASK + 1), sizeof(HASH));
 	uint64 ZOB = GET_RAND();
 	RPOS->DYN->HASH ^= ZOB; // bug fix, else re-use HASH
@@ -191,9 +196,9 @@ static void set_move_eval(PN_NODE* node, MoveRes* mr)
 	float ratio = (float)node->good / node->bad;
 	float l = logf(ratio);
 	if (!node->bad)
-		strcpy(mr->eval, "won");
+		mr->eval = WON_VALUE;
 	else if (!node->good)
-		strcpy(mr->eval, "lost");
+		mr->eval = LOST_VALUE;
 	//else if (node->bad == MY_INFoo && node->good == MY_INFoo)
 	//	strcpy(mr->eval, "INF/INF");
 	//else if (node->good == MY_INFoo)
@@ -201,13 +206,11 @@ static void set_move_eval(PN_NODE* node, MoveRes* mr)
 	//else if (node->bad == MY_INFoo)
 	//	psprintf(mr->eval, "%d/INF", node->good);
 	else if (ratio == FLOAT_INF)
-		strcpy(mr->eval, "+inf");
-	else if (ratio == 0.0f)
-		strcpy(mr->eval, "-inf");
-	else if (l >= 0.0f)
-		sprintf(mr->eval, "+%.1f", l);
+		mr->eval = INF_VALUE;
+	else if (ratio == 0)
+		mr->eval = -INF_VALUE;
 	else
-		sprintf(mr->eval, "%.1f", l);
+		mr->eval = (short)(l * 100);
 }
 
 static void set_move_eval_inv(PN_NODE* node, MoveRes* mr)
@@ -215,24 +218,21 @@ static void set_move_eval_inv(PN_NODE* node, MoveRes* mr)
 	float ratio = (float)node->good / node->bad;
 	float l = -logf(ratio);
 	if (!node->bad)
-		strcpy(mr->eval, "lost");
+		mr->eval = LOST_VALUE;
 	else if (!node->good)
-		strcpy(mr->eval, "won");
+		mr->eval = WON_VALUE;
 	else if (ratio == FLOAT_INF)
-		strcpy(mr->eval, "-inf");
-	else if (ratio == 0.0f)
-		strcpy(mr->eval, "+inf");
-	else if (l >= 0.0f)
-		sprintf(mr->eval, "+%.1f", l);
+		mr->eval = -INF_VALUE;
+	else if (ratio == 0)
+		mr->eval = INF_VALUE;
 	else
-		sprintf(mr->eval, "%.1f", l);
+		mr->eval = (short)(l * 100);
 }
 
-static void set_results(PN_NODE* tree, unsigned int* len_moves, MoveRes* mr)
+static void set_results(PN_NODE* tree, unsigned int k, unsigned int* len_moves, MoveRes* mr, unsigned int max_moves)
 {
-	uint32 k = tree[1].child;
 	*len_moves = 0;
-	while (k && *len_moves < MAX_LEN_MOVES)
+	while (k && *len_moves < max_moves)
 	{
 		mr->move = tree[k].move;
 		set_move_eval_inv(tree + k, mr);
@@ -246,8 +246,8 @@ static void set_results(PN_NODE* tree, unsigned int* len_moves, MoveRes* mr)
 uint32 walk_tree(typePOS* POS, PN_NODE* tree);
 uint32 expand_node(typePOS* POS, PN_NODE* tree, uint32 node, uint32 next);
 
-void ll_do_search(unsigned int* len_moves, MoveRes* move_res, unsigned long long int* tb_hits,
-                  unsigned int* len_main_line, unsigned short* main_line)
+void ll_do_search(unsigned int* len_moves, MoveRes* move_res, unsigned int max_moves,
+                  unsigned long long* tb_hits, unsigned int* len_main_line, unsigned short* main_line)
 {
 	// Info about the parent node is added to move_res[*len_moves]
 	PN_NODE* tree = searchTree;
@@ -300,7 +300,8 @@ void ll_do_search(unsigned int* len_moves, MoveRes* move_res, unsigned long long
 	memcpy(POS->DYN, DYN, sizeof(typeDYNAMIC));
 	final_sort_children(tree, 1);
 
-	set_results(tree, len_moves, move_res);
+	k = tree[1].child;
+	set_results(tree, k, len_moves, move_res, max_moves);
 	*tb_hits = TB_HITS;
 	set_move_eval(tree + 1, move_res + *len_moves);
 	move_res[*len_moves].size = NEXT_NODE;
@@ -318,8 +319,52 @@ void ll_do_search(unsigned int* len_moves, MoveRes* move_res, unsigned long long
 	tree[0].size = NEXT_NODE;
 }
 
-void ll_end_search()
+int ll_has_results()
 {
-	free(searchTree);
-	searchTree = NULL;
+	if (!llInitialized || !searchInitialized)
+		return FALSE;
+	if (!searchTree || !searchTree[1].child)
+		return FALSE;
+	return TRUE;
+}
+
+void ll_get_results(unsigned int* len_moves, MoveRes* move_res, unsigned int max_moves,
+                    const unsigned short* moves, unsigned int num_moves)
+{
+	unsigned int i;
+	uint32 k;
+	PN_NODE* tree = searchTree;
+
+	*len_moves = 0;
+	if (!ll_has_results() || num_moves >= MAX_PLY)
+		return;
+
+	k = tree[1].child;
+	if (!k)
+		return;
+	for (i = 0; i < num_moves; i++) {
+		while (k) {
+			if (are_moves_identical(tree[k].move, moves[i])) {
+				k = tree[k].child;
+				break;
+			}
+			k = tree[k].sibling;
+		}
+		if (!k)
+			return;
+	}
+
+	set_results(tree, k, len_moves, move_res, max_moves);
+}
+
+void ll_clear_data()
+{
+	if (searchTree) {
+		free(searchTree);
+		searchTree = NULL;
+	}
+	if (RPOS->ZTAB) {
+		free(RPOS->ZTAB);
+		RPOS->ZTAB = NULL;
+	}
 }

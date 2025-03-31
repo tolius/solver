@@ -50,6 +50,7 @@
 #include "gameviewer.h"
 #include "movelist.h"
 #include "evaluation.h"
+#include "watkins/losingloeser.h"
 #include "results.h"
 #include "release.h"
 #include "titlewidget.h"
@@ -96,6 +97,7 @@ MainWindow::MainWindow(ChessGame* game, SettingsDialog* settingsDlg)
 	m_tint = QColor(0, 0, 0, 0);
 	m_moveList = new MoveList(this);
 	m_evaluation = new Evaluation(m_gameViewer, this);
+	auto ll = LosingLoeser::instance();
 	m_results = new Results(this);
 	m_release = new Release(this);
 	m_solutionsWidget = nullptr;
@@ -133,6 +135,7 @@ MainWindow::MainWindow(ChessGame* game, SettingsDialog* settingsDlg)
 	connect(m_evaluation, SIGNAL(reportGoodMoves(const std::set<QString>&)), m_moveList, SLOT(goodMovesReported(const std::set<QString>&)));
 	connect(m_evaluation, SIGNAL(reportBadMove(const QString&)), m_moveList, SLOT(badMoveReported(const QString&)));
 	connect(m_evaluation, SIGNAL(currentLineChanged(const QString&)), m_gameViewer, SLOT(updatePGNline(const QString&)));
+	connect(ll.get(), SIGNAL(Finished()), m_results, SLOT(positionChanged()));
 	connect(m_results, &Results::addComment, this, 
 		[&](int ply, const QString& score)
 		{ 

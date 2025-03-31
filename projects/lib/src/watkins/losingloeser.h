@@ -3,11 +3,15 @@
 
 #include "positioninfo.h"
 
+#include "board/move.h"
+
 #include <QObject>
 #include <QString>
 
 #include <memory>
 #include <map>
+#include <tuple>
+#include <vector>
 #include <atomic>
 #include <chrono>
 
@@ -19,7 +23,9 @@ namespace Chess
 
 struct MoveResult
 {
-	QString depth;
+	uint32_t size;
+	uint16_t pgMove;
+	int16_t value;
 	QString eval;
 	QString san;
 };
@@ -55,19 +61,30 @@ class LosingLoeser : public QObject
 		idle,
 		initialized,
 		calculating,
-		stopping
+		stopping,
+		processing
 	};
 
-public:
+private:
 	LosingLoeser();
+
+	static std::shared_ptr<LosingLoeser> _instance;
+
+public:
+	static std::shared_ptr<LosingLoeser> instance();
 
 public:
 	size_t requiredRAM(int Mnodes) const;
 	bool isBusy() const;
 	void start(Chess::Board* ref_board, uint32_t total_nodes, size_t max_moves);
 	void stop();
+	std::vector<MoveResult> get_results(Chess::Board* ref_board);
+	void clear();
 
 private:
+	std::tuple<Chess::Move, QString, bool> get_wMove_info(move_t wMove);
+	std::tuple<Chess::Move, QString, bool> get_pgMove_info(std::shared_ptr<Chess::Board> pos, move_t pgMove);
+	std::vector<move_t> setPosition(Chess::Board* ref_board);
 	void run();
 
 public slots:
@@ -84,6 +101,7 @@ private:
 	uint32_t total_nodes;
 	std::atomic<Status> status;
 	std::map<quint64, LLdata> res_cache;
+	uint64_t curr_result_key;
 
 private:
 	constexpr static uint32_t step_nodes = 200000;

@@ -272,6 +272,11 @@ QString Results::positionChanged()
 					entry.info += " eval";
 			}
 		}
+		else if (entry.source == EntrySource::watkins && entry.score() != UNKNOWN_SCORE)
+		{
+			score = entry.info;
+			entry.info = entry.nodes() <= 1 ? QString("w=%L1").arg(entry.nodes()) : QString("w=%L1").arg(Watkins_nodes(entry));
+		}
 		auto label_score = new QLabel(score, ui->widget_Solution);
 		if (entry.is_best)
 		{

@@ -7,7 +7,6 @@
 #include "board/move.h"
 #include "moveevaluation.h"
 #include "positioninfo.h"
-#include "watkins/losingloeser.h"
 
 #include <QWidget>
 #include <QPointer>
@@ -39,6 +38,8 @@ class UciEngine;
 class EngineOption;
 class HumanPlayer;
 class GameViewer;
+class LosingLoeser;
+struct LLdata;
 struct SolutionEntry;
 namespace Chess
 { 
@@ -268,7 +269,7 @@ private:
 	QTimer timer_eval;
 	EvalUpdate eval_data;
 
-	LosingLoeser ll;
+	std::shared_ptr<LosingLoeser> ll;
 };
 
 #endif // EVALUATION_H

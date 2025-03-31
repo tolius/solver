@@ -2,6 +2,7 @@
 #include "board/board.h"
 #include "board/boardfactory.h"
 #include "watkins/watkinssolution.h"
+#include "watkins/losingloeser.h"
 
 #include <QFileInfo>
 #include <QDir>
@@ -622,13 +623,27 @@ std::list<MoveEntry> Solution::esolEntries(Chess::Board* board, std::list<MoveEn
 	uint32_t best_threshold = (sum < 1000) ? numeric_limits<uint32_t>::max() : static_cast<uint32_t>(sum * 0.20f);
 
 	std::list<MoveEntry> esol_entries;
-	for (auto& entry : entries)
+	if (entries.empty())
 	{
-		entry.weight = reinterpret_cast<const quint16&>(UNKNOWN_SCORE);
-		esol_entries.emplace_back(EntrySource::watkins, entry.san(board), entry);
-		auto& e = esol_entries.back();
-		e.is_best = (entry.nodes() >= best_threshold);
-		e.info = entry.nodes() > 1 ? Watkins_nodes(entry) : "W";
+		auto move_evals = LosingLoeser::instance()->get_results(board);
+		for (auto& mr : move_evals)
+		{
+			MoveEntry e(EntrySource::watkins, mr.san, mr.pgMove, mr.value, mr.size);
+			e.is_best = (mr.value == MATE_VALUE);
+			e.info = mr.eval;
+			esol_entries.push_back(e);
+		}
+	}
+	else
+	{
+		for (auto& entry : entries)
+		{
+			entry.weight = reinterpret_cast<const quint16&>(UNKNOWN_SCORE);
+			esol_entries.emplace_back(EntrySource::watkins, entry.san(board), entry);
+			auto& e = esol_entries.back();
+			e.is_best = (entry.nodes() >= best_threshold);
+			e.info = entry.nodes() > 1 ? Watkins_nodes(entry) : "W";
+		}
 	}
 
 	if (missing_entries) {
@@ -636,7 +651,7 @@ std::list<MoveEntry> Solution::esolEntries(Chess::Board* board, std::list<MoveEn
 		for (auto& m : legal_moves)
 		{
 			auto pgMove = OpeningBook::moveToBits(board->genericMove(m));
-			for (auto& entry : entries) {
+			for (auto& entry : esol_entries) {
 				if (entry.pgMove == pgMove) {
 					pgMove = 0;
 					break;
