@@ -28,7 +28,7 @@ constexpr static qint16 ESOLUTION_VALUE = 0xDD;
 constexpr static quint32 OVERRIDE_MASK = 0xFF00;
 constexpr static quint32 REAL_DEPTH_LIMIT = 200;
 
-constexpr static uint8_t LATEST_ENGINE_VERSION = 5;
+constexpr static uint8_t LATEST_ENGINE_VERSION = 5; // +1 for NNUE
 
 constexpr static QChar SEP_MOVES = '_';
 

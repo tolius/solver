@@ -545,6 +545,8 @@ std::list<MoveEntry> Solution::positionEntries(Chess::Board* board, bool use_eso
 				quint32 v = entry->version();
 				if (v == LATEST_ENGINE_VERSION)
 					engine_info = QString("%1 t=%2").arg(engine_info).arg(entry->time());
+				else if (v == LATEST_ENGINE_VERSION + 1)
+					engine_info = QString("%1 t=%2 nnue").arg(engine_info).arg(entry->time());
 				else
 					engine_info = QString("%1 t=%2 v=%3").arg(engine_info).arg(entry->time()).arg(v);
 			}
@@ -725,6 +727,8 @@ QString Solution::positionInfo(std::shared_ptr<Chess::Board> board)
 				quint32 v = entry->version();
 				if (v == LATEST_ENGINE_VERSION)
 					info = QString("%1&nbsp; t=%2").arg(info).arg(entry->time());
+				else if (v == LATEST_ENGINE_VERSION + 1)
+					info = QString("%1&nbsp; t=%2&nbsp; nnue").arg(info).arg(entry->time());
 				else
 					info = QString("%1&nbsp; t=%2&nbsp; v=%3").arg(info).arg(entry->time()).arg(v);
 			}

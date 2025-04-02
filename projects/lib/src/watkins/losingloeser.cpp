@@ -308,6 +308,13 @@ std::vector<MoveResult> LosingLoeser::get_results(Chess::Board* ref_board)
 	return move_evals;
 }
 
+std::shared_ptr<Chess::Board> LosingLoeser::get_results_board()
+{
+	if (!ll_has_results() || !board || board->key() != curr_result_key)
+		return nullptr;
+	return board;
+}
+
 bool LosingLoeser::isBusy() const
 {
 	return status != Status::idle;

@@ -137,10 +137,17 @@ private:
 		CopyWatkinsOverride,
 		CopyWatkinsEG
 	};
+	enum class CurrentEngine
+	{
+		Main,
+		LL,
+		NNUE
+	};
 
 public slots:
 	void positionChanged();
 	void gotoCurrentMove();
+	void onSync();
 	void onSyncPositions(std::shared_ptr<Chess::Board> ref_board = nullptr);
 	void engineChanged(const QString& engine_filename);
 	void engineHashChanged(int hash_size);
@@ -175,7 +182,6 @@ private slots:
 	void onReplicateWatkinsOverrideTriggered();
 	void onReplicateWatkinsEGTriggered();
 	void onSyncToggled(bool flag);
-	void onAnalysingEngineChanged(int);
 	void onMultiPVClicked(int multiPV);
 	void onEvaluatePosition();
 	void onSolvingStatusChanged();
@@ -208,7 +214,9 @@ private:
 	void updateProgress(int val);
 	void reportStatusInfo(char ch);
 	void updateTime(int64_t time_s);
+	void setCurrEngine(CurrentEngine sel_engine);
 	void startLL();
+	void setNNUE(bool flag);
 
 private:
 	Ui::EvaluationWidget* ui;
@@ -216,12 +224,15 @@ private:
 	GameViewer* game_viewer;
 	std::vector<std::array<QLabel*, 3>> move_labels;
 	std::map<int, QToolButton*> multiPV_buttons;
-	QAction* action_sync;
 	QAction* action_auto;
 	QAction* action_auto_from_here;
 	QAction* action_replicate_Watkins;
 	QAction* action_replicate_Watkins_Override;
 	QAction* action_replicate_Watkins_EG;
+	QAction* action_start;
+	QAction* action_start_LL;
+	QAction* action_start_NNUE;
+	QAction* action_sync;
 	//QThread solver_thread;
 
 	SolverStatus solver_status;
@@ -269,7 +280,10 @@ private:
 	QTimer timer_eval;
 	EvalUpdate eval_data;
 
+	CurrentEngine curr_engine;
+	bool is_nnue;
 	std::shared_ptr<LosingLoeser> ll;
+	QString nnue_file;
 };
 
 #endif // EVALUATION_H

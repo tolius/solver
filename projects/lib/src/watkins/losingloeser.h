@@ -79,6 +79,7 @@ public:
 	void start(Chess::Board* ref_board, uint32_t total_nodes, size_t max_moves);
 	void stop();
 	std::vector<MoveResult> get_results(Chess::Board* ref_board);
+	std::shared_ptr<Chess::Board> get_results_board();
 	void clear();
 
 private:

@@ -45,8 +45,6 @@ constexpr static int EG_WIN_THRESHOLD = 15200;
 constexpr static int START_DEPTH = 10;
 constexpr static uint8_t UNKNOWN_ENGINE_VERSION = 0xFE;
 
-constexpr static int LL_INDEX = 1;
-
 QString score_to_text(int score)
 {
 	if (score == MoveEvaluation::NULL_SCORE)
@@ -130,6 +128,8 @@ Evaluation::Evaluation(GameViewer* game_viewer, QWidget* parent)
 	, game(nullptr)
 	, opponent(new HumanPlayer(nullptr))
 	, solver_status(SolverStatus::Manual)
+	, curr_engine(CurrentEngine::Main)
+	, is_nnue(false)
 	, ll(LosingLoeser::instance())
 	, is_position_update(false)
 	, is_restart(false)
@@ -143,9 +143,9 @@ Evaluation::Evaluation(GameViewer* game_viewer, QWidget* parent)
 	ui->label_CurrentLine->setVisible(QSettings().value("ui/show_current_line", false).toBool());
 	ui->label_CurrentStatusInfo->setVisible(false);
 	ui->widget_LosingLoeser->setVisible(false);
+	ui->widget_NNUE->setVisible(false);
 	ui->widget_NumBestMoves->setVisible(true);
 
-	session.reset();
 	timer_engine.setInterval(1s);
 	connect(&timer_engine, SIGNAL(timeout()), this, SLOT(onTimerEngine()));
 	timer_sync.setSingleShot(true);
@@ -210,6 +210,21 @@ Evaluation::Evaluation(GameViewer* game_viewer, QWidget* parent)
 	autoMenu->addAction(action_replicate_Watkins_EG);
 	autoMenu->setToolTipsVisible(true);
 	ui->btn_Auto->setMenu(autoMenu);
+	
+	auto startMenu = new QMenu;
+	action_start = new QAction("Start", this);
+	action_start->setToolTip("Start analysing using the main engine");
+	action_start_NNUE = new QAction("Start NNUE", this);
+	action_start_NNUE->setEnabled(false);
+	action_start_NNUE->setToolTip("Start analysing using the main engine with NNUE to get an alternative evaluation");
+	action_start_LL = new QAction("Start LL", this);
+	action_start_LL->setEnabled(true);
+	action_start_LL->setToolTip("Start analysing using LosingLoeser to get an alternative evaluation");
+	startMenu->addAction(action_start);
+	startMenu->addAction(action_start_NNUE);
+	startMenu->addAction(action_start_LL);
+	startMenu->setToolTipsVisible(true);
+	ui->btn_Start->setMenu(startMenu);
 
 	auto syncMenu = new QMenu;
 	action_sync = new QAction("Auto sync", this);
@@ -252,17 +267,19 @@ Evaluation::Evaluation(GameViewer* game_viewer, QWidget* parent)
 	connect(ui->btn_AutoHere, &QPushButton::clicked, this, [this]() { setMode(SolverStatus::AutoFromHere); });
 	connect(ui->btn_Save, SIGNAL(clicked()), this, SLOT(onSaveClicked()));
 	connect(ui->btn_Override, SIGNAL(toggled(bool)), this, SLOT(onOverrideToggled(bool)));
-	connect(ui->btn_Start, &QPushButton::clicked, this, [this]() { onEngineToggled(true); });
+	connect(ui->btn_Start, &QToolButton::toggled, this, [this]() { onEngineToggled(true); });
 	connect(ui->btn_Stop, &QPushButton::clicked, this, [this]() { onEngineToggled(false); });
-	connect(ui->btn_Sync, &QToolButton::clicked, this, [this]() { onSyncPositions(board_); });
+	connect(ui->btn_Sync, &QToolButton::clicked, this, [this]() { onSync(); });
 	connect(action_sync, SIGNAL(toggled(bool)), this, SLOT(onSyncToggled(bool)));
 	connect(action_auto, SIGNAL(triggered()), this, SLOT(onAutoTriggered()));
 	connect(action_auto_from_here, &QAction::triggered, this, [this]() { setMode(SolverStatus::AutoFromHere); });
 	connect(action_replicate_Watkins, SIGNAL(triggered()), this, SLOT(onReplicateWatkinsTriggered()));
 	connect(action_replicate_Watkins_EG, SIGNAL(triggered()), this, SLOT(onReplicateWatkinsEGTriggered()));
 	connect(action_replicate_Watkins_Override, SIGNAL(triggered()), this, SLOT(onReplicateWatkinsOverrideTriggered()));
+	connect(action_start, &QAction::triggered, this, [this]() { setCurrEngine(CurrentEngine::Main); });
+	connect(action_start_NNUE, &QAction::triggered, this, [this]() { setCurrEngine(CurrentEngine::NNUE); });
+	connect(action_start_LL, &QAction::triggered, this, [this]() { setCurrEngine(CurrentEngine::LL); });
 	connect(ui->spin_LLnodes, SIGNAL(valueChanged(int)), this, SLOT(onLLnodesChanged(int)));
-	connect(ui->combo_Engine, SIGNAL(currentIndexChanged(int)), this, SLOT(onAnalysingEngineChanged(int)));
 
 	QThread* thread = new QThread;
 	ll->moveToThread(thread);
@@ -353,7 +370,9 @@ void Evaluation::updateOverride()
 
 void Evaluation::updateSave(bool check_curr_pos)
 {	
-	bool enabled = solver && solver->solution() && board_ && (board_->sideToMove() == solver->solution()->winSide()) && board_->key() == curr_key;
+	bool enabled = solver && solver->solution() && board_ && (board_->sideToMove() == solver->solution()->winSide());
+	if (enabled)
+		enabled = curr_engine != CurrentEngine::LL && board_->key() == curr_key;
 	if (enabled && check_curr_pos && solver->isSolving())
 		enabled = game->board() && solver->positionToSolve()->key() == game->board()->key();
 	if (enabled)
@@ -502,6 +521,7 @@ void Evaluation::setEngine(const QString* filename)
 		engine->deleteLater();
 		engine = nullptr;
 	}
+
 	/// Configuration
 	QSettings s;
 	s.beginGroup("engine");
@@ -542,6 +562,22 @@ void Evaluation::setEngine(const QString* filename)
 	config.setWorkingDirectory(path_engines_dir);
 	config.setProtocol("uci");
 	config.setTimeoutScale(120.0);
+
+	/// Find NNUE
+	nnue_file = "";
+	QDir engines_dir(path_engines_dir);
+	for (auto fileInfo : engines_dir.entryInfoList(QStringList("antichess-*.nnue"), QDir::Files)) {
+		if (fileInfo.size()) {
+			nnue_file = fileInfo.fileName();
+			ui->label_NNUE->setText(tr("NNUE: %1").arg(fileInfo.baseName().midRef(10)));
+			break;
+		}
+	}
+	if (nnue_file.isEmpty()) {
+		ui->label_NNUE->setText("NNUE: not found");
+	}
+	action_start_NNUE->setEnabled(!nnue_file.isEmpty());
+
 	/// Create an instance
 	EngineBuilder builder(config);
 	QString error;
@@ -551,6 +587,7 @@ void Evaluation::setEngine(const QString* filename)
 		setMode(SolverStatus::Manual);
 		return;
 	}
+
 	/// Options
 	int hash = static_cast<int>(s.value("hash", 1.0).toDouble() * 1024);
 	engine->setOption("Hash", hash);
@@ -688,7 +725,8 @@ std::tuple<std::shared_ptr<SolutionEntry>, Chess::Move> Evaluation::currData() c
 
 	quint32 depth_time = static_cast<quint32>(std::min((int)REAL_DEPTH_LIMIT, curr_depth));
 	depth_time |= static_cast<quint32>(std::min(0xFFFF, best_time)) << 16;
-	depth_time |= static_cast<quint32>(engine_version) << 8;
+	uint8_t ver = is_nnue ? engine_version + 1 : engine_version;
+	depth_time |= static_cast<quint32>(ver) << 8;
 	qint16 score = static_cast<qint16>(best_score);
 	auto data = std::make_shared<SolutionEntry>(pgMove, score, depth_time);
 	return { data, move };
@@ -853,30 +891,9 @@ void Evaluation::onReplicateWatkinsEGTriggered()
 void Evaluation::onSyncToggled(bool flag)
 {
 	if (flag)
-		onSyncPositions(board_);
+		onSync();
 	else
 		timer_sync.stop();
-}
-
-void Evaluation::onAnalysingEngineChanged(int curr_index)
-{
-	if (curr_index == LL_INDEX)
-	{
-		ui->widget_NumBestMoves->setVisible(false);
-		ui->widget_LosingLoeser->setVisible(true);
-		if (engine && engine->state() == ChessPlayer::State::Thinking) {
-			to_keep_solving = false;
-			stopEngine();
-		}
-		ui->btn_Start->setText("Start LL");
-	}
-	else
-	{
-		ui->widget_LosingLoeser->setVisible(false);
-		ui->widget_NumBestMoves->setVisible(true);
-		ll->stop();
-		ui->btn_Start->setText("Start");
-	}
 }
 
 void Evaluation::onLLnodesChanged(int Mnodes)
@@ -924,6 +941,11 @@ void Evaluation::onLLfinished()
 	//ui->progressBar->setValue(100);
 }
 
+void Evaluation::Evaluation::onSync()
+{
+	onSyncPositions(board_);
+}
+
 void Evaluation::onSyncPositions(std::shared_ptr<Chess::Board> ref_board)
 {
 	if (!game)
@@ -962,6 +984,8 @@ void Evaluation::startEngine()
 
 	eval_pv_1 = "";
 	session.is_auto = (solver_status != SolverStatus::Manual); //!! multiPV_buttons...
+	if (session.is_auto && is_nnue)
+		emit Message("Auto mode initiated when NNUE mode is on.", MessageType::warning);
 	to_keep_solving = session.is_auto && solver;
 	int mate = 0;
 	bool to_repeat = session.to_repeat;
@@ -1076,12 +1100,57 @@ void Evaluation::onEngineToggled(bool flag)
 		return;
 
 	if (flag) {
-		if (ui->combo_Engine->currentIndex() == LL_INDEX) {
+		if (curr_engine != CurrentEngine::LL) {
+			ui->widget_LosingLoeser->setVisible(false);
+			ll->stop();
+		}
+		if (curr_engine != CurrentEngine::NNUE) {
+			ui->widget_NNUE->setVisible(false);
+		}
+		if (curr_engine == CurrentEngine::Main || curr_engine == CurrentEngine::NNUE) {
+			ui->widget_NumBestMoves->setVisible(true);
+		}
+		else {
+			ui->widget_NumBestMoves->setVisible(false);
+			if (engine && engine->state() == ChessPlayer::State::Thinking) {
+				to_keep_solving = false;
+				stopEngine();
+			}
+		}
+		
+		if (curr_engine == CurrentEngine::LL)
+		{
+			ui->widget_LosingLoeser->setVisible(true);
+			ui->btn_Start->setText("Start LL");
 			startLL();
 			ui->label_Engine->setText("LosingLoeser");
 			ui->label_EngineVersion->setText("(analysis mode)");
 		}
-		else {
+		else if(curr_engine == CurrentEngine::NNUE)
+		{
+			ui->widget_NNUE->setVisible(true);
+			ui->btn_Start->setText("Start NNUE");
+			if (engine && !nnue_file.isEmpty())
+			{
+				if (engine->state() == ChessPlayer::State::Thinking) {
+					to_keep_solving = false;
+					stopEngine();
+				}
+				else {
+					setNNUE(true);
+					startEngine();
+					ui->label_Engine->setText(engine_name.replace("Stockfish", "SF NNUE"));
+					QString ver = engine_version == UNKNOWN_ENGINE_VERSION ? "(unknown version)" : tr("v.%1").arg(engine_version + 1);
+					ui->label_EngineVersion->setText(ver);
+				}
+			}
+		}
+		else
+		{
+			ui->btn_Start->setText("Start");
+			if (engine->state() == ChessPlayer::State::Thinking)
+				emit Message("Re-running the engine while NNUE is on.", MessageType::warning);
+			setNNUE(false);
 			startEngine();
 			ui->label_Engine->setText(engine_name);
 			QString ver = engine_version == UNKNOWN_ENGINE_VERSION ? "(unknown version)" : tr("v.%1").arg(engine_version);
@@ -1097,6 +1166,36 @@ void Evaluation::onEngineToggled(bool flag)
 	//	if (solver_status != SolverStatus::Manual)
 	//		setMode(SolverStatus::Manual);
 	}
+}
+
+void Evaluation::setNNUE(bool flag)
+{
+	if (!engine)
+		return;
+	engine->setOption("EvalFile", flag ? nnue_file : "\"\"");
+	is_nnue = flag;
+	if (!is_nnue && curr_engine != CurrentEngine::Main) {
+		curr_engine = CurrentEngine::Main;
+		ui->widget_LosingLoeser->setVisible(false);
+		ui->widget_NNUE->setVisible(false);
+		ui->widget_NumBestMoves->setVisible(true);
+		ui->btn_Start->setText("Start");
+		ui->label_Engine->setText(engine_name);
+		QString ver = engine_version == UNKNOWN_ENGINE_VERSION ? "(unknown version)" : tr("v.%1").arg(engine_version);
+		ui->label_EngineVersion->setText(ver);
+	}
+}
+
+void Evaluation::setCurrEngine(CurrentEngine sel_engine)
+{
+	if (solver_status != SolverStatus::Manual)
+		return;
+
+	curr_engine = sel_engine;
+	if (!ui->btn_Start->isEnabled())
+		return;
+
+	onEngineToggled(true);
 }
 
 void Evaluation::startLL()
@@ -1615,6 +1714,7 @@ void Evaluation::onEvaluatePosition()
 		}
 	}
 	positionChanged();
+	setNNUE(false);
 	startEngine();
 }
 
