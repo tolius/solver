@@ -144,6 +144,9 @@ private:
 		NNUE
 	};
 
+protected:
+	bool eventFilter(QObject* obj, QEvent* event) override;
+
 public slots:
 	void positionChanged();
 	void gotoCurrentMove();
@@ -189,6 +192,7 @@ private slots:
 	void onLLnodesChanged(int);
 	void onLLprogress(const LLdata&);
 	void onLLfinished();
+	void onClearCachesClicked();
 private:
 	void onEngineToggled(bool flag);
 
@@ -201,6 +205,7 @@ private:
 	void updateSave(bool check_curr_pos);
 	void setMode(SolverStatus new_status);
 	void updateStartStop();
+	void updateClearCaches();
 	void clearEvals();
 	void clearEvalLabels();
 	std::tuple<std::shared_ptr<SolutionEntry>, Chess::Move> currData() const;
@@ -281,9 +286,10 @@ private:
 	EvalUpdate eval_data;
 
 	CurrentEngine curr_engine;
+	int engine_hash;
 	bool is_nnue;
-	std::shared_ptr<LosingLoeser> ll;
 	QString nnue_file;
+	std::shared_ptr<LosingLoeser> ll;
 };
 
 #endif // EVALUATION_H

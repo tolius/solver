@@ -129,6 +129,7 @@ Evaluation::Evaluation(GameViewer* game_viewer, QWidget* parent)
 	, opponent(new HumanPlayer(nullptr))
 	, solver_status(SolverStatus::Manual)
 	, curr_engine(CurrentEngine::Main)
+	, engine_hash(0)
 	, is_nnue(false)
 	, ll(LosingLoeser::instance())
 	, is_position_update(false)
@@ -145,6 +146,8 @@ Evaluation::Evaluation(GameViewer* game_viewer, QWidget* parent)
 	ui->widget_LosingLoeser->setVisible(false);
 	ui->widget_NNUE->setVisible(false);
 	ui->widget_NumBestMoves->setVisible(true);
+
+	ui->widget_LosingLoeser->installEventFilter(this);
 
 	timer_engine.setInterval(1s);
 	connect(&timer_engine, SIGNAL(timeout()), this, SLOT(onTimerEngine()));
@@ -189,6 +192,7 @@ Evaluation::Evaluation(GameViewer* game_viewer, QWidget* parent)
 	ui->btn_Override->setEnabled(false);
 	ui->btn_Override->setChecked(false);
 	ui->btn_Sync->setEnabled(false);
+	ui->btn_ClearCaches->setEnabled(false);
 
 	auto autoMenu = new QMenu;
 	action_auto = new QAction("Auto (default)", this);
@@ -280,6 +284,7 @@ Evaluation::Evaluation(GameViewer* game_viewer, QWidget* parent)
 	connect(action_start_NNUE, &QAction::triggered, this, [this]() { setCurrEngine(CurrentEngine::NNUE); });
 	connect(action_start_LL, &QAction::triggered, this, [this]() { setCurrEngine(CurrentEngine::LL); });
 	connect(ui->spin_LLnodes, SIGNAL(valueChanged(int)), this, SLOT(onLLnodesChanged(int)));
+	connect(ui->btn_ClearCaches, SIGNAL(clicked()), this, SLOT(onClearCachesClicked()));
 
 	QThread* thread = new QThread;
 	ll->moveToThread(thread);
@@ -443,6 +448,11 @@ void Evaluation::updateStartStop()
 	updateAuto();
 }
 
+void Evaluation::updateClearCaches()
+{
+	ui->btn_ClearCaches->setEnabled(engine_hash > 0 || (!ll->isBusy() && ll->hasResults()));
+}
+
 void Evaluation::clearEvals()
 {
 	curr_key = board_->key();
@@ -589,9 +599,9 @@ void Evaluation::setEngine(const QString* filename)
 	}
 
 	/// Options
-	int hash = static_cast<int>(s.value("hash", 1.0).toDouble() * 1024);
-	engine->setOption("Hash", hash);
 	engine->setOption("Threads", s.value("threads", 2).toInt());
+	engine_hash = static_cast<int>(s.value("hash", 1.0).toDouble() * 1024);
+	engine->setOption("Hash", engine_hash);
 	// engine->setOption("UCI_Variant", "antichess");
 	engine->setOption("SyzygyPath", path_egtb);
 	engine->setOption("SyzygyProbeLimit", 4);
@@ -606,6 +616,7 @@ void Evaluation::setEngine(const QString* filename)
 	connect(engine, SIGNAL(moveMade(const Chess::Move&)), this, SLOT(onEngineFinished()));
 
 	setMode(SolverStatus::Manual);
+	updateClearCaches();
 }
 
 void Evaluation::onEngineReady()
@@ -837,6 +848,28 @@ void Evaluation::engineChanged(const QString& engine_filename)
 	setEngine(&engine_filename);
 }
 
+bool Evaluation::eventFilter(QObject* obj, QEvent* event)
+{
+	if (obj == ui->widget_LosingLoeser && event->type() == QEvent::Show)
+		onLLnodesChanged(ui->spin_LLnodes->value());
+	return QWidget::eventFilter(obj, event);
+}
+
+void Evaluation::onClearCachesClicked()
+{
+	if (!ll->isBusy())
+		ll->clear();
+	if (engine) {
+		int hash = -engine_hash;
+		if (hash < 0) {
+			engine_hash = hash;
+			engine->setOption("Hash", 10);
+		}
+	}
+	onLLnodesChanged(ui->spin_LLnodes->value());
+	updateClearCaches();
+}
+
 void Evaluation::engineHashChanged(int hash_size)
 {
 	if (!engine)
@@ -846,7 +879,9 @@ void Evaluation::engineHashChanged(int hash_size)
 		stopEngine();
 	}
 	//int hash_size = static_cast<int>(QSettings().value("engine/hash", 1.0).toDouble() * 1024);
+	engine_hash = hash_size;
 	engine->setOption("Hash", hash_size);
+	updateClearCaches();
 }
 
 void Evaluation::engineNumThreadsChanged(int num_threads)
@@ -904,7 +939,7 @@ void Evaluation::onLLnodesChanged(int Mnodes)
 	QString prefix = (avail_ram <= required_ram) ? "<b><span style=\"color:#e59d56;\">" : "<b>";
 	QString postfix = (avail_ram <= required_ram) ? "</span></b>" : "</b>";
 	int prec = size > 9.995 ? 1 : 2;
-	QString memory = tr(" *requires additional %1%L2 GB%3 RAM").arg(prefix).arg(size, 3, 'f', prec).arg(postfix);
+	QString memory = tr(" *requires %1%L2 GB%3 RAM").arg(prefix).arg(size, 3, 'f', prec).arg(postfix);
 	ui->label_Memory->setText(memory);
 }
 
@@ -919,12 +954,12 @@ void Evaluation::onLLprogress(const LLdata& res)
 	ui->label_Speed->setText(tr("%L1 Mn/s").arg(res.speed_ll_Mns, 5, 'f', 2, QChar('0')));
 	ui->label_EGTB->setText(tr("%L1 kn/s").arg(res.speed_egtb_kns, 5, 'f', 2, QChar('0')));
 	updateTime(static_cast<int64_t>(roundf(res.time_us / 1'000'000.0f)));
-	ui->label_Depth->setText(tr("%L1M:").arg(res.size / 1'000'000.0f, 4, 'f', 1));
+	ui->label_Depth->setText(tr("%L1M:").arg(res.size / 1'000'000.0, 4, 'f', 1));
 	ui->label_Mate->setText(res.best_eval);
 	ui->label_BestMove->setText(res.best_move);
 	for (size_t i = 0; i < res.moves.size(); i++)
 	{
-		QString depth = tr("%L1M:").arg(res.moves[i].size / 1'000'000.0f, 4, 'f', 1);
+		QString depth = tr("%L1M:").arg(res.moves[i].size / 1'000'000.0, 4, 'f', 1);
 		move_labels[i][0]->setText(depth);
 		move_labels[i][1]->setText(res.moves[i].eval);
 		move_labels[i][2]->setText(res.moves[i].san);
@@ -939,6 +974,7 @@ void Evaluation::onLLfinished()
 {
 	updateStartStop();
 	//ui->progressBar->setValue(100);
+	updateClearCaches();
 }
 
 void Evaluation::Evaluation::onSync()
@@ -1074,6 +1110,11 @@ void Evaluation::startEngine()
 		//ui->btn_Save->setText("Save move");
 	}
 	num_pieces = board_->numPieces();
+	if (engine_hash < 0) {
+		engine_hash = -engine_hash;
+		engine->setOption("Hash", engine_hash);
+		updateClearCaches();
+	}
 	engine->setOption("MultiPV", session.multi_pv);
 	quint64 num_nodes = (solver && session.is_auto) ? solver->settings().max_search_time / 2 * NODES_PER_S : 0;
 	engine->go(board_.get(), num_nodes, mate);
@@ -1139,7 +1180,7 @@ void Evaluation::onEngineToggled(bool flag)
 				else {
 					setNNUE(true);
 					startEngine();
-					ui->label_Engine->setText(engine_name.replace("Stockfish", "SF NNUE"));
+					ui->label_Engine->setText(QString(engine_name).replace("Stockfish", "SF NNUE"));
 					QString ver = engine_version == UNKNOWN_ENGINE_VERSION ? "(unknown version)" : tr("v.%1").arg(engine_version + 1);
 					ui->label_EngineVersion->setText(ver);
 				}
@@ -1215,6 +1256,7 @@ void Evaluation::startLL()
 	uint32_t total_nodes = ui->spin_LLnodes->value() * 1'000'000;
 	ll->start(board, total_nodes, move_labels.size());
 	updateStartStop();
+	updateClearCaches();
 	emit runLL();
 }
 

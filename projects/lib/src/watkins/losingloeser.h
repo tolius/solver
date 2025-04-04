@@ -76,16 +76,17 @@ public:
 public:
 	size_t requiredRAM(int Mnodes) const;
 	bool isBusy() const;
+	bool hasResults() const;
 	void start(Chess::Board* ref_board, uint32_t total_nodes, size_t max_moves);
 	void stop();
-	std::vector<MoveResult> get_results(Chess::Board* ref_board);
-	std::shared_ptr<Chess::Board> get_results_board();
+	std::vector<MoveResult> getResults(Chess::Board* ref_board);
+	std::shared_ptr<Chess::Board> getResultsBoard();
 	void clear();
 
 private:
 	std::tuple<Chess::Move, QString, bool> get_wMove_info(move_t wMove);
 	std::tuple<Chess::Move, QString, bool> get_pgMove_info(std::shared_ptr<Chess::Board> pos, move_t pgMove);
-	std::vector<move_t> setPosition(Chess::Board* ref_board);
+	std::vector<move_t> set_position(Chess::Board* ref_board);
 	void run();
 
 public slots:

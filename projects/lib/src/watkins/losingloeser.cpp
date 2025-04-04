@@ -52,7 +52,7 @@ size_t LosingLoeser::requiredRAM(int Mnodes) const
 	return ll_required_ram(static_cast<uint32_t>(max(0, Mnodes) * 1'000'000));
 }
 
-std::vector<move_t> LosingLoeser::setPosition(Chess::Board* ref_board)
+std::vector<move_t> LosingLoeser::set_position(Chess::Board* ref_board)
 {
 	std::lock_guard<std::mutex> lock_source(ref_board->change_mutex);
 	vector<move_t> moves;
@@ -81,7 +81,7 @@ void LosingLoeser::start(Chess::Board* ref_board, uint32_t total_nodes, size_t m
 
 	try
 	{
-		vector<move_t> moves = setPosition(ref_board);
+		vector<move_t> moves = set_position(ref_board);
 		this->total_nodes = total_nodes;
 		auto it_res = res_cache.find(board->key());
 		if (it_res != res_cache.end() && it_res->second.total_nodes >= total_nodes) {
@@ -106,7 +106,6 @@ void LosingLoeser::start(Chess::Board* ref_board, uint32_t total_nodes, size_t m
 		emit Message(QString("Failed to start LosingLoeser: %1").arg(e.what()), MessageType::warning);
 	}
 }
-
 
 std::tuple<Chess::Move, QString, bool> LosingLoeser::get_wMove_info(move_t wMove)
 {
@@ -250,7 +249,7 @@ void LosingLoeser::run()
 	emit Finished();
 }
 
-std::vector<MoveResult> LosingLoeser::get_results(Chess::Board* ref_board)
+std::vector<MoveResult> LosingLoeser::getResults(Chess::Board* ref_board)
 {
 	std::vector<MoveResult> move_evals;
 	if (status != Status::idle)
@@ -308,7 +307,7 @@ std::vector<MoveResult> LosingLoeser::get_results(Chess::Board* ref_board)
 	return move_evals;
 }
 
-std::shared_ptr<Chess::Board> LosingLoeser::get_results_board()
+std::shared_ptr<Chess::Board> LosingLoeser::getResultsBoard()
 {
 	if (!ll_has_results() || !board || board->key() != curr_result_key)
 		return nullptr;
@@ -318,6 +317,11 @@ std::shared_ptr<Chess::Board> LosingLoeser::get_results_board()
 bool LosingLoeser::isBusy() const
 {
 	return status != Status::idle;
+}
+
+bool LosingLoeser::hasResults() const
+{
+	return ll_has_results();
 }
 
 void LosingLoeser::Run()
@@ -335,6 +339,8 @@ void LosingLoeser::clear()
 {
 	try
 	{
+		if (isBusy())
+			return;
 		ll_clear_data();
 	}
 	catch (...) {}

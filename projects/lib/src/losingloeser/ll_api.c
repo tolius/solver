@@ -285,7 +285,7 @@ void ll_do_search(unsigned int* len_moves, MoveRes* move_res, unsigned int max_m
 	       && tree[1].size < BILLION
 	       && tree[1].bad && tree[1].good
 	       && (tree[1].bad != MY_INFoo || tree[1].good != MY_INFoo)
-	       && max_nodes < search_nodes)
+	       && max_nodes <= search_nodes)
 	{
 		memcpy(POS, ROOT, sizeof(typePOS));
 		memcpy(POS->DYN, DYN, sizeof(typeDYNAMIC));

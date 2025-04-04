@@ -16,7 +16,7 @@ boolean Get_TB_Score(typePOS* POS, uint8* va, boolean flat)
 	int black_squares[4];
 	int black_pieces[4];
 	size_t num_black_pieces = 0;
-	int stm = POS->wtm;
+	int stm = !POS->wtm;
 	int ep_square = 0;
 	int dtw = 0;
 	int res;

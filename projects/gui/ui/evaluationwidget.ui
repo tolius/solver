@@ -521,7 +521,7 @@
               <item>
                <widget class="QLabel" name="label_LLnodes">
                 <property name="text">
-                 <string>LosingLoeser nodes: </string>
+                 <string>LL nodes: </string>
                 </property>
                </widget>
               </item>
@@ -541,7 +541,7 @@
               <item>
                <widget class="QLabel" name="label_Memory">
                 <property name="text">
-                 <string>*</string>
+                 <string>*requires &lt;b&gt;0.10 GB&lt;/b&gt; RAM</string>
                 </property>
                </widget>
               </item>
@@ -557,6 +557,16 @@
                  </size>
                 </property>
                </spacer>
+              </item>
+              <item>
+               <widget class="QPushButton" name="btn_ClearCaches">
+                <property name="toolTip">
+                 <string>Clear the caches of ALL engines to free up more RAM</string>
+                </property>
+                <property name="text">
+                 <string>Clear caches</string>
+                </property>
+               </widget>
               </item>
              </layout>
             </widget>

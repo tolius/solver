@@ -627,7 +627,7 @@ std::list<MoveEntry> Solution::esolEntries(Chess::Board* board, std::list<MoveEn
 	std::list<MoveEntry> esol_entries;
 	if (entries.empty())
 	{
-		auto move_evals = LosingLoeser::instance()->get_results(board);
+		auto move_evals = LosingLoeser::instance()->getResults(board);
 		for (auto& mr : move_evals)
 		{
 			MoveEntry e(EntrySource::watkins, mr.san, mr.pgMove, mr.value, mr.size);
