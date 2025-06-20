@@ -1557,6 +1557,13 @@
     </widget>
    </item>
    <item>
+    <widget class="QLabel" name="label_CurrentStatusInfo">
+     <property name="alignment">
+      <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
+     </property>
+    </widget>
+   </item>
+   <item>
     <spacer name="verticalSpacer">
      <property name="orientation">
       <enum>Qt::Vertical</enum>
@@ -1571,13 +1578,6 @@
       </size>
      </property>
     </spacer>
-   </item>
-   <item>
-    <widget class="QLabel" name="label_CurrentStatusInfo">
-     <property name="alignment">
-      <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignVCenter</set>
-     </property>
-    </widget>
    </item>
    <item>
     <widget class="QWidget" name="widget_Status" native="true">

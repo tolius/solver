@@ -145,7 +145,7 @@ int set_moves(typePOS* POS, const unsigned short* mv, unsigned int num_moves)
 	for (i = 0; i < num_moves; i++)
 	{
 		u = GenMoves(POS, moves);
-		if (mv[i] == 0xfedc)
+		if (mv[i] == LL_NULL_MOVE)
 		{
 			MakeNullMove(POS);
 			continue;

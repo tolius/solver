@@ -580,11 +580,13 @@ void Evaluation::setEngine(const QString* filename)
 		if (fileInfo.size()) {
 			nnue_file = fileInfo.fileName();
 			ui->label_NNUE->setText(tr("NNUE: %1").arg(fileInfo.baseName().midRef(10)));
+			ui->label_NNUE->setToolTip(nnue_file);
 			break;
 		}
 	}
 	if (nnue_file.isEmpty()) {
 		ui->label_NNUE->setText("NNUE: not found");
+		ui->label_NNUE->setToolTip("");
 	}
 	action_start_NNUE->setEnabled(!nnue_file.isEmpty());
 
@@ -1555,7 +1557,7 @@ void Evaluation::checkProgress(quint64 nodes, bool no_progress, int depth)
 				{
 					if (progress_time < s.add_engine_time) {
 						ti -= s.add_engine_time;
-						reportStatusInfo('=');
+						reportStatusInfo('_');
 					}
 					else {
 						reportStatusInfo('-');

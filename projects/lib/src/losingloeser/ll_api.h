@@ -1,6 +1,8 @@
 #ifndef _LL_API_H_
 #define _LL_API_H_
 
+#define LL_NULL_MOVE 0xfedc
+
 typedef struct { unsigned short move; unsigned int size; short eval; } MoveRes;
 
 unsigned long long ll_required_ram(unsigned int total_nodes);

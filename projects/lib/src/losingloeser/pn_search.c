@@ -1,49 +1,90 @@
 
 #include "losing.h"
 
-static boolean update_node(PN_NODE *tree,uint32 node,boolean full_sort)
-{uint32 n,v,w=tree[node].good,l=tree[node].bad;
- if (!tree[node].child) return TRUE;
- if (!full_sort) ensure_first_child(tree,node); else sort_children(tree,node);
- n=tree[node].child; v=tree[n].bad; tree[node].bad=tree[n].good;
+static boolean update_node(PN_NODE* tree, uint32 node, boolean full_sort)
+{
+	uint32 n, v;
+	uint32 w = tree[node].good;
+	uint32 l = tree[node].bad;
+	if (!tree[node].child)
+		return TRUE;
+	if (!full_sort)
+		ensure_first_child(tree, node);
+	else
+		sort_children(tree, node);
+	n = tree[node].child;
+	v = tree[n].bad;
+	tree[node].bad = tree[n].good;
 #if 1 // linear
- while (tree[n].sibling)
- {n=tree[n].sibling; v+=tree[n].bad; if (v>MY_INFoo) v=MY_INFoo;}
- tree[node].good=v;
+	while (tree[n].sibling)
+	{
+		n = tree[n].sibling;
+		v += tree[n].bad;
+		if (v > MY_INFoo)
+			v = MY_INFoo;
+	}
+	tree[node].good = v;
 #else // RMS
 #define SQR(x) (((uint64) (x))*((uint64) (x))))
 #define INF2 (MY_INFoo*MY_INFoo)
- uint64 vv=SQR(tree[n].bad); 
- while (tree[n].sibling)
- {n=tree[n].sibling; vv+=SQR(tree[n].bad); if (vv>INF2) v=INF2;}
- tree[node].good=(uint32) sqrt(vv);
+	uint64 vv = SQR(tree[n].bad);
+	while (tree[n].sibling)
+	{
+		n = tree[n].sibling;
+		vv += SQR(tree[n].bad);
+		if (vv > INF2)
+			v = INF2;
+	}
+	tree[node].good = (uint32)sqrt(vv);
 #endif
- if (v==w && l==tree[node].bad) return FALSE; return TRUE;}
+	if (v == w && l == tree[node].bad)
+		return FALSE;
+	return TRUE;
+}
 
-static void backtrack_loop(PN_NODE *tree,uint32 node,boolean fs)
-{uint32 n=tree[node].trans,k; if (!node) return;
- if (tree[n].killer) printf("LOST %d\n",n); // unused
- if (update_node(tree,n,fs) && !tree[n].killer)
-   backtrack_loop(tree,tree[n].parent,fs);
- k=tree[n].loop; if (!k) return;
- while (k!=n)
- {uint32 g=tree[k].good,b=tree[k].bad;
-  if (tree[k].killer) printf("LOST %d\n",k); // unused
-  tree[k].good=tree[n].good; tree[k].bad=tree[n].bad;
-  if (!tree[k].killer && (g!=tree[n].good || b!=tree[n].bad))
-    backtrack_loop(tree,tree[k].parent,fs);
-  k=tree[k].loop;}}
+static void backtrack_loop(PN_NODE* tree, uint32 node, boolean fs)
+{
+	uint32 n = tree[node].trans;
+	uint32 k;
+	if (!node)
+		return;
+	if (tree[n].killer)
+		printf("LOST %d\n", n); // unused
+	if (update_node(tree, n, fs) && !tree[n].killer)
+		backtrack_loop(tree, tree[n].parent, fs);
+	k = tree[n].loop;
+	if (!k)
+		return;
+	while (k != n)
+	{
+		uint32 g = tree[k].good;
+		uint32 b = tree[k].bad;
+		if (tree[k].killer)
+			printf("LOST %d\n", k); // unused
+		tree[k].good = tree[n].good;
+		tree[k].bad = tree[n].bad;
+		if (!tree[k].killer && (g != tree[n].good || b != tree[n].bad))
+			backtrack_loop(tree, tree[k].parent, fs);
+		k = tree[k].loop;
+	}
+}
 
 ////////////////////////////////////////////////////////////////////////
 
-static uint32 hash_hit(typePOS *POS)
-{uint32 k=POSITION->DYN->HASH&HASH_MASK; // return 0;
- if (POS->DYN->rev || POS->ZTAB[k].key!=POS->DYN->HASH) return 0;
- return POS->ZTAB[k].node;}
+static uint32 hash_hit(typePOS* POS)
+{
+	uint32 k = POSITION->DYN->HASH & HASH_MASK; // return 0;
+	if (POS->DYN->rev || POS->ZTAB[k].key != POS->DYN->HASH)
+		return 0;
+	return POS->ZTAB[k].node;
+}
 
-static void new_hash(uint32 node,typePOS *POS)
-{uint32 k=POS->DYN->HASH&HASH_MASK;
- POS->ZTAB[k].key=POS->DYN->HASH; POS->ZTAB[k].node=node;}
+static void new_hash(uint32 node, typePOS* POS)
+{
+	uint32 k = POS->DYN->HASH & HASH_MASK;
+	POS->ZTAB[k].key = POS->DYN->HASH;
+	POS->ZTAB[k].node = node;
+}
 
 ////////////////////////////////////////////////////////////////////////
 
@@ -51,67 +92,173 @@ static void new_hash(uint32 node,typePOS *POS)
 #define USE_OPP_BISHOP
 #define WHITE_MUST_WIN TRUE
 
-uint32 expand_node(typePOS *POS,PN_NODE *tree,uint32 node,uint32 next)
-{uint16 ml[256],mm[256]; int i,v,u=GenMoves(POS,ml); uint32 k; uint8 va;
+uint32 expand_node(typePOS* POS, PN_NODE* tree, uint32 node, uint32 next)
+{
+	uint16 ml[256], mm[256];
+	int i, v;
+	int u = GenMoves(POS, ml);
+	uint32 k;
+	uint8 va;
 #if 0 // joint rules
- if (!u) // stalemate, combines FICS and International rules,
-         // only a White win if POS->wtm and wc<bc
- {int wc=POPCNT(wBitboardOcc),bc=POPCNT(bBitboardOcc);
-  if (POS->wtm && wc<bc) {tree[node].bad=0; tree[node].good=MY_INFoo;}
-  if (POS->wtm && wc>=bc) {tree[node].good=0; tree[node].bad=MY_INFoo;}
-  if (!POS->wtm) {tree[node].bad=0; tree[node].good=MY_INFoo;}
-  goto BACK_TRACK;}
+	if (!u) // stalemate, combines FICS and International rules,
+		// only a White win if POS->wtm and wc<bc
+	{
+		int wc = POPCNT(wBitboardOcc);
+		int bc = POPCNT(bBitboardOcc);
+		if (POS->wtm && wc < bc)
+		{ 
+			tree[node].bad = 0;
+			tree[node].good = MY_INFoo;
+		}
+		else if (POS->wtm && wc >= bc)
+		{
+			tree[node].good = 0;
+			tree[node].bad = MY_INFoo;
+		}
+		else if (!POS->wtm)
+		{
+			tree[node].bad = 0;
+			tree[node].good = MY_INFoo;
+		}
+		goto BACK_TRACK;
+	}
 #else // International only
- if (!u) {tree[node].bad=0; tree[node].good=MY_INFoo; goto BACK_TRACK;}
+	if (!u)
+	{
+		tree[node].bad = 0;
+		tree[node].good = MY_INFoo;
+		goto BACK_TRACK;
+	}
 #endif
- tree[node].child=next;
- for (i=0;i<u;i++)
- {tree[next+i].bad=1; tree[next+i].move=ml[i]; tree[next+i].killer=0;
-  tree[next+i].loop=0; tree[next+i].trans=next+i;
-  tree[next+i].parent=node; tree[next+i].child=tree[next+i].size=0;
-  if (!MakeMove(POS,ml[i])) // causes a repetition
-  {tree[next+i].good=MY_INFoo; tree[next+i].bad=MY_INFoo; goto SIBLINGS;}
-  if (POPCNT(wBitboardOcc|bBitboardOcc)<=4 && Get_TB_Score(POS,&va,TRUE))
-  {if (va==1) {tree[next+i].good=MY_INFoo; tree[next+i].bad=0;}
-   if (va==2) {tree[next+i].good=MY_INFoo; tree[next+i].bad=MY_INFoo;}
-   if (va==3) {tree[next+i].good=0; tree[next+i].bad=MY_INFoo;}
-   POS->tb_hits++; UnmakeMove(POS,ml[i],TRUE); goto SIBLINGS;}
-  v=GenMoves(POS,mm);
-  if (POS->DYN->rev==0 || (v && POS->sq[TO(mm[v-1])])) // ep in rev
-  {if ((k=hash_hit(POS)))                       // every move is cap [or pawn]
-   {tree[next+i].trans=k;
-    tree[next+i].loop=tree[k].loop?tree[k].loop:k; tree[k].loop=next+i;
-    tree[next+i].good=tree[k].good; tree[next+i].bad=tree[k].bad;
-    UnmakeMove(POS,ml[i],TRUE); goto SIBLINGS;}
-   else new_hash(next+i,POS);}
-  tree[next+i].good=v; // corrected below if 0, .bad=1 from above
+	tree[node].child = next;
+	for (i = 0; i < u; i++)
+	{
+		tree[next + i].bad = 1;
+		tree[next + i].move = ml[i];
+		tree[next + i].killer = 0;
+		tree[next + i].loop = 0;
+		tree[next + i].trans = next + i;
+		tree[next + i].parent = node;
+		tree[next + i].child = tree[next + i].size = 0;
+		if (!MakeMove(POS, ml[i])) // causes a repetition
+		{
+			tree[next + i].good = MY_INFoo;
+			tree[next + i].bad = MY_INFoo;
+			goto SIBLINGS;
+		}
+		if (POPCNT(wBitboardOcc | bBitboardOcc) <= 4 && Get_TB_Score(POS, &va, TRUE))
+		{
+			if (va == 1)
+			{
+				tree[next + i].good = MY_INFoo;
+				tree[next + i].bad = 0;
+			}
+			else if (va == 2)
+			{
+				tree[next + i].good = MY_INFoo;
+				tree[next + i].bad = MY_INFoo;
+			}
+			else if (va == 3)
+			{
+				tree[next + i].good = 0;
+				tree[next + i].bad = MY_INFoo;
+			}
+			POS->tb_hits++;
+			UnmakeMove(POS, ml[i], TRUE);
+			goto SIBLINGS;
+		}
+		v = GenMoves(POS, mm);
+		if (POS->DYN->rev == 0 || (v && POS->sq[TO(mm[v - 1])])) // ep in rev
+		{
+			if ((k = hash_hit(POS)))                       // every move is cap [or pawn]
+			{
+				tree[next + i].trans = k;
+				tree[next + i].loop = tree[k].loop ? tree[k].loop : k;
+				tree[k].loop = next + i;
+				tree[next + i].good = tree[k].good;
+				tree[next + i].bad = tree[k].bad;
+				UnmakeMove(POS, ml[i], TRUE);
+				goto SIBLINGS;
+			}
+			else new_hash(next + i, POS);
+		}
+		tree[next + i].good = v; // corrected below if 0, .bad=1 from above
 #define BLACK_SQUARES 0xaa55aa55aa55aa55
 #define WHITE_SQUARES 0x55aa55aa55aa55aa
-  if (wBitboardOcc==wBitboardB && !WHITE_MUST_WIN)
-  {if (((!(wBitboardB&BLACK_SQUARES) && bBitboardB&BLACK_SQUARES)) || 
-       ((!(wBitboardB&WHITE_SQUARES) && bBitboardB&WHITE_SQUARES)))
-   {if (POS->wtm) tree[next+i].good=MY_INFoo; else tree[next+i].bad=MY_INFoo;}}
-  if (bBitboardOcc==bBitboardB)
-  {if (((!(bBitboardB&BLACK_SQUARES) && wBitboardB&BLACK_SQUARES)) || 
-       ((!(bBitboardB&WHITE_SQUARES) && wBitboardB&WHITE_SQUARES)))
-   {if (POS->wtm) tree[next+i].bad=MY_INFoo; else tree[next+i].good=MY_INFoo;}}
+		if (wBitboardOcc == wBitboardB && !WHITE_MUST_WIN)
+		{
+			if (((!(wBitboardB & BLACK_SQUARES) && bBitboardB & BLACK_SQUARES)) ||
+				((!(wBitboardB & WHITE_SQUARES) && bBitboardB & WHITE_SQUARES)))
+			{
+				if (POS->wtm)
+					tree[next + i].good = MY_INFoo;
+				else
+					tree[next + i].bad = MY_INFoo;
+			}
+		}
+		if (bBitboardOcc == bBitboardB)
+		{
+			if (((!(bBitboardB & BLACK_SQUARES) && wBitboardB & BLACK_SQUARES)) ||
+				((!(bBitboardB & WHITE_SQUARES) && wBitboardB & WHITE_SQUARES)))
+			{
+				if (POS->wtm)
+					tree[next + i].bad = MY_INFoo;
+				else
+					tree[next + i].good = MY_INFoo;
+			}
+		}
 #if 0 // combined rules
-  if (!v) // FICS + International
-  {int wc=POPCNT(wBitboardOcc),bc=POPCNT(bBitboardOcc);
-   if (POS->wtm && wc<bc) {tree[next+i].bad=0; tree[next+i].good=MY_INFoo;}
-   if (POS->wtm && wc>=bc) {tree[next+i].good=0; tree[next+i].bad=MY_INFoo;}
-   if (!POS->wtm) {tree[next+i].bad=0; tree[next+i].good=MY_INFoo;}}
+		if (!v) // FICS + International
+		{
+			int wc = POPCNT(wBitboardOcc);
+			int bc = POPCNT(bBitboardOcc);
+			if (POS->wtm && wc < bc)
+			{
+				tree[next + i].bad = 0;
+				tree[next + i].good = MY_INFoo;
+			}
+			if (POS->wtm && wc >= bc)
+			{
+				tree[next + i].good = 0;
+				tree[next + i].bad = MY_INFoo;
+			}
+			if (!POS->wtm)
+			{
+				tree[next + i].bad = 0;
+				tree[next + i].good = MY_INFoo;
+			}
+		}
 #else // International only
-  if (!v) {tree[next+i].good=MY_INFoo; tree[next+i].bad=0;}
+		if (!v)
+		{
+			tree[next + i].good = MY_INFoo;
+			tree[next + i].bad = 0;
+		}
 #endif
-  UnmakeMove(POS,ml[i],TRUE); // after oppB check
- SIBLINGS:
-  if (WHITE_MUST_WIN)
-  {if (!POS->wtm && tree[next+i].bad==MY_INFoo) tree[next+i].good=0;
-   if (POS->wtm && tree[next+i].good==MY_INFoo) tree[next+i].bad=0;}
-  if (i!=(u-1)) tree[next+i].sibling=next+i+1; else tree[next+i].sibling=0;}
- BACK_TRACK: backtrack_loop(tree,node,FALSE); //size_backtrack(tree,node,u);
- while (node) {tree[node].size+=u; node=tree[node].parent;} return u;}
+		UnmakeMove(POS, ml[i], TRUE); // after oppB check
+	SIBLINGS:
+		if (WHITE_MUST_WIN)
+		{
+			if (!POS->wtm && tree[next + i].bad == MY_INFoo)
+				tree[next + i].good = 0;
+			if (POS->wtm && tree[next + i].good == MY_INFoo)
+				tree[next + i].bad = 0;
+		}
+		if (i != (u - 1))
+			tree[next + i].sibling = next + i + 1;
+		else
+			tree[next + i].sibling = 0;
+	}
+BACK_TRACK:
+	backtrack_loop(tree, node, FALSE); //size_backtrack(tree,node,u);
+	while (node)
+	{
+		tree[node].size += u;
+		node = tree[node].parent;
+	}
+	return u;
+}
+
 /*
 static void info_node (PN_NODE *tree,uint32 n,boolean verbose)
 {uint32 k=tree[n].child; char A[8];
@@ -126,11 +273,18 @@ static void path_node (PN_NODE *tree,uint32 n)
  while (tree[n].parent) {M[k++]=tree[n].move; n=tree[n].parent;}
  while (k>0) printf("%s ", Notate(N,M[--k]));}
 */
-/*static*/ uint32 walk_tree (typePOS *POS,PN_NODE *tree)
-{uint32 n=1; // char A[8];
- while (tree[n].child) // MakeMove could fail?
- {n=tree[n].child; if (!MakeMove(POS,tree[n].move)) return 0; n=tree[n].trans;}
- return n;}
+/*static*/ uint32 walk_tree(typePOS* POS, PN_NODE* tree)
+{
+	uint32 n = 1; // char A[8];
+	while (tree[n].child) // MakeMove could fail?
+	{
+		n = tree[n].child;
+		if (!MakeMove(POS, tree[n].move))
+			return 0;
+		n = tree[n].trans;
+	}
+	return n;
+}
 /*
 static uint32 large_child(PN_NODE *tree,uint32 n,uint32 sz)
 {uint32 k=tree[n].child; if (!k) return 0; if (tree[k].size>sz) return k;

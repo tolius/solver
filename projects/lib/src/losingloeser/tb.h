@@ -55,6 +55,6 @@ boolean Get_TB_Score(typePOS* POS, uint8* va, boolean flat)
 	}
 	if (res != 0)
 		return FALSE;
-	*va = (dtw > 0) ? dWIN : (dtw == 0) ? dDRAW : dLOST0;
+	*va = (dtw >= 0) ? dWIN : dLOST0; // if dtw == 0, stm (side to move) won
 	return TRUE;
 }

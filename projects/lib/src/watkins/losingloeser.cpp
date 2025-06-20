@@ -57,11 +57,13 @@ std::vector<move_t> LosingLoeser::set_position(Chess::Board* ref_board)
 	std::lock_guard<std::mutex> lock_source(ref_board->change_mutex);
 	vector<move_t> moves;
 	size_t num_moves = ref_board->MoveHistory().size();
-	if (num_moves > 256)
+	if (num_moves > 256 - 1)
 	{
 		emit Message(QString("Too many moves (%1 plies) for LosingLoeser.").arg(num_moves), MessageType::warning);
 		return moves;
 	}
+	//if (num_moves % 2 == 1)
+	//	moves.push_back(LL_NULL_MOVE);
 	board.reset(BoardFactory::create("antichess"));
 	board->setFenString(board->defaultFenString());
 	for (size_t i = 0; i < num_moves; i++)
@@ -259,20 +261,23 @@ std::vector<MoveResult> LosingLoeser::getResults(Chess::Board* ref_board)
 	if (!board || !is_branch(board.get(), ref_board))
 		return move_evals;
 	status = Status::processing;
-	unsigned int num_opening_moves;
 	size_t num_moves;
+	size_t num_opening_moves;
 	vector<move_t> moves;
 	array<MoveRes, 256> move_res;
 	unsigned int len_moves = 0;
-	std::shared_ptr<Board> temp_board;
+	std::shared_ptr<Board> temp_board; // (BoardFactory::create("antichess"));
 	{
 		std::lock_guard<std::mutex> lock_source(ref_board->change_mutex);
 		std::lock_guard<std::mutex> lock_board(board->change_mutex);
-		num_opening_moves = static_cast<unsigned int>(board->MoveHistory().size());
-		num_moves = ref_board->MoveHistory().size();
-		if (num_moves > 256)
-			return move_evals;
+		//temp_board->setFenString(ref_board->defaultFenString());
 		temp_board.reset(board->copy());
+		num_opening_moves = static_cast<size_t>(board->MoveHistory().size());
+		num_moves = static_cast<size_t>(ref_board->MoveHistory().size());
+		if (num_moves > 256 - 1)
+			return move_evals;
+		//if (num_moves % 2 == 1)
+		//	moves.push_back(LL_NULL_MOVE);
 		for (size_t i = num_opening_moves; i < num_moves; i++)
 		{
 			auto& m = ref_board->MoveHistory()[i].move;
