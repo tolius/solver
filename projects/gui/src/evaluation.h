@@ -217,7 +217,7 @@ private:
 	void updateBadMove(const QString& san);
 	void checkProgress(quint64 nodes, bool no_progress, int depth);
 	void updateProgress(int val);
-	void reportStatusInfo(char ch);
+	void reportStatusInfo(const QString& info_status, const QString& info_target);
 	void updateTime(int64_t time_s);
 	void setCurrEngine(CurrentEngine sel_engine);
 	void startLL();
@@ -258,6 +258,7 @@ private:
 	int best_time;
 	int progress_time;
 	int t_progress;
+	int d_progress;
 	int best_score;
 	int abs_score;
 	bool is_endgame;

@@ -35,7 +35,10 @@
 
 class PgnGame;
 class ChessGame;
-namespace Chess { class GenericMove; }
+class Solver;
+namespace Chess { 
+	class GenericMove;
+}
 class QTimer;
 class FlowLayout;
 
@@ -58,7 +61,7 @@ public:
 		* If \a pgn is NULL, then the PGN data is retrieved from \a game.
 		*/
 	void setGame(ChessGame* game, PgnGame* pgn = nullptr);
-	void setTint(QColor tint = QColor());
+	void setSolver(std::shared_ptr<Solver> solver);
 
 public slots:
 	/*!
@@ -74,8 +77,7 @@ public slots:
 			    const QString& sanString,
 			    const QString& comment);
 	void setPosition();
-	void goodMovesReported(const std::set<QString>& good_moves);
-	void badMoveReported(const QString& bad_move);
+	void addComment(int ply, const QString& comment);
 
 signals:
 	/*!
@@ -92,11 +94,6 @@ signals:
 	void copyPgnClicked();
 	void copyZSClicked();
 	void moveSelected(Chess::Move move);
-
-	void gotoFirstMoveClicked();
-	void gotoPreviousMoveClicked(int num);
-	void gotoNextMoveClicked();
-	void gotoCurrentMoveClicked();
 
 protected:
 	// Reimplemented from QWidget
@@ -122,12 +119,12 @@ private:
 			QTextCursor cursor = QTextCursor());
 	void regenerateMoves();
 	void resetMovesToPgn();
-	void regenerateMoveButtons();
-	void updateButtons();
+	bool commentMoves();
 
 private:
 	Ui::MoveListWidget* ui;
 	QPointer<ChessGame> m_game;
+	std::shared_ptr<Solver> m_solver;
 	PgnGame* m_pgn;
 	QList<Move> m_moves;
 	int m_moveCount;
@@ -137,7 +134,6 @@ private:
 	bool m_showComments;
 	QTextCharFormat m_defaultTextFormat;
 	QTimer* m_selectionTimer;
-	FlowLayout* m_flowLayout;
 };
 
 #endif // MOVE_LIST_H

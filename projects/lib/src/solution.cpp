@@ -109,7 +109,7 @@ void Solution::initFilenames()
 	}
 }
 
-void Solution::loadBook()
+void Solution::loadBook(bool ignore_lower_level)
 {
 	QSettings s(path(FileType_spec), QSettings::IniFormat);
 	s.beginGroup("info");
@@ -118,7 +118,7 @@ void Solution::loadBook()
 	s.endGroup();
 	bool all_branches_upper = state_upper_level & static_cast<int>(SolutionInfoState::all_branches);
 	bool all_branches_lower = state_lower_level & static_cast<int>(SolutionInfoState::all_branches);
-	bool exists_lower = fileExists(FileType_book);
+	bool exists_lower = !ignore_lower_level && fileExists(FileType_book);
 	bool exists_upper = fileExists(FileType_book_upper);
 	QString path_book = (exists_lower && all_branches_lower) ? path(FileType_book)
 	                  : (exists_upper && all_branches_upper) ? path(FileType_book_upper)

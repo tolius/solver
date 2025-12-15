@@ -49,6 +49,7 @@
 #include "cutechessapp.h"
 #include "gameviewer.h"
 #include "movelist.h"
+#include "moves.h"
 #include "evaluation.h"
 #include "watkins/losingloeser.h"
 #include "results.h"
@@ -96,6 +97,7 @@ MainWindow::MainWindow(ChessGame* game, SettingsDialog* settingsDlg)
 	m_gameViewer->setContentsMargins(6, 6, 6, 6);
 	m_tint = QColor(0, 0, 0, 0);
 	m_moveList = new MoveList(this);
+	m_moves = new Moves(this);
 	m_evaluation = new Evaluation(m_gameViewer, this);
 	auto ll = LosingLoeser::instance();
 	m_results = new Results(this);
@@ -124,26 +126,22 @@ MainWindow::MainWindow(ChessGame* game, SettingsDialog* settingsDlg)
 	connect(m_moveList, SIGNAL(copyPgnClicked()), this, SLOT(copyPgn()));
 	connect(m_moveList, SIGNAL(copyZSClicked()), this, SLOT(copyZS()));
 	connect(m_moveList, SIGNAL(moveSelected(Chess::Move)), m_gameViewer->boardScene(), SLOT(makeMove(Chess::Move)));
-	connect(m_moveList, SIGNAL(gotoFirstMoveClicked()), m_gameViewer, SLOT(gotoFirstMove()));
-	connect(m_moveList, SIGNAL(gotoPreviousMoveClicked(int)), m_gameViewer, SLOT(gotoPreviousMove(int)));
-
 	//connect(m_moveList, SIGNAL(moveSelected(Chess::Move)), m_evaluation, SLOT(positionChanged(quint64)));
-	connect(m_moveList, SIGNAL(gotoNextMoveClicked()), m_results, SLOT(nextMoveClicked()));
-	connect(m_moveList, SIGNAL(gotoCurrentMoveClicked()), m_evaluation, SLOT(gotoCurrentMove()));
+
+	connect(m_moves, SIGNAL(gotoFirstMoveClicked()), m_gameViewer, SLOT(gotoFirstMove()));
+	connect(m_moves, SIGNAL(gotoPreviousMoveClicked(int)), m_gameViewer, SLOT(gotoPreviousMove(int)));
+	connect(m_moves, SIGNAL(gotoNextMoveClicked()), m_results, SLOT(nextMoveClicked()));
+	connect(m_moves, SIGNAL(gotoCurrentMoveClicked()), m_evaluation, SLOT(gotoCurrentMove()));
 
 	connect(m_evaluation, SIGNAL(tintChanged(QColor, bool)), this, SLOT(setTint(QColor, bool)));
-	connect(m_evaluation, SIGNAL(reportGoodMoves(const std::set<QString>&)), m_moveList, SLOT(goodMovesReported(const std::set<QString>&)));
-	connect(m_evaluation, SIGNAL(reportBadMove(const QString&)), m_moveList, SLOT(badMoveReported(const QString&)));
+	connect(m_evaluation, SIGNAL(reportGoodMoves(const std::set<QString>&)), m_moves, SLOT(goodMovesReported(const std::set<QString>&)));
+	connect(m_evaluation, SIGNAL(reportBadMove(const QString&)), m_moves, SLOT(badMoveReported(const QString&)));
 	connect(m_evaluation, SIGNAL(currentLineChanged(const QString&)), m_gameViewer, SLOT(updatePGNline(const QString&)));
 	connect(ll.get(), SIGNAL(Finished()), m_results, SLOT(positionChanged()));
-	connect(m_results, &Results::addComment, this, 
-		[&](int ply, const QString& score)
-		{ 
-			m_moveList->setMove(ply, Chess::GenericMove(), QString(), score); 
-		}
-	);
+	connect(m_results, &Results::addComment, m_moveList, &MoveList::addComment);
 
 	connect(m_gameViewer, SIGNAL(moveSelected(int)), m_moveList, SLOT(selectMove(int)));
+	connect(m_gameViewer, SIGNAL(moveSelected(int)), m_moves, SLOT(positionChanged()));
 	connect(m_gameViewer, SIGNAL(moveSelected(int)), m_evaluation, SLOT(positionChanged()));
 	connect(m_gameViewer, SIGNAL(moveSelected(int)), m_results, SLOT(positionChanged()));
 	connect(m_gameViewer, SIGNAL(gotoNextMoveClicked()), m_results, SLOT(nextMoveClicked()));
@@ -487,7 +485,7 @@ void MainWindow::createDockWindows()
 	addDockWidget(Qt::RightDockWidgetArea, resultsDock);
 
 	// Move list
-	QDockWidget* moveListDock = new QDockWidget(tr("Moves"), this);
+	QDockWidget* moveListDock = new QDockWidget(tr("Move List"), this);
 	moveListDock->setObjectName("MoveListDock");
 	m_moveList->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
 	moveListDock->setWidget(m_moveList);
@@ -495,9 +493,18 @@ void MainWindow::createDockWindows()
 	moveListDock->setContentsMargins(0, 0, 9, 0);
 	addDockWidget(Qt::RightDockWidgetArea, moveListDock);
 
+	// Moves
+	QDockWidget* movesDock = new QDockWidget(tr("Moves"), this);
+	movesDock->setObjectName("MovesDock");
+	m_moves->setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Expanding);
+	movesDock->setWidget(m_moves);
+	movesDock->setContentsMargins(0, 0, 9, 0);
+	addDockWidget(Qt::RightDockWidgetArea, movesDock);
+
 	tabifyDockWidget(solutionsDock, evaluationDock);
 	tabifyDockWidget(solutionsDock, releaseDock);
 	solutionsDock->raise();
+	tabifyDockWidget(moveListDock, movesDock);
 	tabifyDockWidget(moveListDock, resultsDock);
 	moveListDock->raise();
 	//splitDockWidget(solutionsDock, evaluationDock, Qt::Vertical);
@@ -511,6 +518,7 @@ void MainWindow::createDockWindows()
 	connect(m_newGameAct, SIGNAL(triggered()), m_solutionsWidget, SLOT(on_newSolution()));
 	// Add toggle view actions to the View menu
 	m_viewMenu->addAction(moveListDock->toggleViewAction());
+	m_viewMenu->addAction(movesDock->toggleViewAction());
 	m_viewMenu->addAction(solutionsDock->toggleViewAction());
 	m_viewMenu->addAction(evaluationDock->toggleViewAction());
 	m_viewMenu->addAction(resultsDock->toggleViewAction());
@@ -623,6 +631,7 @@ void MainWindow::setCurrentGame(const TabData& gameData)
 		m_game->pgn()->setTagReceiver(nullptr);
 		m_gameViewer->disconnectGame();
 		disconnect(m_game, nullptr, m_moveList, nullptr);
+		disconnect(m_game, nullptr, m_moves, nullptr);
 
 		ChessGame* tmp = m_game;
 		m_game = nullptr;
@@ -648,6 +657,7 @@ void MainWindow::setCurrentGame(const TabData& gameData)
 	m_log->clear();
 
 	m_moveList->setGame(m_game, gameData.m_pgn);
+	m_moves->setGame(m_game);
 	m_evaluation->setGame(m_game);
 	m_results->setGame(m_game);
 
@@ -1219,6 +1229,7 @@ void MainWindow::openSolution(QModelIndex index, SolutionItem* item)
 	if (m_solutionsWidget)
 		m_solutionsWidget->setSolver(m_solver);
 	m_release->setSolver(m_solver);
+	m_moveList->setSolver(m_solver);
 	m_gameViewer->titleBar()->setSolution(m_solution);
 	m_mergeBooksAct->setEnabled((bool)m_solver);
 	initSolutionGame();
@@ -1314,9 +1325,9 @@ void MainWindow::setTint(QColor tint, bool to_color_move_buttons)
 
 	m_tint = tint;
 	if (to_color_move_buttons)
-		m_moveList->setTint(tint);
+		m_moves->setTint(tint);
 	else
-		m_moveList->setTint();
+		m_moves->setTint();
 	this->centralWidget()->setStyleSheet("");
 	if (!tint.isValid() || tint == QColor(0, 0, 0, 0))
 		return;

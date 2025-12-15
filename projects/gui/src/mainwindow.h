@@ -42,6 +42,7 @@ class QCloseEvent;
 class QTabBar;
 class GameViewer;
 class MoveList;
+class Moves;
 class Evaluation;
 class Results;
 class Release;
@@ -154,7 +155,8 @@ class MainWindow : public QMainWindow
 
 		SettingsDialog* m_settingsDlg;
 		GameViewer* m_gameViewer;
-		MoveList* m_moveList;
+	    MoveList* m_moveList;
+	    Moves* m_moves;
 		Evaluation* m_evaluation;
 		Results* m_results;
 		Release* m_release;

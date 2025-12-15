@@ -258,6 +258,7 @@ add_executable(gui
 	projects/gui/src/movetoken.cpp
 	projects/gui/src/movecommenttoken.cpp
 	projects/gui/src/movelist.cpp
+	projects/gui/src/moves.cpp
 	projects/gui/src/evaluation.cpp
 	projects/gui/src/release.cpp
 	projects/gui/src/results.cpp
@@ -274,6 +275,7 @@ add_executable(gui
 	projects/gui/ui/solutionswidget.ui
 	projects/gui/ui/evaluationwidget.ui
 	projects/gui/ui/movelistwidget.ui
+	projects/gui/ui/moveswidget.ui
 	projects/gui/ui/releasewidget.ui
 	projects/gui/ui/resultswidget.ui
 	projects/gui/ui/titlewidget.ui
@@ -286,8 +288,30 @@ add_executable(gui
 )
 
 if(WIN32)
+	string(REGEX REPLACE "[^0-9\\.]+" "" SOLVER_VERSION_VER ${SOLVER_VERSION})
+	string(REPLACE "." "," SOLVER_VERSION_VER ${SOLVER_VERSION_VER})
+	string(LENGTH "${SOLVER_VERSION}" str_len)
+	IF(${str_len})
+		math(EXPR last_index "${str_len} - 1")
+		string(SUBSTRING "${SOLVER_VERSION}" ${last_index} 1 last_char)
+		string(FIND "abcdefghijklmnopqrstuvwxyz" "${last_char}" char_index)
+		IF(NOT char_index EQUAL -1)
+			math(EXPR char_index "${char_index} + 1")
+			set(SOLVER_VERSION_VER "${SOLVER_VERSION_VER},${char_index}")
+		ENDIF()
+	ENDIF(${str_len})
+	string(REGEX REPLACE "[^0-9\\.]+" "" CUTECHESS_VERSION_VER ${CUTECHESS_VERSION})
+	string(REPLACE "." "," CUTECHESS_VERSION_VER ${CUTECHESS_VERSION_VER})
+	configure_file(projects/gui/res/icons/cutechess_win.rc.in
+		${CMAKE_CURRENT_BINARY_DIR}/cutechess_win.rc
+		@ONLY IMMEDIATE
+	)
+	configure_file(projects/gui/res/icons/cutechess_win.ico
+		${CMAKE_CURRENT_BINARY_DIR}/cutechess_win.ico
+		COPYONLY
+	)
 	target_sources(gui PRIVATE
-		projects/gui/res/icons/cutechess_win.rc
+		${CMAKE_CURRENT_BINARY_DIR}/cutechess_win.rc
 	)
 endif()
 

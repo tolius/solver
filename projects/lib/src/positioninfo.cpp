@@ -678,15 +678,23 @@ bool is_branch(Chess::Board* pos, const Line& opening, const Line& branch)
 	return true;
 }
 
+QString nodes_with_suffix(quint32 num, bool html, quint32 start_num)
+{
+	if (html)
+		return num < start_num  ? ""
+		     : num < 5'000      ? QString("%L1").arg(num)
+		     : num < 5'000'000  ? QString("%L1<b>k</b>").arg((num + 500) / 1000)
+		                        : QString("<b>%L1M</b>").arg((num + 500'000) / 1000'000);
+	return num < start_num  ? ""
+	     : num < 5'000      ? QString("%L1").arg(num)
+	     : num < 5'000'000  ? QString("%L1k").arg((num + 500) / 1000)
+	                        : QString("%L1M").arg((num + 500'000) / 1000'000);
+}
 
 QString Watkins_nodes(const SolutionEntry& entry)
 {
 	quint32 num = entry.nodes();
-	QString num_nodes = num <= 1 ? ""
-	    : num < 5'000            ? QString("%L1").arg(num)
-	    : num < 5'000'000        ? QString("%L1<b>k</b>").arg((num + 500) / 1000)
-	                             : QString("<b>%L1M</b>").arg((num + 500'000) / 1000'000);
-	return num_nodes;
+	return nodes_with_suffix(num, true);
 }
 
 uint64_t load_bigendian(const void* bytes)

@@ -41,6 +41,7 @@ using namespace std::chrono;
 
 constexpr static quint64 NODES_PER_S = 1'500'000;
 constexpr static int NO_PROGRESS_TIME = 12; // [s]
+constexpr static int NO_PROGRESS_DEPTH = 10;
 constexpr static int EG_WIN_THRESHOLD = 15200;
 constexpr static int START_DEPTH = 10;
 constexpr static uint8_t UNKNOWN_ENGINE_VERSION = 0xFE;
@@ -460,6 +461,7 @@ void Evaluation::clearEvals()
 	best_time = 0;
 	progress_time = 0;
 	t_progress = 0;
+	d_progress = 1;
 	best_score = MoveEvaluation::NULL_SCORE;
 	abs_score = MoveEvaluation::NULL_SCORE;
 	is_score_ok = true;
@@ -1440,8 +1442,10 @@ void Evaluation::processEngineOutput(const MoveEvaluation& eval, const QString& 
 		if (is_good_update)
 		{
 			best_time = curr_time;
-			if (best_score != NULL_SCORE && (abs(best_score - curr_score) >= 100 || (curr_score > ABOVE_EG && best_score != curr_score)))
+			if (best_score != NULL_SCORE && (abs(best_score - curr_score) >= 100 || (curr_score > ABOVE_EG && best_score != curr_score))) {
 				t_progress = best_time;
+				d_progress = depth;
+			}
 			best_move = str_move;
 			best_score = curr_score;
 			abs_score = is_endgame ? abs(best_score) : best_score;
@@ -1488,7 +1492,7 @@ void Evaluation::processEngineOutput(const MoveEvaluation& eval, const QString& 
 			good_moves.insert(str_move);
 	}
 	/// Check the results
-	bool no_progress = (best_time - t_progress > NO_PROGRESS_TIME || best_time == 0 || (solver && s && best_score >= s->multiPV_stop_score));
+	bool no_progress = (best_time - t_progress > NO_PROGRESS_TIME || depth - d_progress > NO_PROGRESS_DEPTH);
 	if (best_move.isEmpty())
 		emit Message(tr("!!NONE MOVE in %1").arg(get_move_stack(board_, false, 400)), MessageType::warning);
 	if (session.is_auto && pv == 1 && is_only_move && solver
@@ -1551,22 +1555,31 @@ void Evaluation::checkProgress(quint64 nodes, bool no_progress, int depth)
 			{
 				ti -= s.add_engine_time;
 			}
-			if (!is_score_ok)
+			if (is_score_ok)
 			{
-				if (best_time - t_progress > s.std_engine_time && best_score < 32767 - 28)
+				ui->label_CurrentStatusInfo->setText("");
+				ui->label_CurrentStatusInfo->setVisible(false);
+			}
+			else
+			{
+				bool was_score_ok = (!solver || !s.dont_lose_winning_sequence || move_score == NULL_SCORE
+								     || abs(move_score) <= WIN_THRESHOLD || abs_score > abs(move_score));
+				QString info_target = was_score_ok ? QString("-->%1").arg(score_to_text(abs_score))
+				                                   : QString("%1-->%2").arg(score_to_text(abs_score)).arg(score_to_text(abs(move_score) + 1));
+				if (best_time - t_progress > s.std_engine_time && best_score < MATE_VALUE - 28)
 				{
 					if (progress_time < s.add_engine_time) {
 						ti -= s.add_engine_time;
-						reportStatusInfo('_');
+						reportStatusInfo("Restoring short win", info_target);
 					}
 					else {
-						reportStatusInfo('-');
+						reportStatusInfo("Final attempt to restore", info_target);
 					}
 				}
 				else
 				{
 					ti -= s.add_engine_time_to_ensure_winning_sequence;
-					reportStatusInfo('.');
+					reportStatusInfo("Restoring complex win", info_target);
 				}
 			}
 		}
@@ -1640,15 +1653,17 @@ void Evaluation::updateProgress(int val)
 		timer_eval.start(eval_data.interval());
 }
 
-void Evaluation::reportStatusInfo(char ch)
+void Evaluation::reportStatusInfo(const QString& info_status, const QString& info_target)
 {
-	static const QString logn_eval = "Restoring win";
+	QString logn_eval = QString("%1 %2").arg(info_status).arg(info_target);
 	ui->label_CurrentStatusInfo->setVisible(true);
+	if (!ui->label_CurrentStatusInfo->text().startsWith(info_status))
+		ui->label_CurrentStatusInfo->setText(logn_eval);
 	int len = ui->label_CurrentStatusInfo->text().length();
 	if (len < logn_eval.length() || len >= logn_eval.length() + 20)
-		ui->label_CurrentStatusInfo->setText(logn_eval + ch);
+		ui->label_CurrentStatusInfo->setText(logn_eval + ".");
 	else
-		ui->label_CurrentStatusInfo->setText(ui->label_CurrentStatusInfo->text() + ch);
+		ui->label_CurrentStatusInfo->setText(ui->label_CurrentStatusInfo->text() + ".");
 }
 
 void Evaluation::onEngineStopped()
@@ -1688,6 +1703,7 @@ void Evaluation::onEngineFinished()
 		}
 	}
 	updateStartStop();
+	ui->label_CurrentStatusInfo->setText("");
 	ui->label_CurrentStatusInfo->setVisible(false);
 }
 

@@ -98,7 +98,7 @@ public:
 	std::shared_ptr<SolutionData> mainData() const;
 
 	void initFilenames();
-	void loadBook();
+	void loadBook(bool ignore_lower_level = false);
 	void updateInfo();
 	void activate(bool send_msg = true);
 	void deactivate(bool send_msg = true);

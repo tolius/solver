@@ -109,6 +109,11 @@ struct LIB_EXPORT Transposition
 	qint16 score;
 };
 
+struct LIB_EXPORT MoveInfo
+{
+	QString san;
+	QString info;
+};
 
 
 class LIB_EXPORT Solver : public QObject
@@ -147,6 +152,7 @@ public:
 	bool isSolving() const;
 	bool isBusy() const;
 	std::list<MoveEntry> entries(Chess::Board* board) const;
+	std::vector<MoveInfo> moveList(Chess::Board* board) const;
 
 	void start(Chess::Board* new_pos, std::function<void(QString)> message, SolverMode mode);
 	void stop();

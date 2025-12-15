@@ -1,0 +1,29 @@
+#include <windows.h>
+
+IDI_ICON1               ICON    DISCARDABLE     "cutechess_win.ico"
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION     @SOLVER_VERSION_VER@
+PRODUCTVERSION  @CUTECHESS_VERSION_VER@
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904E4"
+        BEGIN
+            VALUE "FileDescription",    "Solver Antichess"
+            VALUE "FileVersion",        "@SOLVER_VERSION@\0"
+            VALUE "InternalName",       "solver"
+            VALUE "LegalCopyright",     "Copyright (c) tolius, 2024-2025"
+            VALUE "LegalTrademarks1",   "All Rights Reserved"
+            VALUE "LegalTrademarks2",   "All Rights Reserved"
+            VALUE "OriginalFilename",   "solver.exe"
+            VALUE "ProductName",        "solver.exe v@SOLVER_VERSION@ antichess"
+            VALUE "ProductVersion",     "cutechess v@CUTECHESS_VERSION@\0"
+        END
+    END
+
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1252
+    END
+END

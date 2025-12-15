@@ -383,11 +383,8 @@ void Solver::start(pBoard start_pos, std::function<void(QString)> message, Solve
 			}
 			board->undoMove();
 			t = last_parent;
-			t->clearData(false);
 		}
-		else {
-			t->clearData(true);
-		}
+		t->clearData(true);
 		tree_to_solve.push_back(t);
 		process_move(tree_to_solve, tree_state);
 	}
@@ -456,6 +453,8 @@ void Solver::start(pBoard start_pos, std::function<void(QString)> message, Solve
 			"and only then continue at the lower level.");
 		return;
 	}
+	if (is_created)
+		sol->loadBook(true);
 	start(start_pos, message, mode, false);
 }
 
@@ -1790,6 +1789,7 @@ std::list<MoveEntry> Solver::entries(Chess::Board* pos) const
 	transform(esol_entries.begin(), esol_entries.end(), std::inserter(esol, esol.end()),
 	          [](const SolutionEntry& s) { return make_pair(s.pgMove, s); });
 
+	bool is_all_solved = true;
 	for (auto& m : t->moves)
 	{
 		auto move = m->move(temp_board);
@@ -1809,6 +1809,7 @@ std::list<MoveEntry> Solver::entries(Chess::Board* pos) const
 			continue;
 		}
 		entries.back().info = "~"; // if not overridden
+		is_all_solved = false;
 
 		// Find transpositions
 		if (skip_transp)
@@ -1848,7 +1849,7 @@ std::list<MoveEntry> Solver::entries(Chess::Board* pos) const
 			entries.back().info = QString("~->%1 %2").arg(san_i).arg(entries.back().getScore(true));
 		}
 	}
-	if (legal_moves) {
+	if (legal_moves && !legal_moves->empty()) {
 		auto it_start = entries.cbegin();
 		for (auto& m : *legal_moves) {
 			auto pgMove = OpeningBook::moveToBits(temp_board->genericMove(m));
@@ -1860,7 +1861,78 @@ std::list<MoveEntry> Solver::entries(Chess::Board* pos) const
 				esol.erase(it_esol);
 		}
 	}
+	else if (is_all_solved) {
+		bool our_turn = board->sideToMove() == sol->winSide();
+		if (our_turn)
+			entries.sort(SolutionEntry::compare);
+		else
+			entries.sort(std::not_fn(SolutionEntry::compare));
+	}
 	return entries;
+}
+
+std::vector<MoveInfo> Solver::moveList(Chess::Board* pos) const
+{
+	vector<MoveInfo> moves;
+	if (!pos)
+		return moves;
+	if (tree.empty() || tree.front()->moves.empty())
+		return moves;
+	if (!is_branch(pos, sol->opening, Line()))
+		return moves;
+
+	lock_guard<mutex> lock(pos->update_mutex);
+	auto& history = pos->MoveHistory();
+	moves.resize(history.size());
+	using namespace Chess;
+	shared_ptr<Board> temp_board(BoardFactory::create("antichess"));
+	temp_board->setFenString(temp_board->defaultFenString());
+	int i = 0;
+	for (const auto& move : sol->opening) {
+		moves[i++].san = temp_board->moveString(move, Chess::Board::StandardAlgebraic);
+		temp_board->makeMove(move);
+	}
+	pMove t = tree.front();
+	for (i = sol->opening.size(); i < moves.size(); i++)
+	{
+		bool is_found = false;
+		for (auto& m : t->moves)
+		{
+			if (temp_board->genericMove(history[i].move) == m->move())
+			{
+				moves[i].san = m->san(temp_board);
+				temp_board->makeMove(history[i].move);
+				if (m->is_solved()) {
+					if (to_copy_solution && m->weight == ESOLUTION_VALUE)
+						moves[i].info = "sol";
+					else if (m->size)
+						moves[i].info = QString("%1 S=%2").arg(m->getScore(true)).arg(nodes_with_suffix(m->size, false, 1));
+				}
+				else {
+					moves[i].info = QString("~%1 S=%2").arg(m->getScore(true)).arg(nodes_with_suffix(m->size, false, 1));
+				}
+				t = m;
+				is_found = true;
+				break;
+			}
+		}
+		if (!is_found)
+			break;
+	}
+	for (; i < moves.size(); i++) {
+		moves[i].san = temp_board->moveString(history[i].move, Chess::Board::StandardAlgebraic);
+		temp_board->makeMove(history[i].move);
+	}
+
+	int max_len = 0;
+	for (auto& m : moves)
+		if (m.info.length() > max_len)
+			max_len = m.info.length();
+	if (max_len < 8)
+		max_len++;
+	for (auto& m : moves)
+		m.info += QString(" ").repeated(max_len - m.info.length());
+	return moves;
 }
 
 std::chrono::seconds Solver::log_update_time() const

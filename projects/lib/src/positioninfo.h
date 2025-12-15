@@ -197,6 +197,7 @@ bool is_endgame_available(std::shared_ptr<const Position> pos);
 bool is_branch(std::shared_ptr<Chess::Board> main_pos, std::shared_ptr<Chess::Board> branch);
 bool is_branch(Chess::Board* main_pos, Chess::Board* branch);
 bool is_branch(Chess::Board* pos, const Line& opening, const Line& branch);
+QString nodes_with_suffix(quint32 num, bool html, quint32 start_num = 2);
 QString Watkins_nodes(const SolutionEntry& entry);
 
 uint64_t load_bigendian(const void* bytes);

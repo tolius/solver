@@ -17,11 +17,11 @@
 */
 
 #include "movelist.h"
+#include "solver.h"
 #include "ui_movelistwidget.h"
-#include "flowlayout/flowlayout.h"
 #include "chessgame.h"
-#include "humanplayer.h"
 #include "board/board.h"
+#include "board/genericmove.h"
 
 #include <QVBoxLayout>
 #include <QHBoxLayout>
@@ -31,6 +31,8 @@
 #include <QKeyEvent>
 #include <QAction>
 #include <QMenu>
+
+#include <cassert>
 
 
 MoveList::MoveList(QWidget* parent)
@@ -63,11 +65,6 @@ MoveList::MoveList(QWidget* parent)
 
 	connect(ui->m_moveList, SIGNAL(anchorClicked(const QUrl&)), this, SLOT(onLinkClicked(const QUrl&)));
 
-
-	m_flowLayout = new FlowLayout;
-	ui->widget_Moves->setLayout(m_flowLayout);
-	m_flowLayout->setSpacing(0);
-
 	connect(ui->btn_CopyFen, &QPushButton::clicked, this, [&]() {emit copyFenClicked(); });
 	connect(ui->btn_CopyPgn, &QPushButton::clicked, this, [&]() { emit copyPgnClicked(); });
 	connect(ui->btn_CopyZS, &QPushButton::clicked, this, [&]() { emit copyZSClicked(); });
@@ -77,7 +74,6 @@ MoveList::MoveList(QWidget* parent)
 	connect(m_selectionTimer, SIGNAL(timeout()), this, SLOT(selectChosenMove()));
 
 	ui->m_moveList->document()->setIndentWidth(18);
-	ui->splitter->setSizes({0, 100});
 
 	QTextCharFormat format(ui->m_moveList->currentCharFormat());
 	m_defaultTextFormat.setForeground(format.foreground());
@@ -106,12 +102,6 @@ MoveList::MoveList(QWidget* parent)
 	connect(ui->m_moveList, SIGNAL(customContextMenuRequested(const QPoint&)), this, SLOT(onContextMenuRequest()));
 
 	ui->m_moveList->installEventFilter(this);
-
-	connect(ui->btn_GoStart, &QPushButton::clicked, this, [&]() { emit gotoFirstMoveClicked(); });
-	connect(ui->btn_GoBack1, &QPushButton::clicked, this, [&]() { emit gotoPreviousMoveClicked(1); });
-	connect(ui->btn_GoBack2, &QPushButton::clicked, this, [&]() { emit gotoPreviousMoveClicked(2); });
-	connect(ui->btn_GoNext, &QPushButton::clicked, this, [&]() { emit gotoNextMoveClicked(); });
-	connect(ui->btn_GoCurrent, &QPushButton::clicked, this, [&]() { emit gotoCurrentMoveClicked(); });
 }
 
 void MoveList::insertMove(int ply,
@@ -176,6 +166,11 @@ void MoveList::setGame(ChessGame* game, PgnGame* pgn)
 	}
 }
 
+void MoveList::setSolver(std::shared_ptr<Solver> solver)
+{
+	m_solver = solver;
+}
+
 void MoveList::resetMovesToPgn()
 {
 	ui->m_moveList->clear();
@@ -195,13 +190,11 @@ void MoveList::resetMovesToPgn()
 		insertMove(m_moveCount++, md.moveString, md.comment, cursor);
 	}
 	cursor.endEditBlock();
-	updateButtons();
 
 	QScrollBar* sb = ui->m_moveList->verticalScrollBar();
 	sb->setValue(sb->maximum());
 
 	selectMove(m_moveCount - 1);
-	regenerateMoveButtons();
 }
 
 void MoveList::regenerateMoves()
@@ -221,42 +214,26 @@ void MoveList::regenerateMoves()
 	m_selectedMove = -1;
 }
 
-void MoveList::regenerateMoveButtons()
+bool MoveList::commentMoves()
 {
-	// Update move buttons
-	while (QLayoutItem* item = m_flowLayout->takeAt(0))
+	if (!m_solver || !m_game || !m_game->board())
+		return false;
+	auto solver_moves = m_solver->moveList(m_game->board());
+	if (solver_moves.empty()) // solver is not initialized
+		return false;
+	m_moves.clear();
+	ui->m_moveList->clear();
+	QTextCursor cursor(ui->m_moveList->textCursor());
+	cursor.beginEditBlock();
+	cursor.movePosition(QTextCursor::End);
+	m_moveCount = 0;
+	for (auto& m : solver_moves)
 	{
-		delete item->widget();
-		delete item;
+		insertMove(m_moveCount++, m.san, m.info, cursor);
 	}
-	auto legal_moves = m_game->board()->legalMoves();
-	QVector<QToolButton*> buttons;
-	for (auto& m : legal_moves)
-	{
-		QString san = m_game->board()->moveString(m, Chess::Board::StandardAlgebraic);
-		auto btn = new QToolButton;
-		btn->setText(san);
-		m_flowLayout->addWidget(btn);
-		buttons.append(btn);
-	}
-	for (int i = 0; i < buttons.size(); i++)
-	{
-		auto side = m_game->board()->sideToMove();
-		ChessPlayer* player(m_game->player(side));
-		if (player->isHuman())
-		{
-			Chess::GenericMove generic_move = m_game->board()->genericMove(legal_moves[i]);
-			connect(buttons[i], &QToolButton::clicked, player, 
-				[=]() {
-					std::lock_guard<std::mutex> lock(m_game->board()->update_mutex);
-					for (auto& btn : buttons)
-						disconnect(btn, nullptr, player, nullptr);
-					((HumanPlayer*)player)->onHumanMove(generic_move, side);
-				}
-			);
-		}
-	}
-	ui->widget_Moves->adjustSize();
+	cursor.endEditBlock();
+	m_selectedMove = -1;
+	return true;
 }
 
 bool MoveList::eventFilter(QObject* obj, QEvent* event)
@@ -298,8 +275,9 @@ void MoveList::onMoveMade(const Chess::GenericMove& move,
 	QScrollBar* sb = ui->m_moveList->verticalScrollBar();
 	bool atEnd = sb->value() == sb->maximum();
 
-	insertMove(m_moveCount++, sanString, comment);
-	updateButtons();
+	bool is_ok = commentMoves();
+	if (!is_ok)
+		insertMove(m_moveCount++, sanString, comment);
 
 	bool atLastMove = false;
 	if (m_selectedMove == -1 || m_moveToBeSelected == m_moveCount - 2)
@@ -319,6 +297,17 @@ void MoveList::setPosition()
 	resetMovesToPgn();
 }
 
+void MoveList::addComment(int ply, const QString& comment)
+{
+	if (ply >= m_moves.size())
+		return;
+	MoveCommentToken& commentToken = m_moves[ply].comment;
+	if (!commentToken.toString().trimmed().isEmpty())
+		return; // it's already set by solver
+
+	setMove(ply, Chess::GenericMove(), QString(), comment);
+}
+
 // TODO: Handle changes to actual moves (eg. undo), not just comments
 void MoveList::setMove(int ply,
 		       const Chess::GenericMove& move,
@@ -327,17 +316,15 @@ void MoveList::setMove(int ply,
 {
 	Q_UNUSED(move);
 	Q_UNUSED(sanString);
-	//if (ply >= m_moves.size())
-	//	return;
 	Q_ASSERT(ply < m_moves.size());
-
-	QTextCursor c(ui->m_moveList->textCursor());
+	if (ply >= m_moves.size())
+		return;
 
 	MoveCommentToken& commentToken = m_moves[ply].comment;
 	int oldLength = commentToken.length();
-
 	QString str_comment = comment.length() >= 6 ? comment : comment + QString(" ").repeated(6 - comment.length());
 	commentToken.setValue(str_comment);
+	QTextCursor c(ui->m_moveList->textCursor());
 	commentToken.select(c);
 	commentToken.insert(c);
 
@@ -390,9 +377,6 @@ void MoveList::selectChosenMove()
 
 	c.endEditBlock();
 	ui->m_moveList->setTextCursor(c);
-
-	//!! workaround
-	regenerateMoveButtons();
 }
 
 bool MoveList::selectMove(int moveNum)
@@ -405,13 +389,9 @@ bool MoveList::selectMove(int moveNum)
 			m_moveCount--;
 		}
 		regenerateMoves();
-		updateButtons();
 	}
 	if (moveNum == -1)
-	{
 		moveNum = 0;
-		regenerateMoveButtons();
-	}
 	if (moveNum >= m_moveCount || m_moveCount <= 0)
 		return false;
 	if (moveNum == m_selectedMove)
@@ -420,15 +400,6 @@ bool MoveList::selectMove(int moveNum)
 	m_moveToBeSelected = moveNum;
 	m_selectionTimer->start();
 	return true;
-}
-
-void MoveList::updateButtons()
-{
-	ui->btn_GoStart->setEnabled(m_moveCount);
-	ui->btn_GoBack1->setEnabled(m_moveCount);
-	ui->btn_GoBack2->setEnabled(m_moveCount);
-	ui->btn_GoNext->setEnabled(m_moveCount);
-	ui->btn_GoCurrent->setEnabled(m_moveCount);
 }
 
 void MoveList::onLinkClicked(const QUrl& url)
@@ -468,60 +439,4 @@ void MoveList::onContextMenuRequest()
 	menu->addActions(ui->m_moveList->actions());
 	menu->exec(QCursor::pos());
 	delete menu;
-}
-
-void MoveList::setTint(QColor tint)
-{
-	ui->widget_Moves->setStyleSheet("");
-	if (!tint.isValid() || tint == QColor(0, 0, 0, 0))
-		return;
-
-	auto bkg_color_style = [](QColor& bkg, const QColor& tint)
-	{
-		bkg.setRed(bkg.red() + tint.red());
-		bkg.setGreen(bkg.green() + tint.green());
-		bkg.setBlue(bkg.blue() + tint.blue());
-		return QString("background-color: rgba(%1, %2, %3, %4);").arg(bkg.red()).arg(bkg.green()).arg(bkg.blue()).arg(bkg.alpha());
-	};
-
-	QColor bkg = palette().color(QWidget::backgroundRole());
-	QString style = bkg_color_style(bkg, tint);
-	ui->widget_Moves->setStyleSheet(style);
-}
-
-void MoveList::goodMovesReported(const std::set<QString>& good_moves)
-{
-	for (int i = 0; i < m_flowLayout->count(); i++)
-	{
-		auto widget = m_flowLayout->itemAt(i)->widget();
-		if (widget)
-		{
-			auto btn = dynamic_cast<QToolButton*>(widget);
-			if (btn && good_moves.find(btn->text()) == good_moves.end())
-			{
-				btn->setDisabled(true);
-				btn->setCheckable(true);
-				btn->setChecked(true); //?? workaround
-			}
-		}
-	}
-}
-
-void MoveList::badMoveReported(const QString& bad_move)
-{
-	for (int i = 0; i < m_flowLayout->count(); i++)
-	{
-		auto widget = m_flowLayout->itemAt(i)->widget();
-		if (widget)
-		{
-			auto btn = dynamic_cast<QToolButton*>(widget);
-			if (btn && btn->text() == bad_move)
-			{
-				btn->setDisabled(true);
-				btn->setCheckable(true);
-				btn->setChecked(true); //?? workaround
-				return;
-			}
-		}
-	}
 }
